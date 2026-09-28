@@ -1,0 +1,223 @@
+ .tw-main { display: flex; flex-direction: column; height: 100%; }
+
+.tw-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 16px;
+}
+.tw-back {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background 0.12s ease;
+}
+.tw-back:hover { background: #e2e8f0; }
+.tw-header-info { flex: 1; min-width: 0; }
+.tw-header-id { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #94a3b8; }
+.tw-header-subject { font-size: 15.5px; font-weight: 700; color: #0f172a; margin-top: 1px; }
+
+/* â”€â”€ Two-column body: chat + client profile â”€â”€ */
+.tw-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 20px;
+}
+
+/* â”€â”€ Chat column â”€â”€ */
+.tw-chat-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.tw-chat {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 2px 2px 16px;
+}
+
+.tw-bubble-row { display: flex; gap: 9px; align-items: flex-end; }
+.tw-bubble-row.agent { flex-direction: row-reverse; }
+
+.tw-msg-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  flex: 0 0 auto;
+  color: #fff;
+}
+.tw-bubble-row.client .tw-msg-avatar { background: #64748b; }
+.tw-bubble-row.agent .tw-msg-avatar  { background: #4f46e5; }
+
+.tw-bubble-col { display: flex; flex-direction: column; max-width: 62%; }
+.tw-bubble-row.agent .tw-bubble-col { align-items: flex-end; }
+
+.tw-bubble {
+  padding: 9px 13px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.tw-bubble-row.client .tw-bubble {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-bottom-left-radius: 3px;
+}
+.tw-bubble-row.agent .tw-bubble {
+  background: #4f46e5;
+  color: #ffffff;
+  border-bottom-right-radius: 3px;
+}
+.tw-bubble-meta {
+  font-size: 10.5px;
+  margin-top: 4px;
+  color: #94a3b8;
+  padding: 0 2px;
+}
+
+.tw-composer {
+  display: flex;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+}
+.tw-composer input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  background: #f1f5f9;
+  outline: none;
+  font-size: 13.5px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.tw-composer input:focus { border-color: #4f46e5; background: #ffffff; }
+.tw-composer button {
+  padding: 0 20px;
+  background: #4f46e5;
+  color: #fff;
+  border: 0;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.tw-composer button:hover { background: #4338ca; }
+.tw-composer button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* â”€â”€ Client profile column â”€â”€ */
+.tw-client-panel {
+  width: 240px;
+  flex: 0 0 auto;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  height: fit-content;
+}
+
+.tw-client-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4f46e5, #4338ca);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.tw-client-name { font-size: 14.5px; font-weight: 700; color: #0f172a; }
+.tw-client-tag {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #4338ca;
+  background: #eef2ff;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+.tw-client-divider {
+  width: 100%;
+  height: 1px;
+  background: #f1f5f9;
+  margin: 16px 0;
+}
+
+.tw-client-field {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+.tw-client-field:last-child { margin-bottom: 0; }
+.tw-client-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.tw-client-value {
+  font-size: 13px;
+  color: #0f172a;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+/* â”€â”€ Empty state (no ticket selected) â”€â”€ */
+.tw-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: #94a3b8;
+  font-size: 13.5px;
+}
+.tw-empty button {
+  padding: 8px 18px;
+  background: #4f46e5;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
