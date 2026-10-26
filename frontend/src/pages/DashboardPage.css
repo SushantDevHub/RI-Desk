@@ -102,8 +102,8 @@
 .db-sidebar {
   width: 202px;
   flex: 0 0 auto;
-  background: #0f172a;
-  border-right: 1px solid #1e293b;
+  background:  #4338ca;
+  border-right: 1px solid #475e86;
   padding: 14px 10px;
   display: flex;
   flex-direction: column;
