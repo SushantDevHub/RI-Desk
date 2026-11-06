@@ -368,8 +368,8 @@ function calculateResolutionTime(createdAt, resolvedAt) {
 
 // --------------------------------------------------
 // PATCH /api/tickets/:id
-// Update ticket status or priority
-// (Admins can update any ticket; Employees can update status of their assigned tickets)
+// Update ticket status, priority, or category
+// (Admins and employees)
 // --------------------------------------------------
 
 router.patch('/:id', authenticate, (req, res) => {
@@ -385,22 +385,23 @@ router.patch('/:id', authenticate, (req, res) => {
       });
     }
 
-    if (req.user?.role !== 'admin') {
-      const isAssigned =
-        String(existing.assignedToId) === String(req.user.id) ||
-        (existing.assignedTo &&
-          req.user.name &&
-          existing.assignedTo.toLowerCase() === req.user.name.toLowerCase());
+    const { status, priority, category } = req.body;
+    const updates = {};
 
-      if (!isAssigned) {
-        return res.status(403).json({
-          error: 'You can only update tickets assigned to you.',
+    if (category !== undefined) {
+      const cleanedCategory = String(category || '').trim();
+      if (!cleanedCategory) {
+        return res.status(400).json({
+          error: 'Category is required.',
         });
       }
+      if (cleanedCategory.length > 75) {
+        return res.status(400).json({
+          error: 'Category cannot exceed 75 characters.',
+        });
+      }
+      updates.category = cleanedCategory;
     }
-
-    const { status, priority } = req.body;
-    const updates = {};
 
     if (status !== undefined) {
       if (!['open', 'in-progress', 'resolved'].includes(status)) {
@@ -429,12 +430,6 @@ router.patch('/:id', authenticate, (req, res) => {
     }
 
     if (priority !== undefined) {
-      if (req.user?.role !== 'admin') {
-        return res.status(403).json({
-          error: 'Only admins can change priority.',
-        });
-      }
-
       if (!['low', 'medium', 'high'].includes(priority)) {
         return res.status(400).json({
           error: 'Invalid priority.',
@@ -446,7 +441,7 @@ router.patch('/:id', authenticate, (req, res) => {
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({
-        error: 'Provide a status or priority to update.',
+        error: 'Provide a status, priority, or category to update.',
       });
     }
 

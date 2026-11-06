@@ -2626,6 +2626,55 @@ background: linear-gradient(#312b9b, #4f46e5);}
   white-space: nowrap;
 }
 
+/* ─────────────────────────────────────────────
+   Ticket Dates (Created at / Solved at stacked)
+───────────────────────────────────────────── */
+.ticket-dates-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+  white-space: nowrap;
+}
+
+.ticket-date-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.ticket-date-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.ticket-date-val {
+  color: #1e293b;
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.ticket-date-row.solved.is-resolved .ticket-date-label {
+  color: #059669;
+}
+
+.ticket-date-row.solved.is-resolved .ticket-date-val {
+  color: #059669;
+  font-weight: 600;
+}
+
+.ticket-date-row.solved.is-pending .ticket-date-label {
+  color: #94a3b8;
+}
+
+.ticket-date-row.solved.is-pending .ticket-date-val {
+  color: #94a3b8;
+}
+
 .ticket-desc-button {
   width: 26px;
   height: 26px;
@@ -2804,6 +2853,135 @@ background: linear-gradient(#312b9b, #4f46e5);}
   text-overflow: ellipsis;
   vertical-align: middle;
   transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+/* ─────────────────────────────────────────────
+   Inline table row fields (Category, Priority, Status)
+───────────────────────────────────────────── */
+.ticket-row-cell-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  position: relative;
+  vertical-align: middle;
+}
+
+.ticket-row-badge-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 4px 22px 4px 10px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  background-size: 10px 10px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  transition: all 0.15s ease;
+  outline: none;
+  max-width: 140px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticket-row-badge-select:hover {
+  filter: brightness(0.97);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.ticket-row-badge-select:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
+}
+
+.ticket-row-badge-select option {
+  background-color: #ffffff;
+  color: #1e293b;
+  font-weight: 500;
+  padding: 6px 10px;
+}
+
+.ticket-row-edit-btn {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #64748b;
+  border-radius: 5px;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.ticket-row-edit-btn:hover {
+  color: #2563eb;
+  border-color: #93c5fd;
+  background: #eff6ff;
+  transform: translateY(-1px);
+}
+
+.ticket-inline-custom-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ticket-inline-custom-input {
+  width: 110px;
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 500;
+  padding: 3px 6px;
+  border: 1.5px solid #3b82f6;
+  border-radius: 4px;
+  outline: none;
+  color: #1e293b;
+  background: #ffffff;
+}
+
+.ticket-inline-custom-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.ticket-inline-btn {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: none;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.ticket-inline-btn.save {
+  background: #10b981;
+  color: #ffffff;
+}
+.ticket-inline-btn.save:hover {
+  background: #059669;
+}
+
+.ticket-inline-btn.cancel {
+  background: #ef4444;
+  color: #ffffff;
+}
+.ticket-inline-btn.cancel:hover {
+  background: #dc2626;
 }
 
 .ticket-customer-subtext:hover {

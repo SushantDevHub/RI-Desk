@@ -29,6 +29,12 @@ const PRIORITY_COLORS = {
   low: '#059669',
 };
 
+const PRIORITY_BACKGROUNDS = {
+  high: '#fff1f2',
+  medium: '#fffbeb',
+  low: '#ecfdf5',
+};
+
 const STATUS_COLORS = {
   open: '#2563eb',
   'in-progress': '#d97706',
@@ -827,6 +833,62 @@ export default function TicketManagementPage() {
     }
   }
 
+  /* ---------- Inline Row Updates ---------- */
+
+  async function handleInlineUpdate(ticket, field, value) {
+    if (!ticket || !field || ticket[field] === value) return;
+
+    const oldValue = ticket[field];
+    const willBeResolved = field === 'status' && value === 'resolved';
+    const nowIso = new Date().toISOString();
+    const instantResolution = willBeResolved
+      ? calculateResolutionTime(ticket.createdAt, nowIso)
+      : (field === 'status' ? null : (ticket.resolution || ticket.resolutionTime));
+
+    setTickets((prev) =>
+      prev.map((t) =>
+        t.id === ticket.id
+          ? {
+              ...t,
+              [field]: value,
+              ...(field === 'status'
+                ? {
+                    status: value,
+                    resolvedAt: willBeResolved ? nowIso : null,
+                    resolution: instantResolution,
+                    resolutionTime: instantResolution,
+                    resolvedBy: willBeResolved ? (t.assignedTo || 'Employee') : null,
+                  }
+                : {}),
+            }
+          : t
+      )
+    );
+
+    try {
+      const res = await fetch(`${API}/tickets/${encodeURIComponent(ticket.id)}`, {
+        method: 'PATCH',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ [field]: value }),
+      });
+      const data = await readResponse(res);
+      if (!res.ok) {
+        throw new Error(data.error || `Failed to update ${field}.`);
+      }
+      if (data.ticket) {
+        setTickets((prev) =>
+          prev.map((t) => (t.id === ticket.id ? { ...t, ...data.ticket } : t))
+        );
+      }
+      setMessage(`✓ Ticket #${ticket.id} ${field} updated.`);
+    } catch (err) {
+      setTickets((prev) =>
+        prev.map((t) => (t.id === ticket.id ? { ...t, [field]: oldValue } : t))
+      );
+      setActionError(err.message || `Failed to update ${field}.`);
+    }
+  }
+
   /* ---------- Derived data ---------- */
 
   function isTicketUnassigned(ticket) {
@@ -1138,7 +1200,7 @@ export default function TicketManagementPage() {
                     <th>Status</th>
                     <th style={{ width: 140 }}>Resolution time</th>
                     <th>Assigned To</th>
-                    <th>Created at</th>
+                    <th>Created at / Solved at</th>
                     <th className="ticket-actions-header">Actions</th>
                   </tr>
                 </thead>
@@ -1233,50 +1295,87 @@ export default function TicketManagementPage() {
 
                         {/* 3. Category */}
                         <td>
-                          <div className="ticket-category-cell">
-                            <span
-                              className="ticket-category"
+                          <div className="ticket-row-cell-wrap">
+                            <select
+                              className="ticket-row-badge-select"
                               style={{
                                 color: getCategoryColor(ticket.category),
-                                background: getCategoryBg(ticket.category),
+                                backgroundColor: getCategoryBg(ticket.category),
+                                borderColor: `${getCategoryColor(ticket.category)}40`,
                               }}
+                              value={
+                                ['recharge', 'payment', 'wallet', 'technical'].includes(
+                                  String(ticket.category || '').toLowerCase()
+                                )
+                                  ? String(ticket.category).toLowerCase()
+                                  : 'custom_current'
+                              }
+                              onChange={(e) =>
+                                handleInlineUpdate(ticket, 'category', e.target.value)
+                              }
+                              title="Select category"
                             >
-                              {capitalize(ticket.category)}
-                            </span>
+                              <option value="recharge">Recharge</option>
+                              <option value="payment">Payment</option>
+                              <option value="wallet">Wallet</option>
+                              <option value="technical">Technical</option>
+                              {!['recharge', 'payment', 'wallet', 'technical'].includes(
+                                String(ticket.category || '').toLowerCase()
+                              ) && (
+                                <option value="custom_current">
+                                  {capitalize(ticket.category || 'Custom')}
+                                </option>
+                              )}
+                            </select>
                           </div>
                         </td>
 
                         {/* 4. Priority */}
                         <td>
-                          <span
-                            className="ticket-priority"
-                            style={{
-                              color: PRIORITY_COLORS[ticket.priority] || '#64748b',
-                            }}
-                          >
-                            <span
-                              className="ticket-status-dot"
+                          <div className="ticket-row-cell-wrap">
+                            <select
+                              className="ticket-row-badge-select"
                               style={{
-                                background:
-                                  PRIORITY_COLORS[ticket.priority] || '#64748b',
+                                color: PRIORITY_COLORS[ticket.priority] || '#64748b',
+                                backgroundColor:
+                                  PRIORITY_BACKGROUNDS[ticket.priority] || '#f8fafc',
+                                borderColor: `${PRIORITY_COLORS[ticket.priority] || '#cbd5e1'}40`,
                               }}
-                            />
-                            {capitalize(ticket.priority)}
-                          </span>
+                              value={ticket.priority || 'medium'}
+                              onChange={(e) =>
+                                handleInlineUpdate(ticket, 'priority', e.target.value)
+                              }
+                              title="Select priority"
+                            >
+                              <option value="low">● Low</option>
+                              <option value="medium">● Medium</option>
+                              <option value="high">● High</option>
+                            </select>
+                          </div>
                         </td>
 
                         {/* 5. Status */}
                         <td>
-                          <span
-                            className="ticket-status"
-                            style={{
-                              color: STATUS_COLORS[ticket.status] || '#64748b',
-                              background:
-                                STATUS_BACKGROUNDS[ticket.status] || '#eff6ff',
-                            }}
-                          >
-                            {formatStatus(ticket.status)}
-                          </span>
+                          <div className="ticket-row-cell-wrap">
+                            <select
+                              className="ticket-row-badge-select"
+                              style={{
+                                color: STATUS_COLORS[ticket.status] || '#64748b',
+                                backgroundColor:
+                                  STATUS_BACKGROUNDS[ticket.status] || '#eff6ff',
+                                borderColor: `${STATUS_COLORS[ticket.status] || '#cbd5e1'}40`,
+                              }}
+                              value={ticket.status || 'open'}
+                              onChange={(e) =>
+                                handleInlineUpdate(ticket, 'status', e.target.value)
+                              }
+                              title="Select status"
+                            >
+                              <option value="open">Open</option>
+                              <option value="in-progress">In Progress</option>
+                              <option value="resolved">Resolved</option>
+                            </select>
+                          </div>
                         </td>
 
                         {/* 6. Resolution time */}
@@ -1321,11 +1420,36 @@ export default function TicketManagementPage() {
                         {/* 7. Assigned To */}
                         <td>{getAssignedName(ticket)}</td>
 
-                        {/* 8. Created at */}
+                        {/* 8. Created at / Solved at */}
                         <td>
-                          <span className="ticket-created-at">
-                            {formatDate(ticket.createdAt)}
-                          </span>
+                          <div className="ticket-dates-wrap">
+                            <div
+                              className="ticket-date-row created"
+                              title={`Created: ${formatDate(ticket.createdAt)}`}
+                            >
+                              <span className="ticket-date-label">Created:</span>
+                              <span className="ticket-date-val">
+                                {formatDate(ticket.createdAt)}
+                              </span>
+                            </div>
+                            <div
+                              className={`ticket-date-row solved ${
+                                ticket.resolvedAt || ticket.solvedAt ? 'is-resolved' : 'is-pending'
+                              }`}
+                              title={
+                                ticket.resolvedAt || ticket.solvedAt
+                                  ? `Solved: ${formatDate(ticket.resolvedAt || ticket.solvedAt)}`
+                                  : 'Not solved yet'
+                              }
+                            >
+                              <span className="ticket-date-label">Solved:</span>
+                              <span className="ticket-date-val">
+                                {ticket.resolvedAt || ticket.solvedAt
+                                  ? formatDate(ticket.resolvedAt || ticket.solvedAt)
+                                  : '—'}
+                              </span>
+                            </div>
+                          </div>
                         </td>
 
                         {/* 9. Actions */}
