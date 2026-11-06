@@ -1126,12 +1126,12 @@ export default function DashboardPage({
                         <thead>
                           <tr>
                             <th>Ticket ID</th>
+                            <th>Customer</th>
                             <th>Category</th>
                             <th>Priority</th>
                             <th>Status</th>
                             <th style={{ width: 140 }}>Resolution time</th>
                             <th>Assigned To</th>
-                            <th>Customer</th>
                             <th>Created at</th>
                           </tr>
                         </thead>
@@ -1150,12 +1150,76 @@ export default function DashboardPage({
                                 >
                                   <td className="db-mono">
                                     <div className="ticket-id-cell">
-                                      <span className="ticket-id-text">{ticket.id}</span>
+                                      <button
+                                        type="button"
+                                        className="ticket-id-link"
+                                        title={`View details for ticket ${ticket.id}`}
+                                        aria-label={`View details for ticket ${ticket.id}`}
+                                        onClick={() => setViewingTicket(ticket)}
+                                      >
+                                        {ticket.id}
+                                      </button>
                                       {isNew && (
                                         <span className="ticket-new-badge" title="Created recently">
                                           NEW
                                         </span>
                                       )}
+                                    </div>
+                                  </td>
+
+                                  <td>
+                                    <div className="ticket-customer-cell">
+                                      <div
+                                        className="ticket-customer-avatar"
+                                        title={ticket.customer || ticket.createdBy || 'Customer'}
+                                      >
+                                        <svg
+                                          width="14"
+                                          height="14"
+                                          viewBox="0 0 24 24"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          strokeWidth="2.2"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        >
+                                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                          <circle cx="12" cy="7" r="4" />
+                                        </svg>
+                                      </div>
+                                      <div className="ticket-customer-info">
+                                        <span className="ticket-customer-name">
+                                          {ticket.customer || ticket.createdBy || '—'}
+                                        </span>
+                                        {ticket.customerMobile && (
+                                          <button
+                                            type="button"
+                                            className="ticket-customer-phone"
+                                            title={`Contact ${ticket.customer || 'customer'} (${ticket.customerMobile})`}
+                                            aria-label={`Contact ${ticket.customer || 'customer'} at ${ticket.customerMobile}`}
+                                            onClick={() =>
+                                              setContactDialog({
+                                                name: ticket.customer || ticket.createdBy || 'Customer',
+                                                phone: ticket.customerMobile,
+                                              })
+                                            }
+                                          >
+                                            <svg
+                                              width="11"
+                                              height="11"
+                                              viewBox="0 0 24 24"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              strokeWidth="2.4"
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                            >
+                                              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                                            </svg>
+                                            <span>{ticket.customerMobile}</span>
+                                          </button>
+                                        )}
+                                      </div>
                                     </div>
                                   </td>
 
@@ -1170,30 +1234,6 @@ export default function DashboardPage({
                                       >
                                         {capitalize(ticket.category)}
                                       </span>
-                                      <button
-                                        type="button"
-                                        className="ticket-desc-button"
-                                        title="View ticket description"
-                                        aria-label={`View description for ticket ${ticket.id}`}
-                                        onClick={() => setViewingTicket(ticket)}
-                                      >
-                                        <svg
-                                          width="14"
-                                          height="14"
-                                          viewBox="0 0 24 24"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          strokeWidth="2"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                        >
-                                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                          <polyline points="14 2 14 8 20 8" />
-                                          <line x1="16" y1="13" x2="8" y2="13" />
-                                          <line x1="16" y1="17" x2="8" y2="17" />
-                                          <line x1="10" y1="9" x2="8" y2="9" />
-                                        </svg>
-                                      </button>
                                     </div>
                                   </td>
 
@@ -1273,62 +1313,6 @@ export default function DashboardPage({
 
                                   <td>
                                     {ticket.assignedTo || 'Unassigned'}
-                                  </td>
-
-                                  <td>
-                                    <div className="ticket-customer-cell">
-                                      <div
-                                        className="ticket-customer-avatar"
-                                        title={ticket.customer || ticket.createdBy || 'Customer'}
-                                      >
-                                        <svg
-                                          width="14"
-                                          height="14"
-                                          viewBox="0 0 24 24"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          strokeWidth="2.2"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                        >
-                                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                                          <circle cx="12" cy="7" r="4" />
-                                        </svg>
-                                      </div>
-                                      <div className="ticket-customer-info">
-                                        <span className="ticket-customer-name">
-                                          {ticket.customer || ticket.createdBy || '—'}
-                                        </span>
-                                        {ticket.customerMobile && (
-                                          <button
-                                            type="button"
-                                            className="ticket-customer-phone"
-                                            title={`Contact ${ticket.customer || 'customer'} (${ticket.customerMobile})`}
-                                            aria-label={`Contact ${ticket.customer || 'customer'} at ${ticket.customerMobile}`}
-                                            onClick={() =>
-                                              setContactDialog({
-                                                name: ticket.customer || ticket.createdBy || 'Customer',
-                                                phone: ticket.customerMobile,
-                                              })
-                                            }
-                                          >
-                                            <svg
-                                              width="11"
-                                              height="11"
-                                              viewBox="0 0 24 24"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              strokeWidth="2.4"
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                            >
-                                              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                                            </svg>
-                                            <span>{ticket.customerMobile}</span>
-                                          </button>
-                                        )}
-                                      </div>
-                                    </div>
                                   </td>
 
                                   <td>

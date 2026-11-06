@@ -1132,12 +1132,12 @@ export default function TicketManagementPage() {
                 <thead>
                   <tr>
                     <th>Ticket ID</th>
+                    <th>Customer</th>
                     <th>Category</th>
                     <th>Priority</th>
                     <th>Status</th>
                     <th style={{ width: 140 }}>Resolution time</th>
                     <th>Assigned To</th>
-                    <th>Customer</th>
                     <th>Created at</th>
                     <th className="ticket-actions-header">Actions</th>
                   </tr>
@@ -1157,7 +1157,15 @@ export default function TicketManagementPage() {
                         {/* 1. Ticket ID */}
                         <td className="db-mono">
                           <div className="ticket-id-cell">
-                            <span className="ticket-id-text">{ticket.id}</span>
+                            <button
+                              type="button"
+                              className="ticket-id-link"
+                              title={`View details for ticket ${ticket.id}`}
+                              aria-label={`View details for ticket ${ticket.id}`}
+                              onClick={() => setViewingTicket(ticket)}
+                            >
+                              {ticket.id}
+                            </button>
                             {isNew && (
                               <span className="ticket-new-badge" title="Created recently">
                                 NEW
@@ -1166,106 +1174,7 @@ export default function TicketManagementPage() {
                           </div>
                         </td>
 
-                        {/* 2. Category */}
-                        <td>
-                          <div className="ticket-category-cell">
-                            <span
-                              className="ticket-category"
-                              style={{
-                                color: getCategoryColor(ticket.category),
-                                background: getCategoryBg(ticket.category),
-                              }}
-                            >
-                              {capitalize(ticket.category)}
-                            </span>
-                            <button
-                              type="button"
-                              className="ticket-desc-button"
-                              title="View ticket description"
-                              aria-label={`View description for ticket ${ticket.id}`}
-                              onClick={() => setViewingTicket(ticket)}
-                            >
-                              <TicketIcon type="description" />
-                            </button>
-                          </div>
-                        </td>
-
-                        {/* 3. Priority */}
-                        <td>
-                          <span
-                            className="ticket-priority"
-                            style={{
-                              color: PRIORITY_COLORS[ticket.priority] || '#64748b',
-                            }}
-                          >
-                            <span
-                              className="ticket-status-dot"
-                              style={{
-                                background:
-                                  PRIORITY_COLORS[ticket.priority] || '#64748b',
-                              }}
-                            />
-                            {capitalize(ticket.priority)}
-                          </span>
-                        </td>
-
-                        {/* 4. Status */}
-                        <td>
-                          <span
-                            className="ticket-status"
-                            style={{
-                              color: STATUS_COLORS[ticket.status] || '#64748b',
-                              background:
-                                STATUS_BACKGROUNDS[ticket.status] || '#eff6ff',
-                            }}
-                          >
-                            {formatStatus(ticket.status)}
-                          </span>
-                        </td>
-
-                        {/* 5. Resolution time */}
-                        <td>
-                          {ticket.status === 'resolved' ? (
-                            <span
-                              className="db-resolution-badge resolved"
-                              title={
-                                ticket.resolvedAt
-                                  ? `Resolved at ${formatDate(ticket.resolvedAt)}${
-                                      ticket.resolvedBy ? ` by ${ticket.resolvedBy}` : ''
-                                    }`
-                                  : 'Resolved'
-                              }
-                            >
-                              <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <circle cx="12" cy="12" r="10" />
-                                <polyline points="12 6 12 12 16 14" />
-                              </svg>
-                              {ticket.resolution ||
-                                ticket.resolutionTime ||
-                                (ticket.resolvedAt
-                                  ? calculateResolutionTime(ticket.createdAt, ticket.resolvedAt)
-                                  : '< 1 min')}
-                            </span>
-                          ) : (
-                            <span className="db-resolution-badge pending">
-                              Pending
-                            </span>
-                          )}
-                        </td>
-
-                        {/* 6. Assigned To */}
-                        <td>{getAssignedName(ticket)}</td>
-
-                        {/* 7. Customer */}
+                        {/* 2. Customer */}
                         <td>
                           <div className="ticket-customer-cell">
                             <div
@@ -1321,6 +1230,96 @@ export default function TicketManagementPage() {
                             </div>
                           </div>
                         </td>
+
+                        {/* 3. Category */}
+                        <td>
+                          <div className="ticket-category-cell">
+                            <span
+                              className="ticket-category"
+                              style={{
+                                color: getCategoryColor(ticket.category),
+                                background: getCategoryBg(ticket.category),
+                              }}
+                            >
+                              {capitalize(ticket.category)}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* 4. Priority */}
+                        <td>
+                          <span
+                            className="ticket-priority"
+                            style={{
+                              color: PRIORITY_COLORS[ticket.priority] || '#64748b',
+                            }}
+                          >
+                            <span
+                              className="ticket-status-dot"
+                              style={{
+                                background:
+                                  PRIORITY_COLORS[ticket.priority] || '#64748b',
+                              }}
+                            />
+                            {capitalize(ticket.priority)}
+                          </span>
+                        </td>
+
+                        {/* 5. Status */}
+                        <td>
+                          <span
+                            className="ticket-status"
+                            style={{
+                              color: STATUS_COLORS[ticket.status] || '#64748b',
+                              background:
+                                STATUS_BACKGROUNDS[ticket.status] || '#eff6ff',
+                            }}
+                          >
+                            {formatStatus(ticket.status)}
+                          </span>
+                        </td>
+
+                        {/* 6. Resolution time */}
+                        <td>
+                          {ticket.status === 'resolved' ? (
+                            <span
+                              className="db-resolution-badge resolved"
+                              title={
+                                ticket.resolvedAt
+                                  ? `Resolved at ${formatDate(ticket.resolvedAt)}${
+                                      ticket.resolvedBy ? ` by ${ticket.resolvedBy}` : ''
+                                    }`
+                                  : 'Resolved'
+                              }
+                            >
+                              <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <circle cx="12" cy="12" r="10" />
+                                <polyline points="12 6 12 12 16 14" />
+                              </svg>
+                              {ticket.resolution ||
+                                ticket.resolutionTime ||
+                                (ticket.resolvedAt
+                                  ? calculateResolutionTime(ticket.createdAt, ticket.resolvedAt)
+                                  : '< 1 min')}
+                            </span>
+                          ) : (
+                            <span className="db-resolution-badge pending">
+                              Pending
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 7. Assigned To */}
+                        <td>{getAssignedName(ticket)}</td>
 
                         {/* 8. Created at */}
                         <td>

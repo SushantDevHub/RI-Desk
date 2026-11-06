@@ -1183,11 +1183,39 @@
   gap: 6px;
 }
 
+.ticket-id-link,
 .ticket-id-text {
   font-family: 'IBM Plex Mono', monospace;
   font-weight: 600;
-  color: #1e293b;
   font-size: 13px;
+}
+
+.ticket-id-text {
+  color: #1e293b;
+}
+
+.ticket-id-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: #2563eb;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  transition: color 0.15s ease, text-decoration 0.15s ease;
+}
+
+.ticket-id-link:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.ticket-id-link:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 .ticket-customer-subtext {
