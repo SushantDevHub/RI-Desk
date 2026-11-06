@@ -9,9 +9,11 @@
 
 .login-center {
   margin: auto;
-  padding: 36px 0;
+  padding: 24px 0;
   display: flex;
   justify-content: center;
+  align-items: center;
+  width: 100%;
 }
 
 .login-card {
@@ -24,6 +26,13 @@
   padding: 30px;
 }
 
+.login-alert-slot {
+  min-height: 44px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+}
+
 /* ── Brand ── */
 .login-brand {
   display: flex;
@@ -33,7 +42,17 @@
   text-align: center;
   padding: 4px 0 18px;
 }
-
+.login-brand img {
+  width: 54px;
+  height: 54px;
+  align-items: center;
+  object-fit: contain;
+  border-radius: 9px;
+  display: block;
+  margin-bottom: 7px;
+  /* fallback background if image fails */
+  background: var(--primary);
+}
 .login-brand-logo {
   width: 44px;
   height: 44px;
@@ -112,16 +131,17 @@
 
 /* ── Alert ── */
 .login-alert {
-  margin-bottom: 16px;
+  width: 100%;
   padding: 10px 12px;
   border-radius: 8px;
   font-size: 12.5px;
   display: flex;
   gap: 8px;
-  align-items: flex-start;
+  align-items: center;
+  box-sizing: border-box;
 }
-.login-alert-error   { background: var(--danger-bg);  color: var(--danger);  }
-.login-alert-success { background: var(--success-bg); color: var(--success); }
+.login-alert-error   { background: var(--danger-bg);  color: var(--danger);  border: 1px solid #fecdd3; }
+.login-alert-success { background: var(--success-bg); color: var(--success); border: 1px solid #a7f3d0; }
 
 /* ── Fields ── */
 .field { margin-bottom: 14px; }
@@ -141,6 +161,7 @@
   background: var(--bg);
   outline: none;
   font-size: 13.5px;
+  touch-action: manipulation;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 .field input:focus {
@@ -171,11 +192,20 @@
 .remember-me {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   color: var(--ink-soft);
   cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  font-weight: 500;
 }
-.remember-me input { accent-color: var(--primary); }
+.remember-me input {
+  accent-color: var(--primary);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  margin: 0;
+}
 .forgot-link {
   color: var(--primary);
   font-weight: 600;
@@ -200,13 +230,12 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: background 0.15s ease, transform 0.12s ease, box-shadow 0.12s ease;
+  transition: background 0.15s ease, box-shadow 0.12s ease;
   cursor: pointer;
 }
 .login-submit:hover:not(:disabled) {
   background: var(--primary-dark);
-  transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.3);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
 }
 .login-submit:disabled { opacity: 0.7; cursor: not-allowed; }
 
@@ -220,3 +249,63 @@
   width: 100%;
 }
 .login-footer p { margin: 2px 0; }
+/* ── Forgot Password Back Button ── */
+.forgot-back-wrap {
+  margin-top: 14px;
+  text-align: center;
+}
+
+.forgot-back-btn {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.forgot-back-btn:hover {
+  color: var(--primary);
+  background: var(--primary-bg);
+}
+
+/* ── Prevent auto-zoom on all touch & mobile viewports ── */
+@media (max-width: 768px) {
+  .field input {
+    font-size: 16px; /* Prevents auto-zoom in and out on mobile browsers */
+  }
+}
+
+/* ── Mobile responsiveness ── */
+@media (max-width: 480px) {
+  .login-page {
+    padding: 16px 12px;
+  }
+
+  .login-center {
+    padding: 16px 0;
+    width: 100%;
+  }
+
+  .login-card {
+    padding: 24px 18px;
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+  }
+
+  .login-brand-name {
+    font-size: 19px;
+  }
+
+  .login-title h1 {
+    font-size: 16px;
+  }
+
+  .field-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}

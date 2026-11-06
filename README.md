@@ -1,67 +1,89 @@
-# Rechargedesk-app
+# RI-Desk
 
-Everything wired and ready to run — register a real account, log in
-with it. Two folders, each grouped internally by file type:
+A full-stack Support & Ticket Management System built with React, Vite, Express, and JWT Authentication.
+
+---
+
+## Project Structure
 
 ```
-Rechargedesk-app/
-  backend/                  JWT auth API (Express)
-    package.json, .env
-    server.js
-    routes/auth.js            register, login, /me
-    middleware/verifyToken.js
-    utils/userStore.js        reads/writes data/users.json
-
-  frontend/                 Login/register UI (React + Vite)
-    package.json, vite.config.js, index.html
-    src/
-      main.jsx, App.jsx        entry point + wiring to the API
-      api/authApi.js            fetch calls to backend
-      components/LoginPage.jsx   the UI itself
-      styles/LoginPage.css
-      assets/README.md           where the logo goes
+RI-Desk/
+├── backend/                       # Express REST API backend
+│   ├── data/                      # JSON data stores (users, tickets)
+│   │   ├── tickets.json           # Stored tickets data
+│   │   └── users.json             # Stored user accounts
+│   ├── middleware/                # Express middleware
+│   │   └── verifyToken.js         # JWT token verification
+│   ├── routes/                    # API route handlers
+│   │   ├── auth.js                # Auth endpoints (/login, /register, /reset-password)
+│   │   ├── tickets.js             # Ticket CRUD & status workflows (/api/tickets)
+│   │   └── users.js               # Employee management endpoints (/api/users)
+│   ├── utils/                     # Storage helper utilities
+│   │   ├── ticketStore.js         # Ticket file persistence & mutations
+│   │   └── userStore.js           # User file persistence & lookups
+│   ├── .env                       # Backend environment variables
+│   ├── .gitignore                 # Backend git ignore rules
+│   ├── package.json               # Backend dependencies and scripts
+│   ├── README.md                  # Backend API documentation
+│   └── server.js                  # Backend application entry point
+│
+├── frontend/                      # React + Vite frontend client
+│   ├── src/                       # Application source code
+│   │   ├── api/                   # API client integrations
+│   │   │   └── authApi.js         # Authentication API requests & token management
+│   │   ├── components/            # Reusable UI components
+│   │   │   └── LoginPage.jsx      # Login & password reset form component
+│   │   ├── pages/                 # Main application view pages
+│   │   │   ├── CreateEmployeePage.jsx   # Admin create employee view
+│   │   │   ├── DashboardPage.css        # Dashboard styling & ticket table styles
+│   │   │   ├── DashboardPage.jsx        # Main Dashboard (Admin & Employee views)
+│   │   │   ├── EmployeeListPage.jsx     # Admin employee management view
+│   │   │   ├── TicketManagementPage.css # Ticket management styles
+│   │   │   └── TicketManagementPage.jsx # Full ticket management & filters
+│   │   ├── styles/                # Global and shared CSS stylesheets
+│   │   │   ├── base.css           # Global reset and typography
+│   │   │   └── login.css          # Login page styling
+│   │   ├── App.jsx                # Application root router and session check
+│   │   └── main.jsx               # React DOM entry point
+│   ├── .gitignore                 # Frontend git ignore rules
+│   ├── index.html                 # HTML template
+│   ├── package.json               # Frontend dependencies and scripts
+│   └── vite.config.js             # Vite build and development configuration
+│
+├── .gitignore                     # Root git ignore rules
+└── README.md                      # Project documentation and setup guide
 ```
 
-## Run it (two terminals)
+---
 
-**Terminal 1:**
-```
+## Quick Start
+
+### 1. Backend Server
+
+```bash
 cd backend
 npm install
-npm run start        # http://localhost:4000
+npm run start    # Runs at http://localhost:4000
 ```
 
-**Terminal 2:**
-```
+### 2. Frontend Application
+
+```bash
 cd frontend
 npm install
-npm run dev            # http://localhost:5173
+npm run dev      # Runs at http://localhost:5173
 ```
 
-Open the frontend URL. Register an account (name, employee ID,
-password) — that calls `POST /api/auth/register`, stores it (password
-hashed) in `backend/data/users.json`, and logs you straight in. Log
-out and back in with the same credentials and it'll find the match;
-get the password wrong and you'll see "User not found" right in the
-form.
+---
 
-## How it's connected
+## Features
 
-`frontend/src/api/authApi.js` calls the backend directly at
-`http://localhost:4000` (different port than the frontend's `5173`,
-cross-origin — that's why `cors()` is enabled in `backend/server.js`).
-`frontend/src/App.jsx` wires `LoginPage`'s `onLogin`/`onRegister`
-props to those calls, mapping the one differing field name
-(`employeeId` → `username`), stores the returned token, and swaps in
-a signed-in view once `user` is set.
-
-## Known limits (fine for local use)
-
-- `JWT_SECRET` in `backend/.env` is a placeholder — replace before
-  deploying anywhere real.
-- Sessions are in-memory on the backend; restarting it signs everyone
-  out, but registered accounts persist in `users.json`.
-- The signed-in screen in `App.jsx` is a plain placeholder — swap it
-  for your real dashboard/next screen.
-- Logo in `Topbar`/`LoginPage` is still a placeholder — see
-  `frontend/src/assets/README.md`.
+- **Role-Based Access Control**:
+  - **Admin**: Full access to dashboard statistics, ticket management, employee management (create, edit, delete), and status tracking.
+  - **Employee**: Dedicated dashboard showing assigned tickets, status dropdown editor (`Open`, `In Progress`, `Resolved`), customer contact details, and resolution tracking.
+- **Direct Customer Contact**:
+  - Every ticket displays customer avatar with a clickable phone link (`tel:<mobile>`) allowing employees or admins to connect immediately.
+- **Live Resolution Time**:
+  - Automatically calculates and stores duration from ticket creation to resolution upon marking resolved.
+- **JWT Authentication**:
+  - Secure stateless auth with persistent token sessions.

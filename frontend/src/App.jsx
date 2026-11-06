@@ -1,84 +1,107 @@
-import { useState } from 'react';
-import { useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import {
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+} from 'react-router-dom';
+import EmployeeListPage from './pages/EmployeeListPage.jsx';
 import LoginPage from './components/LoginPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
-import { loginUser, registerUser, setToken, clearToken, getToken } from './api/authApi.js';
 
-// ── Login route wrapper ──────────────────────────────────────────────────────
+import {
+  loginUser,
+  setToken,
+  clearToken,
+  getToken,
+} from './api/authApi.js';
+
+// Login route wrapper
 function LoginRoute({ onSuccess }) {
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
-  const navigate              = useNavigate();
+  const [error, setError] = useState('');
 
-  async function handleLogin({ employeeId, password }) {
+  const navigate = useNavigate();
+  const submittingRef = useRef(false);
+
+  async function handleLogin({ mobileNumber, password, remember }) {
+    if (submittingRef.current) return;
+
+    submittingRef.current = true;
     setLoading(true);
     setError('');
+
     try {
-      const data = await loginUser({ username: employeeId, password });
-      setToken(data.token);
+      const data = await loginUser({
+        mobileNumber,
+        password,
+        remember,
+      });
+
+      // Save JWT token
+      setToken(data.token, remember);
+
+      // Save logged-in user including role
       onSuccess(data.user);
-      navigate('/dashboard');
+
+      // Go to dashboard
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       setError(err.message);
+    } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   }
 
- async function handleRegister({ name, employeeId, password }) {
-  setLoading(true);
-  setError('');
-
-  try {
-    await registerUser({
-      name,
-      username: employeeId,
-      password
-    });
-
-    // Registration successful.
-    // Do NOT save the token or log the user in.
-    setLoading(false);
-    navigate('/login');
-
-  } catch (err) {
-    setError(err.message);
-    setLoading(false);
-  }
+  return (
+    <LoginPage
+      loading={loading}
+      error={error}
+      onLogin={handleLogin}
+    />
+  );
 }
 
-  return <LoginPage loading={loading} error={error} onLogin={handleLogin} onRegister={handleRegister} />;
-}
-
-// ── Temporary dashboard placeholder ─────────────────────────────────────────
-// Replace this with your real DashboardPage component when ready.
-
-
-// ── Root app ─────────────────────────────────────────────────────────────────
+// Root app
 export default function App() {
   const [user, setUser] = useState(null);
-  const [checkingSession, setCheckingSession] = useState(true);  // ← ADD THIS
+  const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
     async function restoreSession() {
       const token = getToken();
+
       if (!token) {
-        setCheckingSession(false);  // ← ADD THIS
+        setCheckingSession(false);
         return;
       }
 
       try {
-        const res = await fetch('http://localhost:4000/api/auth/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch(
+          'http://localhost:4000/api/auth/me',
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
         const data = await res.json();
-        if (res.ok) setUser(data.user);
+
+        if (res.ok) {
+          setUser(data.user);
+        } else {
+          clearToken();
+        }
       } catch (err) {
+        console.error('Session restore failed:', err);
         clearToken();
       } finally {
-        setCheckingSession(false);  // ← ADD THIS
+        setCheckingSession(false);
       }
     }
+
     restoreSession();
   }, []);
 
@@ -87,20 +110,55 @@ export default function App() {
     setUser(null);
   }
 
-  // ← ADD THIS BLOCK - while checking, show nothing (loading)
   if (checkingSession) {
     return null;
   }
 
   return (
-    <Routes>
-      <Route path="/login"     element={<LoginRoute onSuccess={setUser} />} />
-      <Route path="/dashboard" element={
-        user
-          ? <DashboardPage user={user} />
-          : <Navigate to="/login" replace />
-      } />
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+<Routes>
+  {/* Login */}
+  <Route
+    path="/login"
+    element={
+      <LoginRoute onSuccess={setUser} />
+    }
+  />
+
+  {/* Dashboard */}
+  <Route
+    path="/dashboard"
+    element={
+      user ? (
+        <DashboardPage
+          user={user}
+          onLogout={handleLogout}
+        />
+      ) : (
+        <Navigate to="/login" replace />
+      )
+    }
+  />
+
+  {/* Employee List */}
+  <Route
+    path="/admin/employees"
+    element={
+      user ? (
+        <EmployeeListPage />
+      ) : (
+        <Navigate to="/login" replace />
+      )
+    }
+  />
+
+  {/* Unknown URL */}
+  <Route
+    path="*"
+    element={
+      <Navigate to="/login" replace />
+    }
+  />
+</Routes>
+
   );
 }
