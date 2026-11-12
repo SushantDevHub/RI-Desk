@@ -67,6 +67,7 @@ router.post('/', requireAdmin, async (req, res) => {
       email,
       mobileNumber,
       password,
+      designation = '',
     } = req.body;
 
     if (!name || !email || !mobileNumber || !password) {
@@ -104,6 +105,7 @@ router.post('/', requireAdmin, async (req, res) => {
       mobileNumber: String(mobileNumber),
       password: hashedPassword,
       role: 'employee',
+      designation: String(designation || '').trim(),
     };
 
     addUser(employee);
@@ -116,6 +118,7 @@ router.post('/', requireAdmin, async (req, res) => {
         email: employee.email,
         mobileNumber: employee.mobileNumber,
         role: employee.role,
+        designation: employee.designation || '',
       },
     });
   } catch (error) {
@@ -146,6 +149,7 @@ router.get('/', authenticate, (req, res) => {
         email: user.email || '',
         mobileNumber: user.mobileNumber,
         role: user.role,
+        designation: user.designation || '',
       }));
 
     return res.json({
@@ -215,7 +219,7 @@ router.delete('/:id', requireAdmin, (req, res) => {
 router.put('/:id', requireAdmin, async (req, res) => {
   try {
     const employeeId = Number(req.params.id);
-    const { name, email, mobileNumber, password } = req.body;
+    const { name, email, mobileNumber, password, designation } = req.body;
 
     if (!Number.isInteger(employeeId)) {
       return res.status(400).json({
@@ -266,6 +270,10 @@ router.put('/:id', requireAdmin, async (req, res) => {
       name: name.trim(),
       email: email.trim(),
       mobileNumber: String(mobileNumber),
+      designation:
+        designation !== undefined
+          ? String(designation).trim()
+          : (users[employeeIndex].designation || ''),
     };
 
     if (password && typeof password === 'string' && password.trim()) {
@@ -287,6 +295,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
         email: users[employeeIndex].email,
         mobileNumber: users[employeeIndex].mobileNumber,
         role: users[employeeIndex].role,
+        designation: users[employeeIndex].designation || '',
       },
     });
   } catch (error) {

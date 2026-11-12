@@ -1079,7 +1079,7 @@ export default function TicketManagementPage() {
               onChange={(event) => setStaffFilter(event.target.value)}
               aria-label="Choose support staff"
             >
-              <option value="all">All Support Staff</option>
+              <option value="all">All Employees</option>
               <option value="unassigned">Unassigned</option>
               {employees.map((emp) => (
                 <option key={emp.id} value={String(emp.id)}>

@@ -9,6 +9,7 @@ import {
 import TicketManagementPage from './TicketManagementPage.jsx';
 import EmployeeListPage from './EmployeeListPage.jsx';
 import CreateEmployeePage from './CreateEmployeePage.jsx';
+import DesignationPage from './DesignationPage.jsx';
 import ContactCustomerDialog from '../components/ContactCustomerDialog.jsx';
 import './DashboardPage.css';
 
@@ -485,23 +486,35 @@ export default function DashboardPage({
     (ticket) => ticket.priority === 'low'
   );
 
-  const unassignedOpenTickets = tickets.filter(
-    (ticket) => ticket.status === 'open' && isTicketUnassigned(ticket)
-  );
+  function sortDescending(a, b) {
+    const timeA = new Date(a.createdAt || 0).getTime();
+    const timeB = new Date(b.createdAt || 0).getTime();
+    if (!isNaN(timeA) && !isNaN(timeB) && timeB !== timeA) {
+      return timeB - timeA;
+    }
+    return String(b.id || '').localeCompare(String(a.id || ''), undefined, {
+      numeric: true,
+    });
+  }
 
-  // When a stat card is selected, show that list; otherwise show unassigned open tickets
-  const dashboardTableTickets =
+  const unassignedOpenTickets = tickets
+    .filter((ticket) => ticket.status !== 'resolved' && isTicketUnassigned(ticket))
+    .sort(sortDescending);
+
+  const openTicketsDescending = openStatTickets.slice().sort(sortDescending);
+
+  const selectedStatTickets =
     selectedStat === 'open'
-      ? openStatTickets
+      ? openTicketsDescending
       : selectedStat === 'high'
-      ? highStatTickets
+      ? highStatTickets.slice().sort(sortDescending)
       : selectedStat === 'medium'
-      ? mediumStatTickets
+      ? mediumStatTickets.slice().sort(sortDescending)
       : selectedStat === 'low'
-      ? lowStatTickets
+      ? lowStatTickets.slice().sort(sortDescending)
       : selectedStat === 'resolved'
-      ? resolvedStatTickets
-      : unassignedOpenTickets;
+      ? resolvedStatTickets.slice().sort(sortDescending)
+      : [];
 
   /* ─────────────────────────────────────────────
      Dashboard statistics
@@ -628,22 +641,291 @@ export default function DashboardPage({
     }
   }
 
-  const displayedTickets = [...dashboardTableTickets].sort((a, b) => {
-    const pA = PRIORITY_ORDER[String(a.priority).toLowerCase()] || 4;
-    const pB = PRIORITY_ORDER[String(b.priority).toLowerCase()] || 4;
-    if (pA !== pB) {
-      return pA - pB;
+  function renderTicketTable(ticketList, emptyText) {
+    if (loading) {
+      return (
+        <div style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>
+          Loading tickets…
+        </div>
+      );
+    }
+    if (error) {
+      return (
+        <div style={{ padding: 24, textAlign: 'center', color: '#e11d48' }}>
+          {error}
+        </div>
+      );
+    }
+    if (!ticketList || ticketList.length === 0) {
+      return (
+        <div style={{ padding: 36, textAlign: 'center', color: '#94a3b8' }}>
+          {emptyText}
+        </div>
+      );
     }
 
-    const timeA = new Date(a.createdAt || 0).getTime();
-    const timeB = new Date(b.createdAt || 0).getTime();
-    if (!isNaN(timeA) && !isNaN(timeB) && timeB !== timeA) {
-      return timeB - timeA;
-    }
-    return String(b.id || '').localeCompare(String(a.id || ''), undefined, {
-      numeric: true,
-    });
-  });
+    return (
+      <div className="db-table-scroll">
+        <table className="db-table">
+          <thead>
+            <tr>
+              <th>Ticket ID</th>
+              <th>Customer</th>
+              <th>Category</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th style={{ width: 140 }}>Resolution time</th>
+              <th>Assigned To</th>
+              <th>Created at / Solved at</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ticketList.map((ticket) => {
+              const isResolved = ticket.status === 'resolved';
+              const isNew = !isResolved && isTicketNew(ticket.createdAt, ticket.status);
+
+              return (
+                <tr
+                  key={ticket.id}
+                  className={`${isResolved ? 'db-row-resolved' : ''} ${isNew ? 'db-row-new' : ''}`.trim()}
+                >
+                  <td className="db-mono">
+                    <div className="ticket-id-cell">
+                      <button
+                        type="button"
+                        className="ticket-id-link"
+                        title={`View details for ticket ${ticket.id}`}
+                        aria-label={`View details for ticket ${ticket.id}`}
+                        onClick={() => setViewingTicket(ticket)}
+                      >
+                        {ticket.id}
+                      </button>
+                      {isNew && (
+                        <span className="ticket-new-badge" title="Created recently">
+                          NEW
+                        </span>
+                      )}
+                    </div>
+                  </td>
+
+                  <td>
+                    <div className="ticket-customer-cell">
+                      <div
+                        className="ticket-customer-avatar"
+                        title={ticket.customer || ticket.createdBy || 'Customer'}
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                      </div>
+                      <div className="ticket-customer-info">
+                        <span className="ticket-customer-name">
+                          {ticket.customer || ticket.createdBy || '—'}
+                        </span>
+                        {ticket.customerMobile && (
+                          <button
+                            type="button"
+                            className="ticket-customer-phone"
+                            title={`Contact ${ticket.customer || 'customer'} (${ticket.customerMobile})`}
+                            aria-label={`Contact ${ticket.customer || 'customer'} at ${ticket.customerMobile}`}
+                            onClick={() =>
+                              setContactDialog({
+                                name: ticket.customer || ticket.createdBy || 'Customer',
+                                phone: ticket.customerMobile,
+                              })
+                            }
+                          >
+                            <svg
+                              width="11"
+                              height="11"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.4"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                            </svg>
+                            <span>{ticket.customerMobile}</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+
+                  <td>
+                    <div className="ticket-row-cell-wrap">
+                      <select
+                        className="ticket-row-badge-select"
+                        style={{
+                          color: getCategoryColor(ticket.category),
+                          backgroundColor: getCategoryBg(ticket.category),
+                          borderColor: `${getCategoryColor(ticket.category)}40`,
+                        }}
+                        value={
+                          ['recharge', 'payment', 'wallet', 'technical'].includes(
+                            String(ticket.category || '').toLowerCase()
+                          )
+                            ? String(ticket.category).toLowerCase()
+                            : 'custom_current'
+                        }
+                        onChange={(e) =>
+                          handleInlineUpdate(ticket, 'category', e.target.value)
+                        }
+                        title="Select category"
+                      >
+                        <option value="recharge">Recharge</option>
+                        <option value="payment">Payment</option>
+                        <option value="wallet">Wallet</option>
+                        <option value="technical">Technical</option>
+                        {!['recharge', 'payment', 'wallet', 'technical'].includes(
+                          String(ticket.category || '').toLowerCase()
+                        ) && (
+                          <option value="custom_current">
+                            {capitalize(ticket.category || 'Custom')}
+                          </option>
+                        )}
+                      </select>
+                    </div>
+                  </td>
+
+                  <td>
+                    <div className="ticket-row-cell-wrap">
+                      <select
+                        className="ticket-row-badge-select"
+                        style={{
+                          color: PRIORITY_STYLE[ticket.priority]?.color || '#64748b',
+                          backgroundColor:
+                            PRIORITY_STYLE[ticket.priority]?.bg || '#f8fafc',
+                          borderColor: `${PRIORITY_STYLE[ticket.priority]?.color || '#cbd5e1'}40`,
+                        }}
+                        value={ticket.priority || 'medium'}
+                        onChange={(e) =>
+                          handleInlineUpdate(ticket, 'priority', e.target.value)
+                        }
+                        title="Select priority"
+                      >
+                        <option value="low">● Low</option>
+                        <option value="medium">● Medium</option>
+                        <option value="high">● High</option>
+                      </select>
+                    </div>
+                  </td>
+
+                  <td>
+                    <div className="ticket-row-cell-wrap">
+                      <select
+                        className="ticket-row-badge-select"
+                        style={{
+                          color: STATUS_COLORS[ticket.status] || '#64748b',
+                          backgroundColor:
+                            STATUS_BACKGROUNDS[ticket.status] || '#eff6ff',
+                          borderColor: `${STATUS_COLORS[ticket.status] || '#cbd5e1'}40`,
+                        }}
+                        value={ticket.status || 'open'}
+                        onChange={(e) =>
+                          handleInlineUpdate(ticket, 'status', e.target.value)
+                        }
+                        title="Select status"
+                      >
+                        <option value="open">Open</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="resolved">Resolved</option>
+                      </select>
+                    </div>
+                  </td>
+
+                  <td>
+                    {ticket.status === 'resolved' ? (
+                      <span
+                        className="db-resolution-badge resolved"
+                        title={
+                          ticket.resolvedAt
+                            ? `Resolved at ${formatDate(ticket.resolvedAt)}${
+                                ticket.resolvedBy ? ` by ${ticket.resolvedBy}` : ''
+                              }`
+                            : 'Resolved'
+                        }
+                      >
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                        {ticket.resolution ||
+                          ticket.resolutionTime ||
+                          (ticket.resolvedAt
+                            ? calculateResolutionTime(ticket.createdAt, ticket.resolvedAt)
+                            : '< 1 min')}
+                      </span>
+                    ) : (
+                      <span className="db-resolution-badge pending">
+                        Pending
+                      </span>
+                    )}
+                  </td>
+
+                  <td>
+                    {ticket.assignedTo || 'Unassigned'}
+                  </td>
+
+                  <td>
+                    <div className="ticket-dates-wrap">
+                      <div
+                        className="ticket-date-row created"
+                        title={`Created: ${formatDate(ticket.createdAt)}`}
+                      >
+                        <span className="ticket-date-label">Created:</span>
+                        <span className="ticket-date-val">
+                          {formatDate(ticket.createdAt)}
+                        </span>
+                      </div>
+                      <div
+                        className={`ticket-date-row solved ${
+                          ticket.resolvedAt || ticket.solvedAt ? 'is-resolved' : 'is-pending'
+                        }`}
+                        title={
+                          ticket.resolvedAt || ticket.solvedAt
+                            ? `Solved: ${formatDate(ticket.resolvedAt || ticket.solvedAt)}`
+                            : 'Not solved yet'
+                        }
+                      >
+                        <span className="ticket-date-label">Solved:</span>
+                        <span className="ticket-date-val">
+                          {ticket.resolvedAt || ticket.solvedAt
+                            ? formatDate(ticket.resolvedAt || ticket.solvedAt)
+                            : '—'}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
 
   /* ─────────────────────────────────────────────
      Render
@@ -904,6 +1186,37 @@ export default function DashboardPage({
             </button>
           )}
 
+          {/* Designation menu */}
+          {isAdmin && (
+            <button
+              className={`db-nav-item ${
+                active === 'designation' ? 'active' : ''
+              }`}
+              onClick={() => {
+                setActive('designation');
+                setMobileMenuOpen(false);
+              }}
+            >
+              <span className="db-nav-left">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3" y="4" width="18" height="16" rx="3" />
+                  <circle cx="12" cy="10" r="3" />
+                  <path d="M7 17a5 5 0 0 1 10 0" />
+                </svg>
+                <span>Designation</span>
+              </span>
+            </button>
+          )}
+
           {/* Tickets menu (available to both Admin and Employee) */}
           <button
             className={`db-nav-item ${
@@ -928,7 +1241,10 @@ export default function DashboardPage({
             <span>Tickets</span>
           </button>
         </div>
+        
 
+
+        
         {/* ─────────────────────────────────────
             MAIN CONTENT
         ───────────────────────────────────── */}
@@ -941,10 +1257,12 @@ export default function DashboardPage({
               onCreateEmployee={() => setActive('create-employee')}
             />
           ) : active === 'create-employee' && isAdmin ? (
-    <CreateEmployeePage
-      onBack={() => setActive('employees')}
-    />
-  ) : (
+            <CreateEmployeePage
+              onBack={() => setActive('employees')}
+            />
+          ) : active === 'designation' && isAdmin ? (
+            <DesignationPage isAdmin={isAdmin} />
+          ) : (
 
             /* Dashboard / Assigned Tickets page */
             <>
@@ -1009,49 +1327,27 @@ export default function DashboardPage({
                 })}
               </div>
 
-              {/* ── Tickets Table Header ── */}
-
-              <div className="db-section-head">
+              {/* ── Single Common View All in Tickets Header ── */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: 12,
+                  marginTop: 24,
+                  marginBottom: 16,
+                }}
+              >
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <span className="db-section-title">
-                      {selectedStat === 'open'
-                        ? `Open Tickets List (${displayedTickets.length})`
-                        : selectedStat === 'high'
-                        ? `High Priority Tickets List (${displayedTickets.length})`
-                        : selectedStat === 'medium'
-                        ? `Medium Priority Tickets List (${displayedTickets.length})`
-                        : selectedStat === 'low'
-                        ? `Low Priority Tickets List (${displayedTickets.length})`
-                        : selectedStat === 'resolved'
-                        ? `Resolved Tickets List (${displayedTickets.length})`
-                        : 'Unassigned Open Tickets'}
-                    </span>
-                    {selectedStat && (
-                      <button
-                        type="button"
-                        className="db-clear-card-filter-btn"
-                        onClick={() => setSelectedStat(null)}
-                        title="Show unassigned open tickets"
-                      >
-                        ✕ Show Unassigned
-                      </button>
-                    )}
-                  </div>
-                  <span className="db-section-note">
-                    {selectedStat === 'open'
-                      ? 'Listing all unresolved tickets currently awaiting action'
-                      : selectedStat === 'high'
-                      ? 'Listing all urgent high-priority tickets'
-                      : selectedStat === 'medium'
-                      ? 'Listing all medium-priority tickets'
-                      : selectedStat === 'low'
-                      ? 'Listing all low-priority tickets'
-                      : selectedStat === 'resolved'
-                      ? 'Listing all closed and resolved conversations'
-                      : 'Open tickets awaiting assignment — click any stat card above to view its ticket list'}
+                  <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                    {selectedStat ? 'Filtered Tickets' : 'Tickets Overview'}
+                  </h2>
+                  <span style={{ fontSize: 13, color: '#64748b', display: 'block', marginTop: 2 }}>
+                    
                   </span>
                 </div>
+
                 <button
                   type="button"
                   className="db-view-all-tickets-btn"
@@ -1061,345 +1357,195 @@ export default function DashboardPage({
                 </button>
               </div>
 
-              <div
-                className="db-card"
-                style={{ marginBottom: 28 }}
-              >
-
-                {/* Loading */}
-
-                {loading && (
+              {/* If a stat card is selected, show that specific list */}
+              {selectedStat ? (
+                <div className="db-card" style={{ marginBottom: 28 }}>
                   <div
                     style={{
-                      padding: 24,
-                      textAlign: 'center',
-                      color: '#94a3b8',
+                      padding: '16px 20px',
+                      borderBottom: '1px solid #f1f5f9',
+                      background: '#fafafa',
+                      borderRadius: '12px 12px 0 0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: 10,
                     }}
                   >
-                    Loading tickets…
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+                          {selectedStat === 'open'
+                            ? 'Open Tickets List'
+                            : selectedStat === 'high'
+                            ? 'High Priority Tickets List'
+                            : selectedStat === 'medium'
+                            ? 'Medium Priority Tickets List'
+                            : selectedStat === 'low'
+                            ? 'Low Priority Tickets List'
+                            : 'Resolved Tickets List'}
+                        </span>
+                        <span
+                          style={{
+                            background: '#e0e7ff',
+                            color: '#3730a3',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: 9999,
+                          }}
+                        >
+                          {selectedStatTickets.length} {selectedStatTickets.length === 1 ? 'ticket' : 'tickets'}
+                        </span>
+                      </div>
+                      <span style={{ display: 'block', marginTop: 2, fontSize: 12.5, color: '#64748b' }}>
+                        {selectedStat === 'open'
+                          ? 'Listing all unresolved tickets currently awaiting action'
+                          : selectedStat === 'high'
+                          ? 'Listing all urgent high-priority tickets'
+                          : selectedStat === 'medium'
+                          ? 'Listing all medium-priority tickets'
+                          : selectedStat === 'low'
+                          ? 'Listing all low-priority tickets'
+                          : 'Listing all closed and resolved conversations'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <button
+                        type="button"
+                        className="db-clear-card-filter-btn"
+                        onClick={() => setSelectedStat(null)}
+                      >
+                        ✕ Reset to Dashboard Slabs
+                      </button>
+                    </div>
                   </div>
-                )}
 
-                {/* Error */}
-
-                {error && (
-                  <div
-                    style={{
-                      padding: 24,
-                      textAlign: 'center',
-                      color: '#e11d48',
-                    }}
-                  >
-                    {error}
-                  </div>
-                )}
-
-                {/* No tickets */}
-
-                {!loading &&
-                  !error &&
-                  displayedTickets.length === 0 && (
+                  {renderTicketTable(
+                    selectedStatTickets,
+                    'No tickets found matching this list.'
+                  )}
+                </div>
+              ) : (
+                /* Default Dashboard view: Two Slabs (Unassigned on top, Open tickets below in descending order) */
+                <>
+                  {/* SLAB 1: Unassigned Tickets (On Top) */}
+                  <div className="db-card" style={{ marginBottom: 28 }}>
                     <div
                       style={{
-                        padding: 40,
-                        textAlign: 'center',
-                        color: '#94a3b8',
+                        padding: '16px 20px',
+                        borderBottom: '1px solid #f1f5f9',
+                        background: '#fafafa',
+                        borderRadius: '12px 12px 0 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: 10,
                       }}
                     >
-                      {selectedStat
-                        ? 'No tickets found matching this list.'
-                        : 'No unassigned open tickets right now. All tickets are assigned.'}
-                      {selectedStat && (
-                        <div style={{ marginTop: 12 }}>
-                          <button
-                            type="button"
-                            className="db-clear-card-filter-btn"
-                            onClick={() => setSelectedStat(null)}
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+                            Unassigned Tickets
+                          </span>
+                          <span
+                            style={{
+                              background: unassignedOpenTickets.length > 0 ? '#fef3c7' : '#f1f5f9',
+                              color: unassignedOpenTickets.length > 0 ? '#92400e' : '#64748b',
+                              fontSize: 12,
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: 9999,
+                            }}
                           >
-                            Reset to Unassigned Tickets
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                {/* Tickets table */}
-
-                {!loading &&
-                  !error &&
-                  displayedTickets.length > 0 && (
-                    <div className="db-table-scroll">
-                      <table className="db-table">
-
-                        <thead>
-                          <tr>
-                            <th>Ticket ID</th>
-                            <th>Customer</th>
-                            <th>Category</th>
-                            <th>Priority</th>
-                            <th>Status</th>
-                            <th style={{ width: 140 }}>Resolution time</th>
-                            <th>Assigned To</th>
-                            <th>Created at / Solved at</th>
-                          </tr>
-                        </thead>
-
-                        <tbody>
-
-                          {displayedTickets.map(
-                            (ticket) => {
-                              const isResolved = ticket.status === 'resolved';
-                              const isNew = !isResolved && isTicketNew(ticket.createdAt, ticket.status);
-
-                              return (
-                                <tr
-                                  key={ticket.id}
-                                  className={`${isResolved ? 'db-row-resolved' : ''} ${isNew ? 'db-row-new' : ''}`.trim()}
-                                >
-                                  <td className="db-mono">
-                                    <div className="ticket-id-cell">
-                                      <button
-                                        type="button"
-                                        className="ticket-id-link"
-                                        title={`View details for ticket ${ticket.id}`}
-                                        aria-label={`View details for ticket ${ticket.id}`}
-                                        onClick={() => setViewingTicket(ticket)}
-                                      >
-                                        {ticket.id}
-                                      </button>
-                                      {isNew && (
-                                        <span className="ticket-new-badge" title="Created recently">
-                                          NEW
-                                        </span>
-                                      )}
-                                    </div>
-                                  </td>
-
-                                  <td>
-                                    <div className="ticket-customer-cell">
-                                      <div
-                                        className="ticket-customer-avatar"
-                                        title={ticket.customer || ticket.createdBy || 'Customer'}
-                                      >
-                                        <svg
-                                          width="14"
-                                          height="14"
-                                          viewBox="0 0 24 24"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          strokeWidth="2.2"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                        >
-                                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                                          <circle cx="12" cy="7" r="4" />
-                                        </svg>
-                                      </div>
-                                      <div className="ticket-customer-info">
-                                        <span className="ticket-customer-name">
-                                          {ticket.customer || ticket.createdBy || '—'}
-                                        </span>
-                                        {ticket.customerMobile && (
-                                          <button
-                                            type="button"
-                                            className="ticket-customer-phone"
-                                            title={`Contact ${ticket.customer || 'customer'} (${ticket.customerMobile})`}
-                                            aria-label={`Contact ${ticket.customer || 'customer'} at ${ticket.customerMobile}`}
-                                            onClick={() =>
-                                              setContactDialog({
-                                                name: ticket.customer || ticket.createdBy || 'Customer',
-                                                phone: ticket.customerMobile,
-                                              })
-                                            }
-                                          >
-                                            <svg
-                                              width="11"
-                                              height="11"
-                                              viewBox="0 0 24 24"
-                                              fill="none"
-                                              stroke="currentColor"
-                                              strokeWidth="2.4"
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                            >
-                                              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                                            </svg>
-                                            <span>{ticket.customerMobile}</span>
-                                          </button>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </td>
-
-                                  {/* Category */}
-                                  <td>
-                                    <div className="ticket-row-cell-wrap">
-                                      <select
-                                        className="ticket-row-badge-select"
-                                        style={{
-                                          color: getCategoryColor(ticket.category),
-                                          backgroundColor: getCategoryBg(ticket.category),
-                                          borderColor: `${getCategoryColor(ticket.category)}40`,
-                                        }}
-                                        value={
-                                          ['recharge', 'payment', 'wallet', 'technical'].includes(
-                                            String(ticket.category || '').toLowerCase()
-                                          )
-                                            ? String(ticket.category).toLowerCase()
-                                            : 'custom_current'
-                                        }
-                                        onChange={(e) =>
-                                          handleInlineUpdate(ticket, 'category', e.target.value)
-                                        }
-                                        title="Select category"
-                                      >
-                                        <option value="recharge">Recharge</option>
-                                        <option value="payment">Payment</option>
-                                        <option value="wallet">Wallet</option>
-                                        <option value="technical">Technical</option>
-                                        {!['recharge', 'payment', 'wallet', 'technical'].includes(
-                                          String(ticket.category || '').toLowerCase()
-                                        ) && (
-                                          <option value="custom_current">
-                                            {capitalize(ticket.category || 'Custom')}
-                                          </option>
-                                        )}
-                                      </select>
-                                    </div>
-                                  </td>
-
-                                  {/* Priority */}
-                                  <td>
-                                    <div className="ticket-row-cell-wrap">
-                                      <select
-                                        className="ticket-row-badge-select"
-                                        style={{
-                                          color: PRIORITY_STYLE[ticket.priority]?.color || '#64748b',
-                                          backgroundColor:
-                                            PRIORITY_STYLE[ticket.priority]?.bg || '#f8fafc',
-                                          borderColor: `${PRIORITY_STYLE[ticket.priority]?.color || '#cbd5e1'}40`,
-                                        }}
-                                        value={ticket.priority || 'medium'}
-                                        onChange={(e) =>
-                                          handleInlineUpdate(ticket, 'priority', e.target.value)
-                                        }
-                                        title="Select priority"
-                                      >
-                                        <option value="low">● Low</option>
-                                        <option value="medium">● Medium</option>
-                                        <option value="high">● High</option>
-                                      </select>
-                                    </div>
-                                  </td>
-
-                                  {/* Status */}
-                                  <td>
-                                    <div className="ticket-row-cell-wrap">
-                                      <select
-                                        className="ticket-row-badge-select"
-                                        style={{
-                                          color: STATUS_COLORS[ticket.status] || '#64748b',
-                                          backgroundColor:
-                                            STATUS_BACKGROUNDS[ticket.status] || '#eff6ff',
-                                          borderColor: `${STATUS_COLORS[ticket.status] || '#cbd5e1'}40`,
-                                        }}
-                                        value={ticket.status || 'open'}
-                                        onChange={(e) =>
-                                          handleInlineUpdate(ticket, 'status', e.target.value)
-                                        }
-                                        title="Select status"
-                                      >
-                                        <option value="open">Open</option>
-                                        <option value="in-progress">In Progress</option>
-                                        <option value="resolved">Resolved</option>
-                                      </select>
-                                    </div>
-                                  </td>
-
-                                  <td>
-                                    {ticket.status === 'resolved' ? (
-                                      <span
-                                        className="db-resolution-badge resolved"
-                                        title={
-                                          ticket.resolvedAt
-                                            ? `Resolved at ${formatDate(ticket.resolvedAt)}${
-                                                ticket.resolvedBy ? ` by ${ticket.resolvedBy}` : ''
-                                              }`
-                                            : 'Resolved'
-                                        }
-                                      >
-                                        <svg
-                                          width="12"
-                                          height="12"
-                                          viewBox="0 0 24 24"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          strokeWidth="2.5"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                        >
-                                          <circle cx="12" cy="12" r="10" />
-                                          <polyline points="12 6 12 12 16 14" />
-                                        </svg>
-                                        {ticket.resolution ||
-                                          ticket.resolutionTime ||
-                                          (ticket.resolvedAt
-                                            ? calculateResolutionTime(ticket.createdAt, ticket.resolvedAt)
-                                            : '< 1 min')}
-                                      </span>
-                                    ) : (
-                                      <span className="db-resolution-badge pending">
-                                        Pending
-                                      </span>
-                                    )}
-                                  </td>
-
-                                  <td>
-                                    {ticket.assignedTo || 'Unassigned'}
-                                  </td>
-
-                                  <td>
-                                    <div className="ticket-dates-wrap">
-                                      <div
-                                        className="ticket-date-row created"
-                                        title={`Created: ${formatDate(ticket.createdAt)}`}
-                                      >
-                                        <span className="ticket-date-label">Created:</span>
-                                        <span className="ticket-date-val">
-                                          {formatDate(ticket.createdAt)}
-                                        </span>
-                                      </div>
-                                      <div
-                                        className={`ticket-date-row solved ${
-                                          ticket.resolvedAt || ticket.solvedAt ? 'is-resolved' : 'is-pending'
-                                        }`}
-                                        title={
-                                          ticket.resolvedAt || ticket.solvedAt
-                                            ? `Solved: ${formatDate(ticket.resolvedAt || ticket.solvedAt)}`
-                                            : 'Not solved yet'
-                                        }
-                                      >
-                                        <span className="ticket-date-label">Solved:</span>
-                                        <span className="ticket-date-val">
-                                          {ticket.resolvedAt || ticket.solvedAt
-                                            ? formatDate(ticket.resolvedAt || ticket.solvedAt)
-                                            : '—'}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            }
+                            {unassignedOpenTickets.length}{' '}
+                            {unassignedOpenTickets.length === 1 ? 'ticket' : 'tickets'}
+                          </span>
+                          {unassignedOpenTickets.length > 0 && (
+                            <span
+                              style={{
+                                background: '#fff1f2',
+                                color: '#be123c',
+                                fontSize: 11,
+                                fontWeight: 600,
+                                padding: '2px 6px',
+                                borderRadius: 4,
+                              }}
+                            >
+                              Action Required
+                            </span>
                           )}
-
-                        </tbody>
-
-                      </table>
+                        </div>
+                        
+                      </div>
                     </div>
-                  )}
 
-              </div>
+                    {renderTicketTable(
+                      unassignedOpenTickets,
+                      '✓ No unassigned tickets. All tickets are currently assigned.'
+                    )}
+                  </div>
+
+                  {/* SLAB 2: Open Tickets (In Descending Order) */}
+                  <div className="db-card" style={{ marginBottom: 28 }}>
+                    <div
+                      style={{
+                        padding: '16px 20px',
+                        borderBottom: '1px solid #f1f5f9',
+                        background: '#fafafa',
+                        borderRadius: '12px 12px 0 0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: 10,
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+                            Open Tickets
+                          </span>
+                          <span
+                            style={{
+                              background: '#e0e7ff',
+                              color: '#3730a3',
+                              fontSize: 12,
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: 9999,
+                            }}
+                          >
+                            {openTicketsDescending.length}{' '}
+                            {openTicketsDescending.length === 1 ? 'ticket' : 'tickets'}
+                          </span>
+                          <span
+                            style={{
+                              background: '#f1f5f9',
+                              color: '#475569',
+                              fontSize: 11,
+                              fontWeight: 600,
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                            }}
+                          >
+                            ↓ Descending
+                          </span>
+                        </div>
+                        
+                      </div>
+                    </div>
+
+                    {renderTicketTable(
+                      openTicketsDescending,
+                      '✓ No open tickets. All tickets are currently resolved!'
+                    )}
+                  </div>
+                </>
+              )}
             </>
           )}
 
