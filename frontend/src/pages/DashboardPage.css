@@ -620,14 +620,19 @@
 }
 
 .db-sidebar {
-  width: 160px;
+  width: 170px;
   flex: 0 0 auto;
   background: #4338ca;
   border-right: 1px solid #475e86;
+  border-bottom: 1px solid #475e86;
+  border-bottom-right-radius: 20px;
+  border-bottom-left-radius: 0;
   padding: 14px 8px;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .db-nav-item {
   display: flex;
@@ -695,6 +700,163 @@
   letter-spacing: -0.2px;
 }
 .db-page-sub { color: #94a3b8; font-size: 13px; margin: 0 0 24px; }
+
+/* ── Real-Time Dashboard Announcement Ticker (Moving Right to Left) ── */
+.db-announcement-ticker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #c7d2fe;
+  box-shadow: 0 1px 4px rgba(79, 70, 229, 0.08);
+  margin-bottom: 18px;
+  overflow: hidden;
+  position: relative;
+  user-select: none;
+}
+
+.db-announcement-ticker.urgent {
+  background: #fff5f5;
+  border-color: #fca5a5;
+  box-shadow: 0 1px 4px rgba(220, 38, 38, 0.08);
+}
+
+.db-ticker-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: #4338ca;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  z-index: 2;
+  box-shadow: 0 2px 6px rgba(67, 56, 202, 0.25);
+}
+
+.db-announcement-ticker.urgent .db-ticker-tag {
+  background: #dc2626;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);
+}
+
+.db-ticker-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 6px #ffffff;
+  animation: tickerDotBlink 1.4s ease-in-out infinite;
+}
+
+@keyframes tickerDotBlink {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+.db-ticker-track-wrap {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  position: relative;
+  mask-image: linear-gradient(90deg, transparent 0%, black 2%, black 98%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 2%, black 98%, transparent 100%);
+}
+
+.db-ticker-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  white-space: nowrap;
+  padding-left: 100%;
+  animation: tickerScrollRightToLeft 28s linear infinite;
+  cursor: default;
+}
+
+/* Pause animation on hover so user can easily read */
+.db-announcement-ticker:hover .db-ticker-track {
+  animation-play-state: paused;
+}
+
+@keyframes tickerScrollRightToLeft {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.db-ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.db-ticker-bulk-divider {
+  color: #818cf8;
+  font-size: 11px;
+  margin: 0 4px;
+}
+
+.db-ticker-category {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #4f46e5;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+
+.db-announcement-ticker.urgent .db-ticker-category {
+  color: #dc2626;
+}
+
+.db-ticker-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.db-ticker-separator {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.db-ticker-content {
+  font-size: 13px;
+  color: #475569;
+  font-weight: 500;
+}
+
+.db-ticker-dismiss {
+  background: transparent;
+  border: 0;
+  color: #94a3b8;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  z-index: 2;
+}
+
+.db-ticker-dismiss:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
 
 /* â”€â”€ Stat grid â”€â”€ */
 .db-stat-grid {
@@ -827,12 +989,14 @@
 .db-table-scroll .db-table { min-width: 600px; }
 .db-table th {
   text-align: left;
-  font-size: 11.5px;
-  color: #94a3b8;
-  font-weight: 600;
-  padding: 11px 16px;
-  border-bottom: 1px solid #e2e8f0;
+  font-size: 13px;
+  color: #0f172a;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 12px 16px;
+  border-bottom: 2px solid #cbd5e1;
   background: #f8fafc;
+  white-space: nowrap;
 }
 .db-table td {
   padding: 12px 16px;
@@ -1900,6 +2064,7 @@ background: linear-gradient(#312b9b, #4f46e5);}
     transform: translateX(-100%);
     transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     overflow-y: auto;
+    border-bottom-right-radius: 24px;
   }
 
   .db-sidebar.mobile-open {
@@ -2289,12 +2454,14 @@ background: linear-gradient(#312b9b, #4f46e5);}
   font-weight: 500;
 }
 
+.ticket-client-cell,
 .ticket-customer-cell {
   display: inline-flex;
   align-items: center;
   gap: 10px;
 }
 
+.ticket-client-avatar,
 .ticket-customer-avatar {
   width: 28px;
   height: 28px;
@@ -2309,18 +2476,21 @@ background: linear-gradient(#312b9b, #4f46e5);}
   transition: all 0.15s ease;
 }
 
+.ticket-client-cell:hover .ticket-client-avatar,
 .ticket-customer-cell:hover .ticket-customer-avatar {
   background: #eff6ff;
   color: #2563eb;
   border-color: #bfdbfe;
 }
 
+.ticket-client-info,
 .ticket-customer-info {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
+.ticket-client-name,
 .ticket-customer-name {
   font-weight: 600;
   color: #1e293b;
@@ -2328,6 +2498,7 @@ background: linear-gradient(#312b9b, #4f46e5);}
   line-height: 1.2;
 }
 
+.ticket-client-phone,
 .ticket-customer-phone {
   display: inline-flex;
   align-items: center;
@@ -2345,13 +2516,14 @@ background: linear-gradient(#312b9b, #4f46e5);}
   line-height: inherit;
 }
 
+.ticket-client-phone:hover,
 .ticket-customer-phone:hover {
   color: #1d4ed8;
   text-decoration: underline;
 }
 
 /* =========================================
-   CONTACT CUSTOMER DIALOG (CALL / WHATSAPP)
+   CONTACT CLIENT DIALOG (CALL / WHATSAPP)
 ========================================= */
 
 .contact-dialog-overlay {
@@ -2836,6 +3008,7 @@ background: linear-gradient(#312b9b, #4f46e5);}
   border-radius: 2px;
 }
 
+.ticket-client-subtext,
 .ticket-customer-subtext {
   display: inline-block;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -2904,6 +3077,20 @@ background: linear-gradient(#312b9b, #4f46e5);}
   color: #1e293b;
   font-weight: 500;
   padding: 6px 10px;
+}
+
+.ticket-status-locked-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #047857;
+  background-color: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: not-allowed;
+  user-select: none;
 }
 
 .ticket-row-edit-btn {
@@ -2984,6 +3171,7 @@ background: linear-gradient(#312b9b, #4f46e5);}
   background: #dc2626;
 }
 
+.ticket-client-subtext:hover,
 .ticket-customer-subtext:hover {
   background-color: #e0e7ff;
   border-color: #c7d2fe;

@@ -359,7 +359,7 @@ export default function TicketLogsDialog({ ticket, onClose }) {
               </h2>
               <p className="ticket-log-sub">
                 {currentTicket.subject ? `"${currentTicket.subject}"` : 'Ticket change history'}
-                {currentTicket.customer ? ` • Customer: ${currentTicket.customer}` : ''}
+                {(currentTicket.client || currentTicket.customer) ? ` • Client: ${currentTicket.client || currentTicket.customer}` : ''}
               </p>
             </div>
           </div>

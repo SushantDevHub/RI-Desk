@@ -11,7 +11,9 @@ import EmployeeListPage from './EmployeeListPage.jsx';
 import CreateEmployeePage from './CreateEmployeePage.jsx';
 import DesignationPage from './DesignationPage.jsx';
 import ClientManagementPage from './ClientManagementPage.jsx';
-import ContactCustomerDialog from '../components/ContactCustomerDialog.jsx';
+import ExtrasPage from './ExtrasPage.jsx';
+import { getActiveAnnouncements } from '../api/announcementApi.js';
+import ContactClientDialog from '../components/ContactClientDialog.jsx';
 import TicketLogsDialog from '../components/TicketLogsDialog.jsx';
 import './DashboardPage.css';
 
@@ -251,6 +253,7 @@ function getActiveTabFromPath(pathname = '') {
   if (p.includes('/designation')) return 'designation';
   if (p.includes('/clients')) return 'clients';
   if (p.includes('/tickets')) return 'tickets';
+  if (p.includes('/extras')) return 'extras';
   return 'dashboard';
 }
 
@@ -276,6 +279,7 @@ export default function DashboardPage({
     else if (targetTab === 'designation') targetPath = '/designation';
     else if (targetTab === 'clients') targetPath = '/clients';
     else if (targetTab === 'tickets') targetPath = '/tickets';
+    else if (targetTab === 'extras') targetPath = '/extras';
 
     if (location.pathname.toLowerCase() !== targetPath.toLowerCase()) {
       navigate(targetPath);
@@ -292,7 +296,12 @@ export default function DashboardPage({
   // Prevent non-admin access to admin tabs
   useEffect(() => {
     if (user && user.role !== 'admin') {
-      if (active === 'employees' || active === 'create-employee' || active === 'designation') {
+      if (
+        active === 'employees' ||
+        active === 'create-employee' ||
+        active === 'designation' ||
+        active === 'extras'
+      ) {
         navigate('/dashboard', { replace: true });
       }
     }
@@ -385,9 +394,32 @@ export default function DashboardPage({
 
   const [resolvingId, setResolvingId] = useState(null);
   const [noticeMessage, setNoticeMessage] = useState('');
+  const [liveAnnouncements, setLiveAnnouncements] = useState([]);
+  const [dismissedAnnouncements, setDismissedAnnouncements] = useState([]);
   const [viewingTicket, setViewingTicket] = useState(null);
   const [viewingLogsTicket, setViewingLogsTicket] = useState(null);
   const [selectedStat, setSelectedStat] = useState(null);
+
+  /* ── Load real-time active announcements ── */
+  useEffect(() => {
+    let isMounted = true;
+    async function loadLiveAnnouncements() {
+      try {
+        const list = await getActiveAnnouncements();
+        if (isMounted) {
+          setLiveAnnouncements(Array.isArray(list) ? list : []);
+        }
+      } catch (err) {
+        // silent fallback
+      }
+    }
+    loadLiveAnnouncements();
+    const interval = setInterval(loadLiveAnnouncements, 20000); // Poll every 20s for real-time announcements
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   /* ── Role ── */
 
@@ -626,6 +658,11 @@ export default function DashboardPage({
   async function handleInlineUpdate(ticket, field, value) {
     if (!ticket || !field || ticket[field] === value) return;
 
+    if (ticket.status === 'resolved' && field === 'status' && !isAdmin) {
+      setNoticeMessage('⚠️ Only administrators can re-open or change the status of a resolved ticket.');
+      return;
+    }
+
     const oldValue = ticket[field];
     const willBeResolved = field === 'status' && value === 'resolved';
     const nowIso = new Date().toISOString();
@@ -755,7 +792,7 @@ export default function DashboardPage({
           <thead>
             <tr>
               <th>Ticket ID</th>
-              <th>Customer</th>
+              <th>Client</th>
               <th>Category</th>
               <th>Priority</th>
               <th>Status</th>
@@ -789,10 +826,10 @@ export default function DashboardPage({
                   </td>
 
                   <td>
-                    <div className="ticket-customer-cell">
+                    <div className="ticket-client-cell">
                       <div
-                        className="ticket-customer-avatar"
-                        title={ticket.customer || ticket.createdBy || 'Customer'}
+                        className="ticket-client-avatar"
+                        title={ticket.client || ticket.customer || ticket.createdBy || 'Client'}
                       >
                         <svg
                           width="14"
@@ -808,20 +845,20 @@ export default function DashboardPage({
                           <circle cx="12" cy="7" r="4" />
                         </svg>
                       </div>
-                      <div className="ticket-customer-info">
-                        <span className="ticket-customer-name">
-                          {ticket.customer || ticket.createdBy || '—'}
+                      <div className="ticket-client-info">
+                        <span className="ticket-client-name">
+                          {ticket.client || ticket.customer || ticket.createdBy || '—'}
                         </span>
-                        {ticket.customerMobile && (
+                        {(ticket.clientMobile || ticket.customerMobile) && (
                           <button
                             type="button"
-                            className="ticket-customer-phone"
-                            title={`Contact ${ticket.customer || 'customer'} (${ticket.customerMobile})`}
-                            aria-label={`Contact ${ticket.customer || 'customer'} at ${ticket.customerMobile}`}
+                            className="ticket-client-phone"
+                            title={`Contact ${ticket.client || ticket.customer || 'client'} (${ticket.clientMobile || ticket.customerMobile})`}
+                            aria-label={`Contact ${ticket.client || ticket.customer || 'client'} at ${ticket.clientMobile || ticket.customerMobile}`}
                             onClick={() =>
                               setContactDialog({
-                                name: ticket.customer || ticket.createdBy || 'Customer',
-                                phone: ticket.customerMobile,
+                                name: ticket.client || ticket.customer || ticket.createdBy || 'Client',
+                                phone: ticket.clientMobile || ticket.customerMobile,
                               })
                             }
                           >
@@ -837,7 +874,7 @@ export default function DashboardPage({
                             >
                               <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
                             </svg>
-                            <span>{ticket.customerMobile}</span>
+                            <span>{ticket.clientMobile || ticket.customerMobile}</span>
                           </button>
                         )}
                       </div>
@@ -906,24 +943,47 @@ export default function DashboardPage({
 
                   <td>
                     <div className="ticket-row-cell-wrap">
-                      <select
-                        className="ticket-row-badge-select"
-                        style={{
-                          color: '#334155',
-                          backgroundColor: '#ffffff',
-                          borderColor: '#e2e8f0',
-                          fontWeight: 500,
-                        }}
-                        value={ticket.status || 'open'}
-                        onChange={(e) =>
-                          handleInlineUpdate(ticket, 'status', e.target.value)
-                        }
-                        title="Select status"
-                      >
-                        <option value="open">Open</option>
-                        <option value="in-progress">In Progress</option>
-                        <option value="resolved">Resolved</option>
-                      </select>
+                      {ticket.status === 'resolved' && !isAdmin ? (
+                        <span
+                          className="ticket-status-locked-badge"
+                          title="Resolved tickets can only be changed by an administrator."
+                        >
+                          <svg
+                            width="11"
+                            height="11"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            style={{ marginRight: 4, flexShrink: 0 }}
+                          >
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                          </svg>
+                          Resolved
+                        </span>
+                      ) : (
+                        <select
+                          className="ticket-row-badge-select"
+                          style={{
+                            color: '#334155',
+                            backgroundColor: '#ffffff',
+                            borderColor: '#e2e8f0',
+                            fontWeight: 500,
+                          }}
+                          value={ticket.status || 'open'}
+                          onChange={(e) =>
+                            handleInlineUpdate(ticket, 'status', e.target.value)
+                          }
+                          title="Select status"
+                        >
+                          <option value="open">Open</option>
+                          <option value="in-progress">In Progress</option>
+                          <option value="resolved">Resolved</option>
+                        </select>
+                      )}
                     </div>
                   </td>
 
@@ -1242,7 +1302,7 @@ export default function DashboardPage({
               }}
             >
               {item.icon}
-              {item.label}
+              <span>{item.label}</span>
             </button>
           ))}
 
@@ -1262,22 +1322,20 @@ export default function DashboardPage({
                 setMobileMenuOpen(false);
               }}
             >
-              <span className="db-nav-left">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-                <span>Employees</span>
-              </span>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+              <span>Employees</span>
             </button>
           )}
 
@@ -1292,23 +1350,21 @@ export default function DashboardPage({
                 setMobileMenuOpen(false);
               }}
             >
-              <span className="db-nav-left">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <rect x="3" y="4" width="18" height="16" rx="3" />
-                  <circle cx="12" cy="10" r="3" />
-                  <path d="M7 17a5 5 0 0 1 10 0" />
-                </svg>
-                <span>Designation</span>
-              </span>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="3" y="4" width="18" height="16" rx="3" />
+                <circle cx="12" cy="10" r="3" />
+                <path d="M7 17a5 5 0 0 1 10 0" />
+              </svg>
+              <span>Designation</span>
             </button>
           )}
 
@@ -1322,26 +1378,24 @@ export default function DashboardPage({
               setMobileMenuOpen(false);
             }}
           >
-            <span className="db-nav-left">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M3 21h18" />
-                <path d="M5 21V7l8-4v18" />
-                <path d="M19 21V11l-6-3" />
-                <path d="M9 9h1" />
-                <path d="M9 13h1" />
-                <path d="M9 17h1" />
-              </svg>
-              <span>Clients</span>
-            </span>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 21h18" />
+              <path d="M5 21V7l8-4v18" />
+              <path d="M19 21V11l-6-3" />
+              <path d="M9 9h1" />
+              <path d="M9 13h1" />
+              <path d="M9 17h1" />
+            </svg>
+            <span>Clients</span>
           </button>
 
           {/* Tickets menu (available to both Admin and Employee) */}
@@ -1367,6 +1421,38 @@ export default function DashboardPage({
             </svg>
             <span>Tickets</span>
           </button>
+
+          {/* Extras menu (just below tickets in admin sidebar) */}
+          {isAdmin && (
+            <button
+              type="button"
+              className={`db-nav-item ${
+                active === 'extras' ? 'active' : ''
+              }`}
+              onClick={() => {
+                setActive('extras');
+                setMobileMenuOpen(false);
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="20 12 20 22 4 22 4 12" />
+                <rect x="2" y="7" width="20" height="5" />
+                <line x1="12" y1="22" x2="12" y2="7" />
+                <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+                <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+              </svg>
+              <span>Extras</span>
+            </button>
+          )}
         </div>
         
 
@@ -1391,6 +1477,8 @@ export default function DashboardPage({
             />
           ) : active === 'designation' && isAdmin ? (
             <DesignationPage isAdmin={isAdmin} />
+          ) : active === 'extras' && isAdmin ? (
+            <ExtrasPage isAdmin={isAdmin} />
           ) : (
 
             /* Dashboard / Assigned Tickets page */
@@ -1402,6 +1490,78 @@ export default function DashboardPage({
               <p className="db-page-sub">
                 Here's what needs your attention right now.
               </p>
+
+              {/* ── Real-Time Announcements Moving Ticker (Right to Left) ── */}
+              {(() => {
+                const activeAlerts = liveAnnouncements.filter(
+                  (item) => !dismissedAnnouncements.includes(item.id)
+                );
+                if (activeAlerts.length === 0) return null;
+                const hasUrgent = activeAlerts.some((item) => item.priority === 'Urgent');
+
+                return (
+                  <div
+                    className={`db-announcement-ticker ${hasUrgent ? 'urgent' : ''}`}
+                  >
+                    <div className="db-ticker-tag">
+                      <span className="db-ticker-pulse-dot" />
+                      <svg
+                        className="db-ticker-icon"
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="m3 11 18-5v12L3 14v-3z" />
+                        <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+                      </svg>
+                      <span className="db-ticker-tag-label">
+                        {hasUrgent ? 'URGENT' : 'ANNOUNCEMENT'}
+                      </span>
+                    </div>
+
+                    <div className="db-ticker-track-wrap" title="Hover to pause scroll">
+                      <div className="db-ticker-track">
+                        {activeAlerts.map((announcement, idx) => (
+                          <span key={announcement.id} className="db-ticker-item">
+                            {idx > 0 && (
+                              <span className="db-ticker-bulk-divider">✦</span>
+                            )}
+                            <span className="db-ticker-category">
+                              [{announcement.category || 'Notice'}]
+                            </span>
+                            <span className="db-ticker-title">
+                              {announcement.title}
+                            </span>
+                            <span className="db-ticker-separator">—</span>
+                            <span className="db-ticker-content">
+                              {announcement.content}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="db-ticker-dismiss"
+                      onClick={() =>
+                        setDismissedAnnouncements((prev) => [
+                          ...prev,
+                          ...activeAlerts.map((a) => a.id),
+                        ])
+                      }
+                      title="Dismiss announcement"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })()}
 
               {/* ── Notice Message ── */}
               {noticeMessage && (
@@ -1804,24 +1964,24 @@ export default function DashboardPage({
                   </span>
                 </div>
 
-                {viewingTicket.customer && (
+                {(viewingTicket.client || viewingTicket.customer) && (
                   <div className="ticket-desc-meta-item">
-                    <span className="ticket-desc-meta-label">Customer:</span>
-                    <span>{viewingTicket.customer}</span>
+                    <span className="ticket-desc-meta-label">Client:</span>
+                    <span>{viewingTicket.client || viewingTicket.customer}</span>
                   </div>
                 )}
 
-                {viewingTicket.customerMobile && (
+                {(viewingTicket.clientMobile || viewingTicket.customerMobile) && (
                   <div className="ticket-desc-meta-item">
                     <span className="ticket-desc-meta-label">Mobile:</span>
                     <button
                       type="button"
-                      className="ticket-customer-phone"
-                      title={`Contact ${viewingTicket.customer || 'customer'} (${viewingTicket.customerMobile})`}
+                      className="ticket-client-phone"
+                      title={`Contact ${viewingTicket.client || viewingTicket.customer || 'client'} (${viewingTicket.clientMobile || viewingTicket.customerMobile})`}
                       onClick={() =>
                         setContactDialog({
-                          name: viewingTicket.customer || 'Customer',
-                          phone: viewingTicket.customerMobile,
+                          name: viewingTicket.client || viewingTicket.customer || 'Client',
+                          phone: viewingTicket.clientMobile || viewingTicket.customerMobile,
                         })
                       }
                     >
@@ -1837,7 +1997,7 @@ export default function DashboardPage({
                       >
                         <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
                       </svg>
-                      <span>{viewingTicket.customerMobile}</span>
+                      <span>{viewingTicket.clientMobile || viewingTicket.customerMobile}</span>
                     </button>
                   </div>
                 )}
@@ -2117,9 +2277,9 @@ export default function DashboardPage({
       )}
 
       {/* ═══════════════════════════════════════
-          CONTACT CUSTOMER POP-UP DIALOG
+          CONTACT CLIENT POP-UP DIALOG
       ═══════════════════════════════════════ */}
-      <ContactCustomerDialog
+      <ContactClientDialog
         contact={contactDialog}
         onClose={() => setContactDialog(null)}
       />

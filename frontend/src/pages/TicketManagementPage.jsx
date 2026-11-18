@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getToken } from '../api/authApi.js';
-import ContactCustomerDialog from '../components/ContactCustomerDialog.jsx';
+import ContactClientDialog from '../components/ContactClientDialog.jsx';
 import TicketLogsDialog from '../components/TicketLogsDialog.jsx';
 import './TicketManagementPage.css';
 
@@ -9,6 +9,8 @@ const API = 'http://localhost:4000/api';
 const INITIAL_FORM = {
   subject: '',
   userType: 'admin',
+  client: '',
+  clientMobile: '',
   customer: '',
   customerMobile: '',
   category: 'recharge',
@@ -202,10 +204,13 @@ function isTicketNew(createdAt, status) {
 
 // Returns an error message, or '' when the form is valid.
 function validateTicket(ticket) {
+  const clientName = (ticket.client || ticket.customer || '').trim();
+  const mobile = (ticket.clientMobile || ticket.customerMobile || '').trim();
+
   if (
     !ticket.subject.trim() ||
-    !ticket.customer.trim() ||
-    !ticket.customerMobile.trim() ||
+    !clientName ||
+    !mobile ||
     !ticket.description.trim()
   ) {
     return 'Please fill in all required fields.';
@@ -219,7 +224,7 @@ function validateTicket(ticket) {
     return 'Category cannot exceed 75 characters.';
   }
 
-  if (!/^\d{10}$/.test(ticket.customerMobile.trim())) {
+  if (!/^\d{10}$/.test(mobile)) {
     return 'Enter a valid 10-digit mobile number.';
   }
 
@@ -228,11 +233,16 @@ function validateTicket(ticket) {
 
 // Builds the request body used by both create and edit.
 function buildPayload(ticket) {
+  const clientName = (ticket.client || ticket.customer || '').trim();
+  const mobile = (ticket.clientMobile || ticket.customerMobile || '').trim();
+
   return {
     subject: ticket.subject.trim(),
     userType: ticket.userType,
-    customer: ticket.customer.trim(),
-    customerMobile: ticket.customerMobile.trim(),
+    client: clientName,
+    customer: clientName,
+    clientMobile: mobile,
+    customerMobile: mobile,
     category: ticket.category,
     priority: ticket.priority,
     description: ticket.description.trim(),
@@ -307,6 +317,10 @@ function TicketFormFields({ values, onChange, employees, idPrefix, isAdmin }) {
   const id = (name) => `${idPrefix}-ticket-${name}`;
   const isCustomCategory =
     !['recharge', 'payment', 'wallet', 'technical'].includes(values.category);
+  const isStatusLocked =
+    !isAdmin &&
+    idPrefix === 'edit' &&
+    (values.originalStatus === 'resolved' || values.status === 'resolved');
 
   return (
     <div className="ticket-form-grid">
@@ -322,11 +336,14 @@ function TicketFormFields({ values, onChange, employees, idPrefix, isAdmin }) {
       </div>
 
       <div className="ticket-form-field">
-        <label htmlFor={id('customer')}>Client Name *</label>
+        <label htmlFor={id('client')}>Client Name *</label>
         <input
-          id={id('customer')}
-          value={values.customer}
-          onChange={(e) => onChange('customer', e.target.value)}
+          id={id('client')}
+          value={values.client ?? values.customer ?? ''}
+          onChange={(e) => {
+            onChange('client', e.target.value);
+            onChange('customer', e.target.value);
+          }}
           placeholder="Enter client name"
           required
         />
@@ -339,10 +356,12 @@ function TicketFormFields({ values, onChange, employees, idPrefix, isAdmin }) {
           type="tel"
           inputMode="numeric"
           maxLength={10}
-          value={values.customerMobile}
-          onChange={(e) =>
-            onChange('customerMobile', e.target.value.replace(/\D/g, ''))
-          }
+          value={values.clientMobile ?? values.customerMobile ?? ''}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, '');
+            onChange('clientMobile', val);
+            onChange('customerMobile', val);
+          }}
           placeholder="10-digit mobile number"
           required
         />
@@ -427,11 +446,21 @@ function TicketFormFields({ values, onChange, employees, idPrefix, isAdmin }) {
       </div>
 
       <div className="ticket-form-field">
-        <label htmlFor={id('status')}>Status *</label>
+        <label htmlFor={id('status')}>
+          Status *
+          {isStatusLocked && (
+            <span style={{ fontSize: 11, fontWeight: 500, color: '#047857', marginLeft: 8 }}>
+              🔒 Resolved (Admin only can re-open)
+            </span>
+          )}
+        </label>
         <select
           id={id('status')}
           value={values.status}
           onChange={(e) => onChange('status', e.target.value)}
+          disabled={isStatusLocked}
+          style={isStatusLocked ? { background: '#f8fafc', cursor: 'not-allowed', color: '#64748b' } : {}}
+          title={isStatusLocked ? 'Only administrators can re-open or change the status of a resolved ticket.' : 'Select status'}
         >
           <option value="open">Open</option>
           <option value="in-progress">In Progress</option>
@@ -753,8 +782,10 @@ export default function TicketManagementPage() {
       id: ticket.id,
       subject: ticket.subject || '',
       userType: ticket.userType || 'client',
-      customer: ticket.customer || '',
-      customerMobile: ticket.customerMobile || '',
+      client: ticket.client || ticket.customer || '',
+      customer: ticket.client || ticket.customer || '',
+      clientMobile: ticket.clientMobile || ticket.customerMobile || '',
+      customerMobile: ticket.clientMobile || ticket.customerMobile || '',
       category: ticket.category || 'recharge',
       priority: ticket.priority || 'medium',
       description: ticket.description || '',
@@ -763,6 +794,7 @@ export default function TicketManagementPage() {
           ? String(ticket.assignedToId)
           : '',
       status: ticket.status || 'open',
+      originalStatus: ticket.status || 'open',
     });
   }
 
@@ -781,6 +813,11 @@ export default function TicketManagementPage() {
     if (!editingTicket) return;
 
     setActionError('');
+
+    if (editingTicket.originalStatus === 'resolved' && editingTicket.status !== 'resolved' && !isAdmin) {
+      setActionError('Only administrators can re-open or change the status of a resolved ticket.');
+      return;
+    }
 
     const validationError = validateTicket(editingTicket);
     if (validationError) {
@@ -895,6 +932,11 @@ export default function TicketManagementPage() {
 
   async function handleInlineUpdate(ticket, field, value) {
     if (!ticket || !field || ticket[field] === value) return;
+
+    if (ticket.status === 'resolved' && field === 'status' && !isAdmin) {
+      setActionError('Only administrators can re-open or change the status of a resolved ticket.');
+      return;
+    }
 
     const oldValue = ticket[field];
     const willBeResolved = field === 'status' && value === 'resolved';
@@ -1083,7 +1125,7 @@ export default function TicketManagementPage() {
           <p className="db-page-sub">
             {isAdmin
               ? 'View tickets, manage details and assign them to employees.'
-              : 'View and track support tickets.'}
+              : 'Create tickets, view and track support requests.'}
           </p>
         </div>
 
@@ -1098,16 +1140,14 @@ export default function TicketManagementPage() {
           >
             Refresh
           </button>
-
-          {isAdmin && (
-            <button
-              type="button"
-              className="ticket-create-button"
-              onClick={openCreateDialog}
-            >
-              + Create Ticket
-            </button>
-          )}
+          {/* Create Ticket Button */}
+          <button
+            type="button"
+            className="ticket-create-button"
+            onClick={openCreateDialog}
+          >
+            + Create Ticket
+          </button>
         </div>
       </div>
 
@@ -1281,7 +1321,7 @@ export default function TicketManagementPage() {
                 <thead>
                   <tr>
                     <th>Ticket ID</th>
-                    <th>Customer</th>
+                    <th>Client</th>
                     <th>Category</th>
                     <th>Priority</th>
                     <th>Status</th>
@@ -1317,12 +1357,12 @@ export default function TicketManagementPage() {
                           </div>
                         </td>
 
-                        {/* 2. Customer */}
+                        {/* 2. Client */}
                         <td>
-                          <div className="ticket-customer-cell">
+                          <div className="ticket-client-cell">
                             <div
-                              className="ticket-customer-avatar"
-                              title={ticket.customer || ticket.createdBy || 'Customer'}
+                              className="ticket-client-avatar"
+                              title={ticket.client || ticket.customer || ticket.createdBy || 'Client'}
                             >
                               <svg
                                 width="14"
@@ -1338,20 +1378,20 @@ export default function TicketManagementPage() {
                                 <circle cx="12" cy="7" r="4" />
                               </svg>
                             </div>
-                            <div className="ticket-customer-info">
-                              <span className="ticket-customer-name">
-                                {ticket.customer || ticket.createdBy || '—'}
+                            <div className="ticket-client-info">
+                              <span className="ticket-client-name">
+                                {ticket.client || ticket.customer || ticket.createdBy || '—'}
                               </span>
-                              {ticket.customerMobile && (
+                              {(ticket.clientMobile || ticket.customerMobile) && (
                                 <button
                                   type="button"
-                                  className="ticket-customer-phone"
-                                  title={`Contact ${ticket.customer || 'customer'} (${ticket.customerMobile})`}
-                                  aria-label={`Contact ${ticket.customer || 'customer'} at ${ticket.customerMobile}`}
+                                  className="ticket-client-phone"
+                                  title={`Contact ${ticket.client || ticket.customer || 'client'} (${ticket.clientMobile || ticket.customerMobile})`}
+                                  aria-label={`Contact ${ticket.client || ticket.customer || 'client'} at ${ticket.clientMobile || ticket.customerMobile}`}
                                   onClick={() =>
                                     setContactDialog({
-                                      name: ticket.customer || ticket.createdBy || 'Customer',
-                                      phone: ticket.customerMobile,
+                                      name: ticket.client || ticket.customer || ticket.createdBy || 'Client',
+                                      phone: ticket.clientMobile || ticket.customerMobile,
                                     })
                                   }
                                 >
@@ -1367,7 +1407,7 @@ export default function TicketManagementPage() {
                                   >
                                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
                                   </svg>
-                                  <span>{ticket.customerMobile}</span>
+                                  <span>{ticket.clientMobile || ticket.customerMobile}</span>
                                 </button>
                               )}
                             </div>
@@ -1438,23 +1478,46 @@ export default function TicketManagementPage() {
                         {/* 5. Status */}
                         <td>
                           <div className="ticket-row-cell-wrap">
-                            <select
-                              className="ticket-row-badge-select"
-                              style={{
-                                color: '#334155',
-                                backgroundColor: '#ffffff',
-                                borderColor: '#e2e8f0',
-                              }}
-                              value={ticket.status || 'open'}
-                              onChange={(e) =>
-                                handleInlineUpdate(ticket, 'status', e.target.value)
-                              }
-                              title="Select status"
-                            >
-                              <option value="open">Open</option>
-                              <option value="in-progress">In Progress</option>
-                              <option value="resolved">Resolved</option>
-                            </select>
+                            {ticket.status === 'resolved' && !isAdmin ? (
+                              <span
+                                className="ticket-status-locked-badge"
+                                title="Resolved tickets can only be changed by an administrator."
+                              >
+                                <svg
+                                  width="11"
+                                  height="11"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  style={{ marginRight: 4, flexShrink: 0 }}
+                                >
+                                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                </svg>
+                                Resolved
+                              </span>
+                            ) : (
+                              <select
+                                className="ticket-row-badge-select"
+                                style={{
+                                  color: '#334155',
+                                  backgroundColor: '#ffffff',
+                                  borderColor: '#e2e8f0',
+                                }}
+                                value={ticket.status || 'open'}
+                                onChange={(e) =>
+                                  handleInlineUpdate(ticket, 'status', e.target.value)
+                                }
+                                title="Select status"
+                              >
+                                <option value="open">Open</option>
+                                <option value="in-progress">In Progress</option>
+                                <option value="resolved">Resolved</option>
+                              </select>
+                            )}
                           </div>
                         </td>
 
@@ -1619,7 +1682,7 @@ export default function TicketManagementPage() {
                 values={ticketForm}
                 onChange={updateTicketForm}
                 employees={employees}
-                isAdmin={true}
+                isAdmin={isAdmin}
               />
 
               {employeeError && (
@@ -1690,7 +1753,7 @@ export default function TicketManagementPage() {
                 values={editingTicket}
                 onChange={updateEditingTicket}
                 employees={employees}
-                isAdmin={true}
+                isAdmin={isAdmin}
               />
 
               <div className="ticket-dialog-actions">
@@ -1882,24 +1945,24 @@ export default function TicketManagementPage() {
                   </span>
                 </div>
 
-                {viewingTicket.customer && (
+                {(viewingTicket.client || viewingTicket.customer) && (
                   <div className="ticket-desc-meta-item">
-                    <span className="ticket-desc-meta-label">Customer:</span>
-                    <span>{viewingTicket.customer}</span>
+                    <span className="ticket-desc-meta-label">Client:</span>
+                    <span>{viewingTicket.client || viewingTicket.customer}</span>
                   </div>
                 )}
 
-                {viewingTicket.customerMobile && (
+                {(viewingTicket.clientMobile || viewingTicket.customerMobile) && (
                   <div className="ticket-desc-meta-item">
                     <span className="ticket-desc-meta-label">Mobile:</span>
                     <button
                       type="button"
-                      className="ticket-customer-phone"
-                      title={`Contact ${viewingTicket.customer || 'customer'} (${viewingTicket.customerMobile})`}
+                      className="ticket-client-phone"
+                      title={`Contact ${viewingTicket.client || viewingTicket.customer || 'client'} (${viewingTicket.clientMobile || viewingTicket.customerMobile})`}
                       onClick={() =>
                         setContactDialog({
-                          name: viewingTicket.customer || 'Customer',
-                          phone: viewingTicket.customerMobile,
+                          name: viewingTicket.client || viewingTicket.customer || 'Client',
+                          phone: viewingTicket.clientMobile || viewingTicket.customerMobile,
                         })
                       }
                     >
@@ -1915,7 +1978,7 @@ export default function TicketManagementPage() {
                       >
                         <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
                       </svg>
-                      <span>{viewingTicket.customerMobile}</span>
+                      <span>{viewingTicket.clientMobile || viewingTicket.customerMobile}</span>
                     </button>
                   </div>
                 )}
@@ -1967,9 +2030,9 @@ export default function TicketManagementPage() {
       )}
 
       {/* ═══════════════════════════════════════
-          CONTACT CUSTOMER POP-UP DIALOG
+          CONTACT CLIENT POP-UP DIALOG
       ═══════════════════════════════════════ */}
-      <ContactCustomerDialog
+      <ContactClientDialog
         contact={contactDialog}
         onClose={() => setContactDialog(null)}
       />

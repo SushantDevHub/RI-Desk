@@ -80,9 +80,9 @@ npm run dev      # Runs at http://localhost:5173
 
 - **Role-Based Access Control**:
   - **Admin**: Full access to dashboard statistics, ticket management, employee management (create, edit, delete), and status tracking.
-  - **Employee**: Dedicated dashboard showing assigned tickets, status dropdown editor (`Open`, `In Progress`, `Resolved`), customer contact details, and resolution tracking.
-- **Direct Customer Contact**:
-  - Every ticket displays customer avatar with a clickable phone link (`tel:<mobile>`) allowing employees or admins to connect immediately.
+  - **Employee**: Dedicated dashboard showing assigned tickets, status dropdown editor (`Open`, `In Progress`, `Resolved`), client contact details, and resolution tracking.
+- **Direct Client Contact**:
+  - Every ticket displays client avatar with a clickable phone link (`tel:<mobile>`) allowing employees or admins to connect immediately.
 - **Live Resolution Time**:
   - Automatically calculates and stores duration from ticket creation to resolution upon marking resolved.
 - **JWT Authentication**:

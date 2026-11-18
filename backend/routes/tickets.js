@@ -422,8 +422,10 @@ router.post('/', authenticate, (req, res) => {
       subject,
       description,
       priority = 'medium',
-      userType = 'admin',
+      userType = 'client',
+      client = '',
       customer = '',
+      clientMobile = '',
       customerMobile = '',
       category = 'recharge',
       status = 'open',
@@ -550,12 +552,17 @@ router.post('/', authenticate, (req, res) => {
       ],
     });
 
+    const finalClient = String(client || customer || '').trim();
+    const finalClientMobile = String(clientMobile || customerMobile || '').trim();
+
     const ticket = {
       id: `TKT-${nextNumber}`,
       subject: subject.trim(),
       userType,
-      customer: String(customer).trim(),
-      customerMobile: String(customerMobile).trim(),
+      client: finalClient,
+      customer: finalClient,
+      clientMobile: finalClientMobile,
+      customerMobile: finalClientMobile,
       category: cleanedCategory,
       description: description.trim(),
       priority,
@@ -860,6 +867,17 @@ router.patch('/:id', authenticate, (req, res) => {
         });
       }
 
+      // Security constraint: Once a ticket is resolved, only admins can change its status
+      if (
+        existing.status === 'resolved' &&
+        status !== 'resolved' &&
+        req.user.role !== 'admin'
+      ) {
+        return res.status(403).json({
+          error: 'Only administrators can re-open or change the status of a resolved ticket.',
+        });
+      }
+
       newStatus = status;
       if (status !== existing.status) {
         changes.push({
@@ -965,7 +983,7 @@ router.patch('/:id', authenticate, (req, res) => {
 router.put('/:id', authenticate, (req, res) => {
   try {
     const {
-      subject, userType, customer, customerMobile,
+      subject, userType, client, customer, clientMobile, customerMobile,
       category, priority, description, assignedToId, status,
     } = req.body;
 
@@ -1009,6 +1027,17 @@ router.put('/:id', authenticate, (req, res) => {
     const existing = getAllTickets().find((t) => String(t.id) === String(req.params.id));
     if (!existing) {
       return res.status(404).json({ error: 'Ticket not found.' });
+    }
+
+    // Security constraint: Once a ticket is resolved, only admins can change its status
+    if (
+      existing.status === 'resolved' &&
+      status !== 'resolved' &&
+      req.user.role !== 'admin'
+    ) {
+      return res.status(403).json({
+        error: 'Only administrators can re-open or change the status of a resolved ticket.',
+      });
     }
 
     const oldPriority = existing.priority || 'medium';
@@ -1072,17 +1101,20 @@ router.put('/:id', authenticate, (req, res) => {
         newValue: newDescription || 'None',
       });
     }
-    const oldCustomer = (existing.customer || '').trim();
-    const newCustomer = String(customer ?? '').trim();
-    if (oldCustomer !== newCustomer) {
+    const incomingClient = client !== undefined ? client : customer;
+    const oldClient = (existing.client || existing.customer || '').trim();
+    const newClient = incomingClient !== undefined ? String(incomingClient).trim() : oldClient;
+    if (oldClient !== newClient) {
       changes.push({
-        field: 'Customer',
-        oldValue: oldCustomer || 'None',
-        newValue: newCustomer || 'None',
+        field: 'Client',
+        oldValue: oldClient || 'None',
+        newValue: newClient || 'None',
       });
     }
-    const oldMobile = (existing.customerMobile || '').trim();
-    const newMobile = String(customerMobile ?? '').trim();
+
+    const incomingMobile = clientMobile !== undefined ? clientMobile : customerMobile;
+    const oldMobile = (existing.clientMobile || existing.customerMobile || '').trim();
+    const newMobile = incomingMobile !== undefined ? String(incomingMobile).trim() : oldMobile;
     if (oldMobile !== newMobile) {
       changes.push({
         field: 'Mobile',
@@ -1139,8 +1171,10 @@ router.put('/:id', authenticate, (req, res) => {
     const updated = updateTicket(req.params.id, {
       subject: subject.trim(),
       userType,
-      customer: String(customer ?? '').trim(),
-      customerMobile: String(customerMobile ?? '').trim(),
+      client: newClient,
+      customer: newClient,
+      clientMobile: newMobile,
+      customerMobile: newMobile,
       category: cleanedCategory,
       priority,
       description: description.trim(),

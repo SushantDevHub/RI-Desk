@@ -40,7 +40,7 @@ export default function ContactCustomerDialog({ contact, onClose }) {
       >
         <div className="contact-dialog-header">
           <div className="contact-dialog-header-info">
-            <h2 id="contact-dialog-title">Contact Customer</h2>
+            <h2 id="contact-dialog-title">Contact Client</h2>
             <p>Choose your preferred communication method</p>
           </div>
           <button
@@ -59,7 +59,7 @@ export default function ContactCustomerDialog({ contact, onClose }) {
           </div>
           <div className="contact-dialog-details">
             <span className="contact-dialog-name">
-              {contact.name || 'Customer'}
+              {contact.name || 'Client'}
             </span>
             <span className="contact-dialog-number">{displayPhone}</span>
           </div>

@@ -610,7 +610,7 @@ export default function DesignationPage({ isAdmin = true }) {
                       <option value="Technical">Technical</option>
                       <option value="Billing">Billing</option>
                       <option value="Operations">Operations</option>
-                      <option value="Customer Service">Customer Service</option>
+                      <option value="Client Service">Client Service</option>
                       <option value="Management">Management</option>
                     </select>
                   </div>
