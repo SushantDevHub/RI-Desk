@@ -61,6 +61,261 @@ const PRIORITY_ORDER = {
   low: 3,
 };
 
+function capitalize(str = '') {
+  if (!str) return '';
+  return String(str).charAt(0).toUpperCase() + String(str).slice(1);
+}
+
+function formatStatus(status = '') {
+  if (status === 'in-progress') return 'In Progress';
+  if (status === 'resolved') return 'Resolved';
+  if (status === 'open') return 'Open';
+  return capitalize(status);
+}
+
+function buildChangeSentence(change) {
+  const fieldName = change.field === 'Assignment' ? 'Assigned Status' : change.field;
+  const oldVal = change.oldValue || 'None';
+  const newVal = change.newValue || 'None';
+  return `${fieldName} changed from "${oldVal}" to "${newVal}"`;
+}
+
+function buildLogMessage(changes = [], action = '') {
+  if (!changes || changes.length === 0) return action || 'Ticket updated';
+  if (action === 'Ticket Created') {
+    return `Ticket created with ${changes
+      .map((c) => `${c.field === 'Assignment' ? 'Assigned Status' : c.field}: "${c.newValue}"`)
+      .join(', ')}`;
+  }
+  return changes.map(buildChangeSentence).join(' • ');
+}
+
+function createLogEntry({
+  performedBy = 'Admin User',
+  performedByRole = 'admin',
+  action = 'Updated',
+  changes = [],
+  priority = null,
+  status = null,
+  assignment = null,
+  message = null,
+}) {
+  const generatedMessage = message || buildLogMessage(changes, action);
+  return {
+    id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    timestamp: new Date().toISOString(),
+    performedBy,
+    performedByRole,
+    action,
+    message: generatedMessage,
+    priority,
+    status,
+    assignment,
+    changes,
+  };
+}
+
+function getOrSynthesizeLogs(ticket) {
+  if (!ticket) return [];
+
+  const isAssigned = Boolean(ticket.assignedTo || ticket.assignedToId);
+  const employeeName = ticket.assignedTo || null;
+  const actualAssignmentText = isAssigned
+    ? `Assigned (${employeeName})`
+    : 'Not Assigned (Unassigned)';
+  const actualPriority = capitalize(ticket.priority || 'medium');
+  const actualStatus = formatStatus(ticket.status || 'open');
+  const actualDescription = (ticket.description || '').trim();
+  const actualCategory = capitalize(ticket.category || 'Recharge');
+  const actualSubject = (ticket.subject || '').trim();
+
+  let logs = [];
+  if (Array.isArray(ticket.logs) && ticket.logs.length > 0) {
+    logs = ticket.logs.map((log) => ({ ...log }));
+  } else {
+    // Initial creation log
+    const initialLog = {
+      id: `log_init_${ticket.id || Date.now()}`,
+      timestamp: ticket.createdAt || new Date().toISOString(),
+      performedBy: ticket.createdBy || 'Admin User',
+      performedByRole: 'admin',
+      action: 'Ticket Created',
+      priority: {
+        old: null,
+        new: ticket.priority || 'medium',
+      },
+      status: {
+        old: null,
+        new: ticket.status || 'open',
+      },
+      assignment: {
+        old: null,
+        new: employeeName,
+        oldAssigned: false,
+        newAssigned: isAssigned,
+      },
+      changes: [
+        {
+          field: 'Priority',
+          oldValue: 'None',
+          newValue: actualPriority,
+        },
+        {
+          field: 'Status',
+          oldValue: 'None',
+          newValue: actualStatus,
+        },
+        {
+          field: 'Assignment',
+          oldValue: 'None',
+          newValue: actualAssignmentText,
+          isAssigned,
+        },
+        {
+          field: 'Description',
+          oldValue: 'None',
+          newValue: actualDescription || 'No description provided',
+        },
+      ],
+      message: `Ticket created with Priority: "${actualPriority}", Status: "${actualStatus}", Assignment: "${actualAssignmentText}"`,
+    };
+
+    logs = [initialLog];
+  }
+
+  // Track the latest logged state across all logs in chronological order
+  const lastLoggedState = {
+    priority: null,
+    status: null,
+    assignment: null,
+    isAssigned: null,
+    description: null,
+    category: null,
+    subject: null,
+  };
+
+  logs.forEach((log) => {
+    if (log.priority && log.priority.new !== undefined && log.priority.new !== null) {
+      lastLoggedState.priority = capitalize(log.priority.new);
+    }
+    if (log.status && log.status.new !== undefined && log.status.new !== null) {
+      lastLoggedState.status = formatStatus(log.status.new);
+    }
+    if (log.assignment) {
+      if (log.assignment.newAssigned !== undefined) {
+        lastLoggedState.isAssigned = Boolean(log.assignment.newAssigned);
+      }
+      if (log.assignment.new !== undefined && log.assignment.new !== null) {
+        lastLoggedState.assignment = log.assignment.newAssigned
+          ? `Assigned (${log.assignment.new})`
+          : 'Not Assigned (Unassigned)';
+      }
+    }
+    if (Array.isArray(log.changes)) {
+      log.changes.forEach((c) => {
+        if (!c || !c.field) return;
+        const f = String(c.field).toLowerCase();
+        if (f === 'priority') lastLoggedState.priority = capitalize(c.newValue);
+        if (f === 'status') lastLoggedState.status = formatStatus(c.newValue);
+        if (f === 'assignment') {
+          lastLoggedState.assignment = c.newValue;
+          lastLoggedState.isAssigned =
+            c.newAssigned ?? c.isAssigned ?? (c.newValue && !c.newValue.includes('Not Assigned'));
+        }
+        if (f === 'description') lastLoggedState.description = c.newValue;
+        if (f === 'category') lastLoggedState.category = capitalize(c.newValue);
+        if (f === 'subject') lastLoggedState.subject = c.newValue;
+      });
+    }
+  });
+
+  // Reconcile any divergence between the last logged state and the current ticket state
+  const missingChanges = [];
+
+  if (lastLoggedState.priority && lastLoggedState.priority !== actualPriority) {
+    missingChanges.push({
+      field: 'Priority',
+      oldValue: lastLoggedState.priority,
+      newValue: actualPriority,
+    });
+  }
+
+  if (lastLoggedState.status && lastLoggedState.status !== actualStatus) {
+    missingChanges.push({
+      field: 'Status',
+      oldValue: lastLoggedState.status,
+      newValue: actualStatus,
+    });
+  }
+
+  if (lastLoggedState.assignment && lastLoggedState.assignment !== actualAssignmentText) {
+    missingChanges.push({
+      field: 'Assignment',
+      oldValue: lastLoggedState.assignment,
+      newValue: actualAssignmentText,
+      oldAssigned: Boolean(lastLoggedState.isAssigned),
+      newAssigned: actualIsAssigned,
+    });
+  }
+
+  if (
+    lastLoggedState.description !== null &&
+    actualDescription &&
+    lastLoggedState.description.trim() !== actualDescription
+  ) {
+    missingChanges.push({
+      field: 'Description',
+      oldValue: lastLoggedState.description || 'None',
+      newValue: actualDescription || 'None',
+    });
+  }
+
+  if (lastLoggedState.category && lastLoggedState.category !== actualCategory) {
+    missingChanges.push({
+      field: 'Category',
+      oldValue: lastLoggedState.category,
+      newValue: actualCategory,
+    });
+  }
+
+  if (lastLoggedState.subject && actualSubject && lastLoggedState.subject !== actualSubject) {
+    missingChanges.push({
+      field: 'Subject',
+      oldValue: lastLoggedState.subject,
+      newValue: actualSubject,
+    });
+  }
+
+  if (missingChanges.length > 0) {
+    const reconciledLog = createLogEntry({
+      performedBy: ticket.resolvedBy || 'Admin User',
+      performedByRole: ticket.resolvedBy ? 'admin' : 'employee',
+      action: missingChanges
+        .map((c) => `${c.field === 'Assignment' ? 'Assignment' : c.field} Changed`)
+        .join(', '),
+      priority: {
+        old: lastLoggedState.priority || actualPriority,
+        new: actualPriority,
+      },
+      status: {
+        old: lastLoggedState.status || actualStatus,
+        new: actualStatus,
+      },
+      assignment: {
+        old: lastLoggedState.assignment || 'Not Assigned (Unassigned)',
+        new: actualAssignmentText,
+        oldAssigned: Boolean(lastLoggedState.isAssigned),
+        newAssigned: actualIsAssigned,
+      },
+      changes: missingChanges,
+      timestamp: ticket.updatedAt || new Date().toISOString(),
+    });
+    logs.push(reconciledLog);
+  }
+
+  return logs;
+}
+
 // --------------------------------------------------
 // Allow only admins
 // --------------------------------------------------
@@ -101,7 +356,10 @@ router.get('/', authenticate, (req, res) => {
       ).length,
     };
 
-    const sortedTickets = [...tickets].sort((a, b) => {
+    const sortedTickets = [...tickets].map((t) => ({
+      ...t,
+      logs: getOrSynthesizeLogs(t),
+    })).sort((a, b) => {
       const pA = PRIORITY_ORDER[String(a.priority).toLowerCase()] || 4;
       const pB = PRIORITY_ORDER[String(b.priority).toLowerCase()] || 4;
       if (pA !== pB) {
@@ -245,6 +503,53 @@ router.post('/', authenticate, (req, res) => {
       }, 1000) + 1;
 
     // Create the ticket with its employee assignment
+    const isAssigned = Boolean(employee);
+    const employeeName = employee ? employee.name : null;
+    const createdAt = new Date().toISOString();
+
+    const initialLog = createLogEntry({
+      performedBy: req.user.name || 'Admin User',
+      performedByRole: req.user.role || 'admin',
+      action: 'Ticket Created',
+      priority: {
+        old: null,
+        new: priority,
+      },
+      status: {
+        old: null,
+        new: status,
+      },
+      assignment: {
+        old: null,
+        new: employeeName,
+        oldAssigned: false,
+        newAssigned: isAssigned,
+      },
+      changes: [
+        {
+          field: 'Priority',
+          oldValue: 'None',
+          newValue: capitalize(priority),
+        },
+        {
+          field: 'Status',
+          oldValue: 'None',
+          newValue: formatStatus(status),
+        },
+        {
+          field: 'Assignment',
+          oldValue: 'None',
+          newValue: isAssigned ? `Assigned (${employeeName})` : 'Not Assigned (Unassigned)',
+          isAssigned,
+        },
+        {
+          field: 'Description',
+          oldValue: 'None',
+          newValue: description.trim() || 'No description provided',
+        },
+      ],
+    });
+
     const ticket = {
       id: `TKT-${nextNumber}`,
       subject: subject.trim(),
@@ -262,7 +567,8 @@ router.post('/', authenticate, (req, res) => {
       assignedTo: employee ? employee.name : null,
       assignedToId: employee ? employee.id : null,
 
-      createdAt: new Date().toISOString(),
+      createdAt,
+      logs: [initialLog],
     };
 
     addTicket(ticket);
@@ -313,9 +619,60 @@ router.patch(
         });
       }
 
+      const existing = getAllTickets().find(
+        (t) => String(t.id) === String(req.params.id)
+      );
+
+      if (!existing) {
+        return res.status(404).json({
+          error: 'Ticket not found.',
+        });
+      }
+
+      const oldEmployeeName = existing.assignedTo || null;
+      const oldIsAssigned = Boolean(existing.assignedTo || existing.assignedToId);
+      const newEmployeeName = employee ? employee.name : null;
+      const newIsAssigned = Boolean(employee);
+
+      const assignLog = createLogEntry({
+        performedBy: req.user.name || 'Admin User',
+        performedByRole: req.user.role || 'admin',
+        action: 'Assignment Updated',
+        priority: {
+          old: existing.priority || 'medium',
+          new: existing.priority || 'medium',
+        },
+        status: {
+          old: existing.status || 'open',
+          new: existing.status || 'open',
+        },
+        assignment: {
+          old: oldEmployeeName,
+          new: newEmployeeName,
+          oldAssigned: oldIsAssigned,
+          newAssigned: newIsAssigned,
+        },
+        changes: [
+          {
+            field: 'Assignment',
+            oldValue: oldIsAssigned
+              ? `Assigned (${oldEmployeeName})`
+              : 'Not Assigned (Unassigned)',
+            newValue: newIsAssigned
+              ? `Assigned (${newEmployeeName})`
+              : 'Not Assigned (Unassigned)',
+            oldAssigned: oldIsAssigned,
+            newAssigned: newIsAssigned,
+          },
+        ],
+      });
+
+      const currentLogs = getOrSynthesizeLogs(existing);
+
       const updated = updateTicket(req.params.id, {
         assignedTo: employee.name,
         assignedToId: employee.id,
+        logs: [...currentLogs, assignLog],
         updatedAt: new Date().toISOString(),
       });
 
@@ -385,8 +742,58 @@ router.patch('/:id', authenticate, (req, res) => {
       });
     }
 
-    const { status, priority, category } = req.body;
+    const { status, priority, category, description, subject, assignedToId } = req.body;
     const updates = {};
+    const changes = [];
+
+    const oldPriority = existing.priority || 'medium';
+    let newPriority = oldPriority;
+
+    const oldStatus = existing.status || 'open';
+    let newStatus = oldStatus;
+
+    const isAssigned = Boolean(existing.assignedTo || existing.assignedToId);
+    const employeeName = existing.assignedTo || null;
+    let newAssignedTo = employeeName;
+    let newIsAssigned = isAssigned;
+
+    if (assignedToId !== undefined) {
+      if (
+        assignedToId === null ||
+        assignedToId === '' ||
+        assignedToId === 0 ||
+        String(assignedToId).trim().toLowerCase() === 'unassigned'
+      ) {
+        updates.assignedToId = null;
+        updates.assignedTo = null;
+        newAssignedTo = null;
+        newIsAssigned = false;
+      } else {
+        const emp = getAllUsers().find(
+          (u) => String(u.id) === String(assignedToId) && u.role === 'employee'
+        );
+        if (emp) {
+          updates.assignedToId = emp.id;
+          updates.assignedTo = emp.name;
+          newAssignedTo = emp.name;
+          newIsAssigned = true;
+        }
+      }
+
+      if (newAssignedTo !== employeeName || newIsAssigned !== isAssigned) {
+        changes.push({
+          field: 'Assignment',
+          oldValue: isAssigned
+            ? `Assigned (${employeeName})`
+            : 'Not Assigned (Unassigned)',
+          newValue: newIsAssigned
+            ? `Assigned (${newAssignedTo})`
+            : 'Not Assigned (Unassigned)',
+          oldAssigned: isAssigned,
+          newAssigned: newIsAssigned,
+        });
+      }
+    }
 
     if (category !== undefined) {
       const cleanedCategory = String(category || '').trim();
@@ -400,13 +807,65 @@ router.patch('/:id', authenticate, (req, res) => {
           error: 'Category cannot exceed 75 characters.',
         });
       }
+      if (cleanedCategory !== existing.category) {
+        changes.push({
+          field: 'Category',
+          oldValue: capitalize(existing.category || 'Custom'),
+          newValue: capitalize(cleanedCategory),
+        });
+      }
       updates.category = cleanedCategory;
+    }
+
+    if (subject !== undefined) {
+      const trimmedSubject = String(subject || '').trim();
+      if (!trimmedSubject) {
+        return res.status(400).json({
+          error: 'Subject cannot be empty.',
+        });
+      }
+      const oldSubject = (existing.subject || '').trim();
+      if (oldSubject !== trimmedSubject) {
+        changes.push({
+          field: 'Subject',
+          oldValue: oldSubject || 'None',
+          newValue: trimmedSubject || 'None',
+        });
+      }
+      updates.subject = trimmedSubject;
+    }
+
+    if (description !== undefined) {
+      const trimmedDesc = String(description || '').trim();
+      if (!trimmedDesc) {
+        return res.status(400).json({
+          error: 'Description cannot be empty.',
+        });
+      }
+      const oldDesc = (existing.description || '').trim();
+      if (oldDesc !== trimmedDesc) {
+        changes.push({
+          field: 'Description',
+          oldValue: oldDesc || 'None',
+          newValue: trimmedDesc || 'None',
+        });
+      }
+      updates.description = trimmedDesc;
     }
 
     if (status !== undefined) {
       if (!['open', 'in-progress', 'resolved'].includes(status)) {
         return res.status(400).json({
           error: 'Invalid status.',
+        });
+      }
+
+      newStatus = status;
+      if (status !== existing.status) {
+        changes.push({
+          field: 'Status',
+          oldValue: formatStatus(existing.status),
+          newValue: formatStatus(status),
         });
       }
 
@@ -436,6 +895,15 @@ router.patch('/:id', authenticate, (req, res) => {
         });
       }
 
+      newPriority = priority;
+      if (priority !== existing.priority) {
+        changes.push({
+          field: 'Priority',
+          oldValue: capitalize(existing.priority),
+          newValue: capitalize(priority),
+        });
+      }
+
       updates.priority = priority;
     }
 
@@ -445,12 +913,40 @@ router.patch('/:id', authenticate, (req, res) => {
       });
     }
 
+    const currentLogs = getOrSynthesizeLogs(existing);
+    if (changes.length > 0) {
+      const logEntry = createLogEntry({
+        performedBy: req.user.name || 'User',
+        performedByRole: req.user.role || 'user',
+        action: changes.map((c) => `${c.field} Changed`).join(', '),
+        priority: {
+          old: oldPriority,
+          new: newPriority,
+        },
+        status: {
+          old: oldStatus,
+          new: newStatus,
+        },
+        assignment: {
+          old: employeeName,
+          new: newAssignedTo,
+          oldAssigned: isAssigned,
+          newAssigned: newIsAssigned,
+        },
+        changes,
+      });
+      updates.logs = [...currentLogs, logEntry];
+    }
+
     updates.updatedAt = new Date().toISOString();
 
     const updated = updateTicket(req.params.id, updates);
 
     return res.json({
-      message: 'Ticket updated successfully.',
+      message:
+        changes.length > 0
+          ? buildLogMessage(changes, 'Ticket Updated')
+          : 'Ticket updated successfully.',
       ticket: updated,
     });
   } catch (error) {
@@ -511,6 +1007,116 @@ router.put('/:id', authenticate, (req, res) => {
     }
 
     const existing = getAllTickets().find((t) => String(t.id) === String(req.params.id));
+    if (!existing) {
+      return res.status(404).json({ error: 'Ticket not found.' });
+    }
+
+    const oldPriority = existing.priority || 'medium';
+    const newPriority = priority;
+    const oldStatus = existing.status || 'open';
+    const newStatus = status;
+
+    const oldAssignedTo = existing.assignedTo || null;
+    const oldIsAssigned = Boolean(existing.assignedTo || existing.assignedToId);
+    const newAssignedTo = employee ? employee.name : null;
+    const newIsAssigned = Boolean(employee);
+
+    const changes = [];
+    if (oldPriority !== newPriority) {
+      changes.push({
+        field: 'Priority',
+        oldValue: capitalize(oldPriority),
+        newValue: capitalize(newPriority),
+      });
+    }
+    if (oldStatus !== newStatus) {
+      changes.push({
+        field: 'Status',
+        oldValue: formatStatus(oldStatus),
+        newValue: formatStatus(newStatus),
+      });
+    }
+    if (oldAssignedTo !== newAssignedTo || oldIsAssigned !== newIsAssigned) {
+      changes.push({
+        field: 'Assignment',
+        oldValue: oldIsAssigned
+          ? `Assigned (${oldAssignedTo})`
+          : 'Not Assigned (Unassigned)',
+        newValue: newIsAssigned
+          ? `Assigned (${newAssignedTo})`
+          : 'Not Assigned (Unassigned)',
+        oldAssigned: oldIsAssigned,
+        newAssigned: newIsAssigned,
+      });
+    }
+    if (existing.category !== cleanedCategory) {
+      changes.push({
+        field: 'Category',
+        oldValue: capitalize(existing.category || 'Custom'),
+        newValue: capitalize(cleanedCategory),
+      });
+    }
+    if (existing.subject !== subject.trim()) {
+      changes.push({
+        field: 'Subject',
+        oldValue: existing.subject || '',
+        newValue: subject.trim(),
+      });
+    }
+    const oldDescription = (existing.description || '').trim();
+    const newDescription = description.trim();
+    if (oldDescription !== newDescription) {
+      changes.push({
+        field: 'Description',
+        oldValue: oldDescription || 'None',
+        newValue: newDescription || 'None',
+      });
+    }
+    const oldCustomer = (existing.customer || '').trim();
+    const newCustomer = String(customer ?? '').trim();
+    if (oldCustomer !== newCustomer) {
+      changes.push({
+        field: 'Customer',
+        oldValue: oldCustomer || 'None',
+        newValue: newCustomer || 'None',
+      });
+    }
+    const oldMobile = (existing.customerMobile || '').trim();
+    const newMobile = String(customerMobile ?? '').trim();
+    if (oldMobile !== newMobile) {
+      changes.push({
+        field: 'Mobile',
+        oldValue: oldMobile || 'None',
+        newValue: newMobile || 'None',
+      });
+    }
+
+    const currentLogs = getOrSynthesizeLogs(existing);
+    let updatedLogs = currentLogs;
+    if (changes.length > 0) {
+      const logEntry = createLogEntry({
+        performedBy: req.user.name || 'User',
+        performedByRole: req.user.role || 'user',
+        action: changes.map((c) => `${c.field} Changed`).join(', '),
+        priority: {
+          old: oldPriority,
+          new: newPriority,
+        },
+        status: {
+          old: oldStatus,
+          new: newStatus,
+        },
+        assignment: {
+          old: oldAssignedTo,
+          new: newAssignedTo,
+          oldAssigned: oldIsAssigned,
+          newAssigned: newIsAssigned,
+        },
+        changes,
+      });
+      updatedLogs = [...currentLogs, logEntry];
+    }
+
     let resolvedAt = existing?.resolvedAt || null;
     let resolution = existing?.resolution || null;
     let resolvedBy = existing?.resolvedBy || null;
@@ -546,6 +1152,7 @@ router.put('/:id', authenticate, (req, res) => {
       resolutionTime: resolution,
       resolvedBy,
       resolvedById,
+      logs: updatedLogs,
       updatedAt: new Date().toISOString(),
     });
 
@@ -553,10 +1160,49 @@ router.put('/:id', authenticate, (req, res) => {
       return res.status(404).json({ error: 'Ticket not found.' });
     }
 
-    return res.json({ message: 'Ticket updated successfully.', ticket: updated });
+    return res.json({
+      message:
+        changes.length > 0
+          ? buildLogMessage(changes, 'Ticket Updated')
+          : 'Ticket updated successfully.',
+      ticket: updated,
+    });
   } catch (error) {
     console.error('Update ticket error:', error);
     return res.status(500).json({ error: 'Failed to update ticket.' });
+  }
+});
+
+// --------------------------------------------------
+// GET /api/tickets/:id/logs
+// Get ticket logs / audit history
+// --------------------------------------------------
+
+router.get('/:id/logs', authenticate, (req, res) => {
+  try {
+    const ticket = getAllTickets().find(
+      (t) => String(t.id) === String(req.params.id)
+    );
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found.' });
+    }
+
+    const logs = getOrSynthesizeLogs(ticket);
+
+    // If reconciled logs have added missing entries, persist to store
+    if (!ticket.logs || ticket.logs.length !== logs.length) {
+      updateTicket(ticket.id, { logs });
+    }
+
+    return res.json({
+      ticketId: ticket.id,
+      ticket: { ...ticket, logs },
+      logs,
+    });
+  } catch (error) {
+    console.error('Get ticket logs error:', error);
+    return res.status(500).json({ error: 'Failed to fetch ticket logs.' });
   }
 });
 

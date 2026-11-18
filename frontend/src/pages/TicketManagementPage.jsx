@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getToken } from '../api/authApi.js';
 import ContactCustomerDialog from '../components/ContactCustomerDialog.jsx';
+import TicketLogsDialog from '../components/TicketLogsDialog.jsx';
 import './TicketManagementPage.css';
 
 const API = 'http://localhost:4000/api';
@@ -24,51 +25,49 @@ const PRIORITY_ORDER = {
 };
 
 const PRIORITY_COLORS = {
-  high: '#e11d48',
-  medium: '#d97706',
-  low: '#059669',
+  high: '#dc2626',
+  medium: '#334155',
+  low: '#334155',
 };
 
 const PRIORITY_BACKGROUNDS = {
-  high: '#fff1f2',
-  medium: '#fffbeb',
-  low: '#ecfdf5',
+  high: '#ffffff',
+  medium: '#ffffff',
+  low: '#ffffff',
 };
 
 const STATUS_COLORS = {
-  open: '#2563eb',
-  'in-progress': '#d97706',
-  resolved: '#059669',
+  open: '#334155',
+  'in-progress': '#334155',
+  resolved: '#334155',
 };
 
 const STATUS_BACKGROUNDS = {
-  open: '#eff6ff',
-  'in-progress': '#fffbeb',
-  resolved: '#ecfdf5',
+  open: '#ffffff',
+  'in-progress': '#ffffff',
+  resolved: '#ffffff',
 };
 
 const CATEGORY_COLORS = {
-  recharge: '#7c3aed',
-  payment: '#0891b2',
-  wallet: '#d97706',
-  technical: '#e11d48',
+  recharge: '#334155',
+  payment: '#334155',
+  wallet: '#334155',
+  technical: '#334155',
 };
 
 const CATEGORY_BACKGROUNDS = {
-  recharge: '#f5f3ff',
-  payment: '#ecfeff',
-  wallet: '#fffbeb',
-  technical: '#fff1f2',
+  recharge: '#ffffff',
+  payment: '#ffffff',
+  wallet: '#ffffff',
+  technical: '#ffffff',
 };
 
-function getCategoryColor(cat = '') {
-  const key = String(cat).toLowerCase();
-  return CATEGORY_COLORS[key] || '#4f46e5';
+function getCategoryColor() {
+  return '#334155';
 }
 
-function getCategoryBg(cat = '') {
-  const key = String(cat).toLowerCase();
-  return CATEGORY_BACKGROUNDS[key] || '#eef2ff';
+function getCategoryBg() {
+  return '#ffffff';
 }
 const DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   year: 'numeric',
@@ -280,6 +279,10 @@ function TicketIcon({ type }) {
     );
   }
 
+  if (type === 'log' || type === 'history') {
+    return <span className="ticket-log-l-symbol">L</span>;
+  }
+
   return (
     <svg {...common}>
       <path d="M3 6h18" />
@@ -485,6 +488,7 @@ export default function TicketManagementPage() {
   const [editingTicket, setEditingTicket] = useState(null);
   const [ticketToDelete, setTicketToDelete] = useState(null);
   const [viewingTicket, setViewingTicket] = useState(null);
+  const [viewingLogsTicket, setViewingLogsTicket] = useState(null);
   const [newlyCreatedTicketId, setNewlyCreatedTicketId] = useState(null);
   const [contactDialog, setContactDialog] = useState(null);
 
@@ -632,9 +636,10 @@ export default function TicketManagementPage() {
     fetchTickets(false);
     fetchEmployees();
 
+    // Fast live auto-refresh every 1500ms
     const interval = setInterval(() => {
       fetchTickets(true);
-    }, 5000);
+    }, 1500);
 
     function onVisibilityChange() {
       if (document.visibilityState === 'visible') {
@@ -643,9 +648,17 @@ export default function TicketManagementPage() {
     }
     document.addEventListener('visibilitychange', onVisibilityChange);
 
+    function handleFastSync() {
+      fetchTickets(true);
+    }
+    window.addEventListener('tickets-updated', handleFastSync);
+    window.addEventListener('storage', handleFastSync);
+
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('tickets-updated', handleFastSync);
+      window.removeEventListener('storage', handleFastSync);
     };
   }, []);
 
@@ -710,7 +723,18 @@ export default function TicketManagementPage() {
         }, 15000);
       }
 
-      await fetchTickets();
+      if (data.ticket) {
+        setTickets((prev) => [data.ticket, ...prev.filter((t) => t.id !== data.ticket.id)]);
+      }
+
+      window.dispatchEvent(
+        new CustomEvent('tickets-updated', { detail: data.ticket })
+      );
+      try {
+        localStorage.setItem('tickets_last_sync', String(Date.now()));
+      } catch (e) {}
+
+      await fetchTickets(true);
     } catch (err) {
       setFormError(err.message || 'Failed to create ticket.');
     } finally {
@@ -767,6 +791,19 @@ export default function TicketManagementPage() {
     try {
       setSavingTicket(true);
 
+      const matchedEmployee = employees.find(
+        (e) => String(e.id) === String(editingTicket.assignedToId)
+      );
+      const optimisticUpdate = {
+        ...editingTicket,
+        assignedTo: matchedEmployee ? matchedEmployee.name : null,
+        assignedToId: matchedEmployee ? matchedEmployee.id : null,
+        updatedAt: new Date().toISOString(),
+      };
+      setTickets((prev) =>
+        prev.map((t) => (t.id === editingTicket.id ? { ...t, ...optimisticUpdate } : t))
+      );
+
       const response = await fetch(
         `${API}/tickets/${encodeURIComponent(editingTicket.id)}`,
         {
@@ -780,9 +817,23 @@ export default function TicketManagementPage() {
       setEditingTicket(null);
       setMessage(data.message || 'Ticket updated successfully.');
 
-      await fetchTickets();
+      if (data.ticket) {
+        setTickets((prev) =>
+          prev.map((t) => (t.id === editingTicket.id ? { ...t, ...data.ticket } : t))
+        );
+      }
+
+      window.dispatchEvent(
+        new CustomEvent('tickets-updated', { detail: data.ticket || optimisticUpdate })
+      );
+      try {
+        localStorage.setItem('tickets_last_sync', String(Date.now()));
+      } catch (e) {}
+
+      await fetchTickets(true);
     } catch (err) {
       setActionError(err.message || 'Failed to update ticket.');
+      await fetchTickets(true);
     } finally {
       setSavingTicket(false);
     }
@@ -823,6 +874,13 @@ export default function TicketManagementPage() {
       setTickets((previous) =>
         previous.filter((ticket) => String(ticket.id) !== String(deletedId))
       );
+
+      window.dispatchEvent(
+        new CustomEvent('tickets-updated', { detail: { id: deletedId, deleted: true } })
+      );
+      try {
+        localStorage.setItem('tickets_last_sync', String(Date.now()));
+      } catch (e) {}
 
       setTicketToDelete(null);
       setMessage(data.message || 'Ticket deleted successfully.');
@@ -880,7 +938,36 @@ export default function TicketManagementPage() {
           prev.map((t) => (t.id === ticket.id ? { ...t, ...data.ticket } : t))
         );
       }
-      setMessage(`✓ Ticket #${ticket.id} ${field} updated.`);
+
+      window.dispatchEvent(
+        new CustomEvent('tickets-updated', { detail: data.ticket || { id: ticket.id, [field]: value } })
+      );
+      try {
+        localStorage.setItem('tickets_last_sync', String(Date.now()));
+      } catch (e) {}
+
+      const fieldTitle =
+        field === 'priority'
+          ? 'Priority'
+          : field === 'status'
+          ? 'Status'
+          : capitalize(field);
+      const oldFormatted =
+        field === 'priority'
+          ? capitalize(oldValue)
+          : field === 'status'
+          ? formatStatus(oldValue)
+          : capitalize(oldValue);
+      const newFormatted =
+        field === 'priority'
+          ? capitalize(value)
+          : field === 'status'
+          ? formatStatus(value)
+          : capitalize(value);
+
+      setMessage(
+        `✓ Ticket #${ticket.id}: ${fieldTitle} changed from "${oldFormatted}" to "${newFormatted}".`
+      );
     } catch (err) {
       setTickets((prev) =>
         prev.map((t) => (t.id === ticket.id ? { ...t, [field]: oldValue } : t))
@@ -1219,15 +1306,9 @@ export default function TicketManagementPage() {
                         {/* 1. Ticket ID */}
                         <td className="db-mono">
                           <div className="ticket-id-cell">
-                            <button
-                              type="button"
-                              className="ticket-id-link"
-                              title={`View details for ticket ${ticket.id}`}
-                              aria-label={`View details for ticket ${ticket.id}`}
-                              onClick={() => setViewingTicket(ticket)}
-                            >
+                            <span className="ticket-id-text">
                               {ticket.id}
-                            </button>
+                            </span>
                             {isNew && (
                               <span className="ticket-new-badge" title="Created recently">
                                 NEW
@@ -1299,9 +1380,9 @@ export default function TicketManagementPage() {
                             <select
                               className="ticket-row-badge-select"
                               style={{
-                                color: getCategoryColor(ticket.category),
-                                backgroundColor: getCategoryBg(ticket.category),
-                                borderColor: `${getCategoryColor(ticket.category)}40`,
+                                color: '#334155',
+                                backgroundColor: '#ffffff',
+                                borderColor: '#e2e8f0',
                               }}
                               value={
                                 ['recharge', 'payment', 'wallet', 'technical'].includes(
@@ -1336,10 +1417,10 @@ export default function TicketManagementPage() {
                             <select
                               className="ticket-row-badge-select"
                               style={{
-                                color: PRIORITY_COLORS[ticket.priority] || '#64748b',
-                                backgroundColor:
-                                  PRIORITY_BACKGROUNDS[ticket.priority] || '#f8fafc',
-                                borderColor: `${PRIORITY_COLORS[ticket.priority] || '#cbd5e1'}40`,
+                                color: ticket.priority === 'high' ? '#dc2626' : '#334155',
+                                backgroundColor: '#ffffff',
+                                borderColor: ticket.priority === 'high' ? '#fecaca' : '#e2e8f0',
+                                fontWeight: ticket.priority === 'high' ? 600 : 500,
                               }}
                               value={ticket.priority || 'medium'}
                               onChange={(e) =>
@@ -1360,10 +1441,9 @@ export default function TicketManagementPage() {
                             <select
                               className="ticket-row-badge-select"
                               style={{
-                                color: STATUS_COLORS[ticket.status] || '#64748b',
-                                backgroundColor:
-                                  STATUS_BACKGROUNDS[ticket.status] || '#eff6ff',
-                                borderColor: `${STATUS_COLORS[ticket.status] || '#cbd5e1'}40`,
+                                color: '#334155',
+                                backgroundColor: '#ffffff',
+                                borderColor: '#e2e8f0',
                               }}
                               value={ticket.status || 'open'}
                               onChange={(e) =>
@@ -1455,6 +1535,16 @@ export default function TicketManagementPage() {
                         {/* 9. Actions */}
                         <td className="ticket-actions-cell">
                           <div className="ticket-row-actions">
+                            <button
+                              type="button"
+                              className="ticket-icon-button ticket-log-icon"
+                              title="View Ticket Logs (Priority, Status, Assignment history)"
+                              aria-label={`View logs for ticket ${ticket.id}`}
+                              onClick={() => setViewingLogsTicket(ticket)}
+                            >
+                              <TicketIcon type="log" />
+                            </button>
+
                             <button
                               type="button"
                               className="ticket-icon-button ticket-edit-icon"
@@ -1717,8 +1807,9 @@ export default function TicketManagementPage() {
                   <span
                     className="ticket-category"
                     style={{
-                      color: getCategoryColor(viewingTicket.category),
-                      background: getCategoryBg(viewingTicket.category),
+                      color: '#334155',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
                       padding: '2px 8px',
                       fontSize: '11px',
                     }}
@@ -1732,15 +1823,14 @@ export default function TicketManagementPage() {
                   <span
                     className="ticket-priority"
                     style={{
-                      color:
-                        PRIORITY_COLORS[viewingTicket.priority] || '#64748b',
+                      color: viewingTicket.priority === 'high' ? '#dc2626' : '#334155',
+                      fontWeight: viewingTicket.priority === 'high' ? 600 : 500,
                     }}
                   >
                     <span
                       className="ticket-status-dot"
                       style={{
-                        background:
-                          PRIORITY_COLORS[viewingTicket.priority] || '#64748b',
+                        background: viewingTicket.priority === 'high' ? '#dc2626' : '#94a3b8',
                       }}
                     />
                     {capitalize(viewingTicket.priority)}
@@ -1752,14 +1842,43 @@ export default function TicketManagementPage() {
                   <span
                     className="ticket-status"
                     style={{
-                      color: STATUS_COLORS[viewingTicket.status] || '#64748b',
-                      background:
-                        STATUS_BACKGROUNDS[viewingTicket.status] || '#eff6ff',
+                      color: '#334155',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
                       padding: '2px 8px',
                       fontSize: '11px',
                     }}
                   >
                     {formatStatus(viewingTicket.status)}
+                  </span>
+                </div>
+
+                <div className="ticket-desc-meta-item">
+                  <span className="ticket-desc-meta-label">Assigned:</span>
+                  <span
+                    className="ticket-assigned-status"
+                    style={{
+                      color: viewingTicket.assignedTo ? '#0f172a' : '#64748b',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      padding: '2px 8px',
+                      fontSize: '11px',
+                      borderRadius: '6px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      fontWeight: viewingTicket.assignedTo ? 600 : 500,
+                    }}
+                  >
+                    <span
+                      className="ticket-status-dot"
+                      style={{
+                        background: viewingTicket.assignedTo ? '#10b981' : '#94a3b8',
+                      }}
+                    />
+                    {viewingTicket.assignedTo
+                      ? `Assigned (${viewingTicket.assignedTo})`
+                      : 'Not Assigned'}
                   </span>
                 </div>
 
@@ -1813,6 +1932,20 @@ export default function TicketManagementPage() {
             <div className="ticket-dialog-actions">
               <button
                 type="button"
+                className="ticket-view-logs-btn"
+                onClick={() => {
+                  const t = viewingTicket;
+                  setViewingTicket(null);
+                  setViewingLogsTicket(t);
+                }}
+                title="View complete audit & change logs for this ticket"
+              >
+                <TicketIcon type="log" />
+                <span>View Ticket Logs</span>
+              </button>
+
+              <button
+                type="button"
                 className="ticket-create-button"
                 onClick={() => setViewingTicket(null)}
               >
@@ -1821,6 +1954,16 @@ export default function TicketManagementPage() {
             </div>
           </section>
         </div>
+      )}
+
+      {/* ═══════════════════════════════════════
+          TICKET LOGS POP-UP DIALOG
+      ═══════════════════════════════════════ */}
+      {viewingLogsTicket && (
+        <TicketLogsDialog
+          ticket={viewingLogsTicket}
+          onClose={() => setViewingLogsTicket(null)}
+        />
       )}
 
       {/* ═══════════════════════════════════════

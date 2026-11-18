@@ -11,6 +11,7 @@ import EmployeeListPage from './EmployeeListPage.jsx';
 import CreateEmployeePage from './CreateEmployeePage.jsx';
 import DesignationPage from './DesignationPage.jsx';
 import ContactCustomerDialog from '../components/ContactCustomerDialog.jsx';
+import TicketLogsDialog from '../components/TicketLogsDialog.jsx';
 import './DashboardPage.css';
 
 /* ─────────────────────────────────────────────
@@ -76,58 +77,62 @@ const PRIORITY_ORDER = {
 
 const PRIORITY_STYLE = {
   high: {
-    bg: '#fff1f2',
-    color: '#e11d48',
-    dot: '#e11d48',
+    bg: '#ffffff',
+    color: '#dc2626',
+    dot: '#dc2626',
+    borderColor: '#fecaca',
+    fontWeight: 600,
   },
 
   medium: {
-    bg: '#fffbeb',
-    color: '#d97706',
-    dot: '#d97706',
+    bg: '#ffffff',
+    color: '#334155',
+    dot: '#94a3b8',
+    borderColor: '#e2e8f0',
+    fontWeight: 500,
   },
 
   low: {
-    bg: '#ecfdf5',
-    color: '#059669',
-    dot: '#059669',
+    bg: '#ffffff',
+    color: '#334155',
+    dot: '#94a3b8',
+    borderColor: '#e2e8f0',
+    fontWeight: 500,
   },
 };
 
 const STATUS_COLORS = {
-  open: '#2563eb',
-  'in-progress': '#d97706',
-  resolved: '#059669',
+  open: '#334155',
+  'in-progress': '#334155',
+  resolved: '#334155',
 };
 
 const STATUS_BACKGROUNDS = {
-  open: '#eff6ff',
-  'in-progress': '#fffbeb',
-  resolved: '#ecfdf5',
+  open: '#ffffff',
+  'in-progress': '#ffffff',
+  resolved: '#ffffff',
 };
 
 const CATEGORY_COLORS = {
-  recharge: '#7c3aed',
-  payment: '#0891b2',
-  wallet: '#d97706',
-  technical: '#e11d48',
+  recharge: '#334155',
+  payment: '#334155',
+  wallet: '#334155',
+  technical: '#334155',
 };
 
 const CATEGORY_BACKGROUNDS = {
-  recharge: '#f5f3ff',
-  payment: '#ecfeff',
-  wallet: '#fffbeb',
-  technical: '#fff1f2',
+  recharge: '#ffffff',
+  payment: '#ffffff',
+  wallet: '#ffffff',
+  technical: '#ffffff',
 };
 
-function getCategoryColor(cat = '') {
-  const key = String(cat).toLowerCase();
-  return CATEGORY_COLORS[key] || '#4f46e5';
+function getCategoryColor() {
+  return '#334155';
 }
 
-function getCategoryBg(cat = '') {
-  const key = String(cat).toLowerCase();
-  return CATEGORY_BACKGROUNDS[key] || '#eef2ff';
+function getCategoryBg() {
+  return '#ffffff';
 }
 
 function formatStatus(status) {
@@ -339,6 +344,7 @@ export default function DashboardPage({
   const [resolvingId, setResolvingId] = useState(null);
   const [noticeMessage, setNoticeMessage] = useState('');
   const [viewingTicket, setViewingTicket] = useState(null);
+  const [viewingLogsTicket, setViewingLogsTicket] = useState(null);
   const [selectedStat, setSelectedStat] = useState(null);
 
   /* ── Role ── */
@@ -400,10 +406,10 @@ export default function DashboardPage({
 
     fetchTickets(false);
 
-    // Live auto-refresh every 5 seconds so changes reflect on both panels
+    // Fast live auto-refresh every 1500ms so changes reflect across all panels
     const interval = setInterval(() => {
       fetchTickets(true);
-    }, 5000);
+    }, 1500);
 
     function onVisibilityChange() {
       if (document.visibilityState === 'visible') {
@@ -412,10 +418,18 @@ export default function DashboardPage({
     }
     document.addEventListener('visibilitychange', onVisibilityChange);
 
+    function handleFastSync() {
+      fetchTickets(true);
+    }
+    window.addEventListener('tickets-updated', handleFastSync);
+    window.addEventListener('storage', handleFastSync);
+
     return () => {
       isMounted = false;
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('tickets-updated', handleFastSync);
+      window.removeEventListener('storage', handleFastSync);
     };
   }, []);
 
@@ -501,11 +515,16 @@ export default function DashboardPage({
     .filter((ticket) => ticket.status !== 'resolved' && isTicketUnassigned(ticket))
     .sort(sortDescending);
 
-  const openTicketsDescending = openStatTickets.slice().sort(sortDescending);
+  // Open tickets slab only includes assigned open tickets so unassigned tickets are not duplicated
+  const openTicketsDescending = openStatTickets
+    .filter((ticket) => !isTicketUnassigned(ticket))
+    .sort(sortDescending);
+
+  const allOpenTicketsDescending = openStatTickets.slice().sort(sortDescending);
 
   const selectedStatTickets =
     selectedStat === 'open'
-      ? openTicketsDescending
+      ? allOpenTicketsDescending
       : selectedStat === 'high'
       ? highStatTickets.slice().sort(sortDescending)
       : selectedStat === 'medium'
@@ -620,12 +639,36 @@ export default function DashboardPage({
         );
       }
 
+      window.dispatchEvent(
+        new CustomEvent('tickets-updated', { detail: data.ticket || { id: ticket.id, [field]: value } })
+      );
+      try {
+        localStorage.setItem('tickets_last_sync', String(Date.now()));
+      } catch (e) {}
+
+      const fieldTitle =
+        field === 'priority'
+          ? 'Priority'
+          : field === 'status'
+          ? 'Status'
+          : capitalize(field);
+      const oldFormatted =
+        field === 'priority'
+          ? capitalize(oldValue)
+          : field === 'status'
+          ? formatStatus(oldValue)
+          : capitalize(oldValue);
+      const newFormatted =
+        field === 'priority'
+          ? capitalize(value)
+          : field === 'status'
+          ? formatStatus(value)
+          : capitalize(value);
+
       setNoticeMessage(
-        field === 'status'
-          ? (value === 'resolved'
-              ? `✓ Ticket #${ticket.id} marked as resolved (${instantResolution}).`
-              : `✓ Ticket #${ticket.id} status changed to ${formatStatus(value)}.`)
-          : `✓ Ticket #${ticket.id} ${field} updated.`
+        field === 'status' && value === 'resolved'
+          ? `✓ Ticket #${ticket.id}: Status changed from "${oldFormatted}" to "Resolved" (${instantResolution}).`
+          : `✓ Ticket #${ticket.id}: ${fieldTitle} changed from "${oldFormatted}" to "${newFormatted}".`
       );
     } catch (err) {
       setTickets((previous) =>
@@ -677,6 +720,7 @@ export default function DashboardPage({
               <th style={{ width: 140 }}>Resolution time</th>
               <th>Assigned To</th>
               <th>Created at / Solved at</th>
+              <th style={{ width: 80, textAlign: 'center' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -691,15 +735,9 @@ export default function DashboardPage({
                 >
                   <td className="db-mono">
                     <div className="ticket-id-cell">
-                      <button
-                        type="button"
-                        className="ticket-id-link"
-                        title={`View details for ticket ${ticket.id}`}
-                        aria-label={`View details for ticket ${ticket.id}`}
-                        onClick={() => setViewingTicket(ticket)}
-                      >
+                      <span className="ticket-id-text">
                         {ticket.id}
-                      </button>
+                      </span>
                       {isNew && (
                         <span className="ticket-new-badge" title="Created recently">
                           NEW
@@ -769,9 +807,10 @@ export default function DashboardPage({
                       <select
                         className="ticket-row-badge-select"
                         style={{
-                          color: getCategoryColor(ticket.category),
-                          backgroundColor: getCategoryBg(ticket.category),
-                          borderColor: `${getCategoryColor(ticket.category)}40`,
+                          color: '#334155',
+                          backgroundColor: '#ffffff',
+                          borderColor: '#e2e8f0',
+                          fontWeight: 500,
                         }}
                         value={
                           ['recharge', 'payment', 'wallet', 'technical'].includes(
@@ -805,10 +844,10 @@ export default function DashboardPage({
                       <select
                         className="ticket-row-badge-select"
                         style={{
-                          color: PRIORITY_STYLE[ticket.priority]?.color || '#64748b',
-                          backgroundColor:
-                            PRIORITY_STYLE[ticket.priority]?.bg || '#f8fafc',
-                          borderColor: `${PRIORITY_STYLE[ticket.priority]?.color || '#cbd5e1'}40`,
+                          color: ticket.priority === 'high' ? '#dc2626' : '#334155',
+                          backgroundColor: '#ffffff',
+                          borderColor: ticket.priority === 'high' ? '#fecaca' : '#e2e8f0',
+                          fontWeight: ticket.priority === 'high' ? 600 : 500,
                         }}
                         value={ticket.priority || 'medium'}
                         onChange={(e) =>
@@ -816,9 +855,9 @@ export default function DashboardPage({
                         }
                         title="Select priority"
                       >
-                        <option value="low">● Low</option>
-                        <option value="medium">● Medium</option>
-                        <option value="high">● High</option>
+                        <option value="low" style={{ color: '#334155' }}>● Low</option>
+                        <option value="medium" style={{ color: '#334155' }}>● Medium</option>
+                        <option value="high" style={{ color: '#dc2626', fontWeight: 600 }}>● High</option>
                       </select>
                     </div>
                   </td>
@@ -828,10 +867,10 @@ export default function DashboardPage({
                       <select
                         className="ticket-row-badge-select"
                         style={{
-                          color: STATUS_COLORS[ticket.status] || '#64748b',
-                          backgroundColor:
-                            STATUS_BACKGROUNDS[ticket.status] || '#eff6ff',
-                          borderColor: `${STATUS_COLORS[ticket.status] || '#cbd5e1'}40`,
+                          color: '#334155',
+                          backgroundColor: '#ffffff',
+                          borderColor: '#e2e8f0',
+                          fontWeight: 500,
                         }}
                         value={ticket.status || 'open'}
                         onChange={(e) =>
@@ -916,6 +955,20 @@ export default function DashboardPage({
                             : '—'}
                         </span>
                       </div>
+                    </div>
+                  </td>
+
+                  <td className="ticket-actions-cell" style={{ textAlign: 'center' }}>
+                    <div className="ticket-row-actions" style={{ justifyContent: 'center' }}>
+                      <button
+                        type="button"
+                        className="ticket-icon-button ticket-log-icon"
+                        title="View Ticket Logs (Priority, Status, Assignment history)"
+                        aria-label={`View logs for ticket ${ticket.id}`}
+                        onClick={() => setViewingLogsTicket(ticket)}
+                      >
+                        <span className="ticket-log-l-symbol">L</span>
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -1388,8 +1441,9 @@ export default function DashboardPage({
                         </span>
                         <span
                           style={{
-                            background: '#e0e7ff',
-                            color: '#3730a3',
+                            background: '#f1f5f9',
+                            color: '#334155',
+                            border: '1px solid #e2e8f0',
                             fontSize: 12,
                             fontWeight: 700,
                             padding: '2px 8px',
@@ -1453,8 +1507,9 @@ export default function DashboardPage({
                           </span>
                           <span
                             style={{
-                              background: unassignedOpenTickets.length > 0 ? '#fef3c7' : '#f1f5f9',
-                              color: unassignedOpenTickets.length > 0 ? '#92400e' : '#64748b',
+                              background: '#f1f5f9',
+                              color: '#334155',
+                              border: '1px solid #e2e8f0',
                               fontSize: 12,
                               fontWeight: 700,
                               padding: '2px 8px',
@@ -1467,19 +1522,21 @@ export default function DashboardPage({
                           {unassignedOpenTickets.length > 0 && (
                             <span
                               style={{
-                                background: '#fff1f2',
-                                color: '#be123c',
+                                background: '#f8fafc',
+                                color: '#475569',
+                                border: '1px solid #e2e8f0',
                                 fontSize: 11,
                                 fontWeight: 600,
                                 padding: '2px 6px',
                                 borderRadius: 4,
                               }}
                             >
-                              Action Required
                             </span>
                           )}
                         </div>
-                        
+                        <span style={{ display: 'block', marginTop: 2, fontSize: 12.5, color: '#64748b' }}>
+                          Tickets awaiting assignment to support staff
+                        </span>
                       </div>
                     </div>
 
@@ -1511,8 +1568,9 @@ export default function DashboardPage({
                           </span>
                           <span
                             style={{
-                              background: '#e0e7ff',
-                              color: '#3730a3',
+                              background: '#f1f5f9',
+                              color: '#334155',
+                              border: '1px solid #e2e8f0',
                               fontSize: 12,
                               fontWeight: 700,
                               padding: '2px 8px',
@@ -1524,8 +1582,9 @@ export default function DashboardPage({
                           </span>
                           <span
                             style={{
-                              background: '#f1f5f9',
+                              background: '#f8fafc',
                               color: '#475569',
+                              border: '1px solid #e2e8f0',
                               fontSize: 11,
                               fontWeight: 600,
                               padding: '2px 6px',
@@ -1535,13 +1594,15 @@ export default function DashboardPage({
                             ↓ Descending
                           </span>
                         </div>
-                        
+                        <span style={{ display: 'block', marginTop: 2, fontSize: 12.5, color: '#64748b' }}>
+                          Active assigned tickets ordered by latest creation date (newest first)
+                        </span>
                       </div>
                     </div>
 
                     {renderTicketTable(
                       openTicketsDescending,
-                      '✓ No open tickets. All tickets are currently resolved!'
+                      '✓ No assigned open tickets. All tickets are currently resolved or unassigned!'
                     )}
                   </div>
                 </>
@@ -1592,8 +1653,9 @@ export default function DashboardPage({
                   <span
                     className="ticket-category"
                     style={{
-                      color: getCategoryColor(viewingTicket.category),
-                      background: getCategoryBg(viewingTicket.category),
+                      color: '#334155',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
                       padding: '2px 8px',
                       fontSize: '11px',
                     }}
@@ -1607,17 +1669,14 @@ export default function DashboardPage({
                   <span
                     className="ticket-priority"
                     style={{
-                      color:
-                        PRIORITY_STYLE[viewingTicket.priority]?.color ||
-                        '#64748b',
+                      color: viewingTicket.priority === 'high' ? '#dc2626' : '#334155',
+                      fontWeight: viewingTicket.priority === 'high' ? 600 : 500,
                     }}
                   >
                     <span
                       className="ticket-status-dot"
                       style={{
-                        background:
-                          PRIORITY_STYLE[viewingTicket.priority]?.dot ||
-                          '#64748b',
+                        background: viewingTicket.priority === 'high' ? '#dc2626' : '#94a3b8',
                       }}
                     />
                     {capitalize(viewingTicket.priority)}
@@ -1629,14 +1688,43 @@ export default function DashboardPage({
                   <span
                     className="ticket-status"
                     style={{
-                      color: STATUS_COLORS[viewingTicket.status] || '#64748b',
-                      background:
-                        STATUS_BACKGROUNDS[viewingTicket.status] || '#eff6ff',
+                      color: '#334155',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
                       padding: '2px 8px',
                       fontSize: '11px',
                     }}
                   >
                     {formatStatus(viewingTicket.status)}
+                  </span>
+                </div>
+
+                <div className="ticket-desc-meta-item">
+                  <span className="ticket-desc-meta-label">Assigned:</span>
+                  <span
+                    className="ticket-assigned-status"
+                    style={{
+                      color: viewingTicket.assignedTo ? '#0f172a' : '#64748b',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      padding: '2px 8px',
+                      fontSize: '11px',
+                      borderRadius: '6px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      fontWeight: viewingTicket.assignedTo ? 600 : 500,
+                    }}
+                  >
+                    <span
+                      className="ticket-status-dot"
+                      style={{
+                        background: viewingTicket.assignedTo ? '#10b981' : '#94a3b8',
+                      }}
+                    />
+                    {viewingTicket.assignedTo
+                      ? `Assigned (${viewingTicket.assignedTo})`
+                      : 'Not Assigned'}
                   </span>
                 </div>
 
@@ -1690,6 +1778,20 @@ export default function DashboardPage({
             <div className="ticket-dialog-actions">
               <button
                 type="button"
+                className="ticket-view-logs-btn"
+                onClick={() => {
+                  const t = viewingTicket;
+                  setViewingTicket(null);
+                  setViewingLogsTicket(t);
+                }}
+                title="View complete audit & change logs for this ticket"
+              >
+                <span className="ticket-log-l-symbol">L</span>
+                <span>View Ticket Logs</span>
+              </button>
+
+              <button
+                type="button"
                 className="ticket-create-button"
                 onClick={() => setViewingTicket(null)}
               >
@@ -1698,6 +1800,16 @@ export default function DashboardPage({
             </div>
           </section>
         </div>
+      )}
+
+      {/* ═══════════════════════════════════════
+          TICKET LOGS POP-UP DIALOG
+      ═══════════════════════════════════════ */}
+      {viewingLogsTicket && (
+        <TicketLogsDialog
+          ticket={viewingLogsTicket}
+          onClose={() => setViewingLogsTicket(null)}
+        />
       )}
       {/* ═══════════════════════════════════════
           CHANGE PASSWORD POP-UP DIALOG

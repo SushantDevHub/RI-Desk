@@ -1,0 +1,606 @@
+/* =========================================
+   TICKET LOGS DIALOG (AUDIT & CHANGE HISTORY)
+   ========================================= */
+
+.ticket-log-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  padding: 16px;
+  animation: ticketLogFadeIn 0.18s ease-out;
+}
+
+@keyframes ticketLogFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ticket-log-dialog {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 660px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.08);
+  animation: ticketLogSlideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+@keyframes ticketLogSlideUp {
+  from {
+    transform: translateY(14px) scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Header */
+.ticket-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #fafafa;
+}
+
+.ticket-log-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ticket-log-badge-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #362ecb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ticket-log-l-symbol {
+  font-family: 'IBM Plex Mono', monospace, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1;
+  color: #3b34c3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+
+.ticket-log-title {
+  font-size: 16.5px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: -0.2px;
+}
+
+.ticket-log-id {
+  font-family: 'IBM Plex Mono', monospace;
+  color: #0f172a;
+  background: #f1f5f9;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+  font-size: 14.5px;
+}
+
+.ticket-log-sub {
+  font-size: 12px;
+  color: #64748b;
+  margin: 3px 0 0;
+}
+
+.ticket-log-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.ticket-log-close-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+/* Current state summary cards */
+.ticket-log-state-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 14px 22px;
+  background: #ffffff;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.ticket-log-state-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ticket-log-state-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.ticket-log-state-val {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticket-log-state-val.priority-high {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.ticket-log-state-val.priority-neutral {
+  color: #334155;
+  font-weight: 600;
+}
+
+.ticket-log-state-val.assigned-val {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.ticket-log-state-val.unassigned-val {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.ticket-log-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ticket-log-dot.dot-assigned {
+  background: #10b981;
+}
+
+.ticket-log-dot.dot-unassigned {
+  background: #94a3b8;
+}
+
+/* Card of Description */
+.ticket-log-desc-card {
+  margin: 12px 22px 0;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.ticket-log-desc-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.ticket-log-desc-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.ticket-log-desc-category-pill {
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.ticket-log-desc-card-body {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #1e293b;
+}
+
+.ticket-log-desc-card-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #334155;
+  font-size: 12.5px;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+/* Body / Timeline container */
+.ticket-log-body {
+  padding: 14px 22px 18px;
+  overflow-y: auto;
+  flex: 1;
+  background: #fafafa;
+}
+
+.ticket-log-empty {
+  text-align: center;
+  padding: 36px 16px;
+  color: #64748b;
+  font-size: 13.5px;
+  background: #ffffff;
+  border: 1px dashed #e2e8f0;
+  border-radius: 10px;
+}
+
+/* Timeline */
+.ticket-log-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ticket-log-item {
+  display: flex;
+  gap: 14px;
+}
+
+.ticket-log-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 16px;
+  flex-shrink: 0;
+  padding-top: 4px;
+}
+
+.ticket-log-circle {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #334155;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 2px #cbd5e1;
+  flex-shrink: 0;
+}
+
+.ticket-log-line {
+  flex: 1;
+  width: 2px;
+  background: #e2e8f0;
+  margin-top: 6px;
+}
+
+.ticket-log-content {
+  flex: 1;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.ticket-log-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.ticket-log-action-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ticket-log-action-badge {
+  background: #f1f5f9;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.2px;
+}
+
+.ticket-log-author {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.ticket-log-author strong {
+  color: #334155;
+}
+
+.ticket-log-role {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-left: 3px;
+}
+
+.ticket-log-timestamp {
+  font-size: 11.5px;
+  font-family: 'IBM Plex Mono', monospace;
+  color: #64748b;
+}
+
+/* Event message box */
+.ticket-log-message-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.ticket-log-message-box-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+}
+
+.ticket-log-msg-title {
+  color: #475569;
+}
+
+.ticket-log-message-box-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ticket-log-msg-sentence {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #334155;
+}
+
+.ticket-log-msg-dot {
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.ticket-log-msg-field {
+  color: #0f172a;
+}
+
+.ticket-log-inline-pill {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.ticket-log-inline-pill.old {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.ticket-log-inline-pill.new {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+}
+
+.ticket-log-inline-pill.new.high-pill {
+  color: #dc2626 !important;
+  border-color: #fecaca;
+  font-weight: 700;
+}
+
+/* Changes table */
+.ticket-log-changes-table-wrap {
+  overflow-x: auto;
+}
+
+.ticket-log-changes-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.ticket-log-changes-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #f8fafc;
+}
+
+.ticket-log-changes-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #f8fafc;
+  vertical-align: middle;
+}
+
+.ticket-log-changes-table tr:last-child td {
+  border-bottom: none;
+}
+
+.ticket-log-cell-field {
+  font-weight: 600;
+  color: #334155;
+  width: 25%;
+  white-space: nowrap;
+}
+
+.ticket-log-cell-arrow {
+  color: #94a3b8;
+  text-align: center;
+}
+
+.ticket-log-cell-val {
+  width: 35%;
+}
+
+.ticket-log-val-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.ticket-log-val-badge.old-val {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.ticket-log-val-badge.new-val {
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+  font-weight: 600;
+}
+
+.ticket-log-val-badge.priority-high-text {
+  color: #dc2626 !important;
+  font-weight: 700 !important;
+  border-color: #fecaca !important;
+}
+
+.ticket-log-val-badge.is-assigned-badge {
+  background: #f8fafc;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+  font-weight: 600;
+}
+
+.ticket-log-val-badge.is-unassigned-badge {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px dashed #cbd5e1;
+  font-weight: 500;
+}
+
+.ticket-log-val-badge.desc-val-badge {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 100%;
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.ticket-log-no-changes {
+  font-size: 12px;
+  color: #94a3b8;
+  font-style: italic;
+  padding: 6px 0;
+}
+
+/* Footer */
+.ticket-log-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 12px 22px;
+  border-top: 1px solid #f1f5f9;
+  background: #ffffff;
+}
+
+.ticket-log-footer-btn {
+  background: #0a4adf;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ticket-log-footer-btn:hover {
+  background: #194fa4;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .ticket-log-state-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .ticket-log-changes-table {
+    font-size: 11.5px;
+  }
+  .ticket-log-changes-table th,
+  .ticket-log-changes-table td {
+    padding: 6px 6px;
+  }
+}
