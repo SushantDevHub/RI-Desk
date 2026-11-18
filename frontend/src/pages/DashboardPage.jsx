@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 import {
   clearToken,
@@ -10,6 +10,7 @@ import TicketManagementPage from './TicketManagementPage.jsx';
 import EmployeeListPage from './EmployeeListPage.jsx';
 import CreateEmployeePage from './CreateEmployeePage.jsx';
 import DesignationPage from './DesignationPage.jsx';
+import ClientManagementPage from './ClientManagementPage.jsx';
 import ContactCustomerDialog from '../components/ContactCustomerDialog.jsx';
 import TicketLogsDialog from '../components/TicketLogsDialog.jsx';
 import './DashboardPage.css';
@@ -243,6 +244,16 @@ const NAV = [
   },
 ];
 
+function getActiveTabFromPath(pathname = '') {
+  const p = pathname.toLowerCase();
+  if (p.includes('/employees/create')) return 'create-employee';
+  if (p.includes('/employees')) return 'employees';
+  if (p.includes('/designation')) return 'designation';
+  if (p.includes('/clients')) return 'clients';
+  if (p.includes('/tickets')) return 'tickets';
+  return 'dashboard';
+}
+
 /* ─────────────────────────────────────────────
    Dashboard Page
 ───────────────────────────────────────────── */
@@ -252,10 +263,41 @@ export default function DashboardPage({
   onLogout,
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
 
-  /* ── Navigation state ── */
+  /* ── Navigation state synchronized with browser URL & history ── */
 
-  const [active, setActive] = useState('dashboard');
+  const active = getActiveTabFromPath(location.pathname);
+
+  function setActive(targetTab) {
+    let targetPath = '/dashboard';
+    if (targetTab === 'employees') targetPath = '/employees';
+    else if (targetTab === 'create-employee') targetPath = '/employees/create';
+    else if (targetTab === 'designation') targetPath = '/designation';
+    else if (targetTab === 'clients') targetPath = '/clients';
+    else if (targetTab === 'tickets') targetPath = '/tickets';
+
+    if (location.pathname.toLowerCase() !== targetPath.toLowerCase()) {
+      navigate(targetPath);
+    }
+  }
+
+  // Normalize root path to /dashboard
+  useEffect(() => {
+    if (location.pathname === '/') {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [location.pathname, navigate]);
+
+  // Prevent non-admin access to admin tabs
+  useEffect(() => {
+    if (user && user.role !== 'admin') {
+      if (active === 'employees' || active === 'create-employee' || active === 'designation') {
+        navigate('/dashboard', { replace: true });
+      }
+    }
+  }, [user, active, navigate]);
+
   const [employeesOpen, setEmployeesOpen] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -1270,6 +1312,38 @@ export default function DashboardPage({
             </button>
           )}
 
+          {/* Client menu */}
+          <button
+            className={`db-nav-item ${
+              active === 'clients' ? 'active' : ''
+            }`}
+            onClick={() => {
+              setActive('clients');
+              setMobileMenuOpen(false);
+            }}
+          >
+            <span className="db-nav-left">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M3 21h18" />
+                <path d="M5 21V7l8-4v18" />
+                <path d="M19 21V11l-6-3" />
+                <path d="M9 9h1" />
+                <path d="M9 13h1" />
+                <path d="M9 17h1" />
+              </svg>
+              <span>Clients</span>
+            </span>
+          </button>
+
           {/* Tickets menu (available to both Admin and Employee) */}
           <button
             className={`db-nav-item ${
@@ -1305,6 +1379,8 @@ export default function DashboardPage({
         <div className="db-main">
           {active === 'tickets' ? (
             <TicketManagementPage />
+          ) : active === 'clients' ? (
+            <ClientManagementPage isAdmin={isAdmin} />
           ) : active === 'employees' && isAdmin ? (
             <EmployeeListPage
               onCreateEmployee={() => setActive('create-employee')}

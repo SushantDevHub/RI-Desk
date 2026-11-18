@@ -322,12 +322,12 @@ function TicketFormFields({ values, onChange, employees, idPrefix, isAdmin }) {
       </div>
 
       <div className="ticket-form-field">
-        <label htmlFor={id('customer')}>Customer Name *</label>
+        <label htmlFor={id('customer')}>Client Name *</label>
         <input
           id={id('customer')}
           value={values.customer}
           onChange={(e) => onChange('customer', e.target.value)}
-          placeholder="Enter customer name"
+          placeholder="Enter client name"
           required
         />
       </div>

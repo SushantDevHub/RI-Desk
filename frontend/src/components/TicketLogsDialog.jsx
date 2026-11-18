@@ -505,60 +505,6 @@ export default function TicketLogsDialog({ ticket, onClose }) {
                         </span>
                       </div>
 
-                      {/* Event Edit Message */}
-                      <div className="ticket-log-message-box">
-                        <div className="ticket-log-message-box-header">
-                          <svg
-                            width="13"
-                            height="13"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                          </svg>
-                          <span className="ticket-log-msg-title">Edit Details</span>
-                        </div>
-                        <div className="ticket-log-message-box-body">
-                          {changes.length > 0 ? (
-                            changes.map((change, cIdx) => {
-                              const fieldName =
-                                change.field === 'Assignment' ? 'Assigned Status' : change.field;
-                              const isHighNew =
-                                String(change.field).toLowerCase() === 'priority' &&
-                                String(change.newValue).toLowerCase().includes('high');
-                              return (
-                                <div key={`msg-${cIdx}`} className="ticket-log-msg-sentence">
-                                  <span className="ticket-log-msg-dot">•</span>
-                                  <span>
-                                    <strong>{fieldName}</strong> changed from{' '}
-                                    <span className="ticket-log-inline-pill old">
-                                      {change.oldValue || 'None'}
-                                    </span>{' '}
-                                    to{' '}
-                                    <span
-                                      className={`ticket-log-inline-pill new ${
-                                        isHighNew ? 'high-pill' : ''
-                                      }`}
-                                    >
-                                      {change.newValue || 'None'}
-                                    </span>
-                                  </span>
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="ticket-log-msg-sentence">
-                              <span>{log.message || log.action || 'Ticket was updated.'}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
                       {/* Changes Table showing Old Value and New Value */}
                       {changes.length > 0 ? (
                         <div className="ticket-log-changes-table-wrap">

@@ -5,7 +5,6 @@ import {
   Navigate,
   useNavigate,
 } from 'react-router-dom';
-import EmployeeListPage from './pages/EmployeeListPage.jsx';
 import LoginPage from './components/LoginPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 
@@ -115,50 +114,33 @@ export default function App() {
   }
 
   return (
-<Routes>
-  {/* Login */}
-  <Route
-    path="/login"
-    element={
-      <LoginRoute onSuccess={setUser} />
-    }
-  />
+    <Routes>
+      {/* Login */}
+      <Route
+        path="/login"
+        element={
+          user ? (
+            <Navigate to="/dashboard" replace />
+          ) : (
+            <LoginRoute onSuccess={setUser} />
+          )
+        }
+      />
 
-  {/* Dashboard */}
-  <Route
-    path="/dashboard"
-    element={
-      user ? (
-        <DashboardPage
-          user={user}
-          onLogout={handleLogout}
-        />
-      ) : (
-        <Navigate to="/login" replace />
-      )
-    }
-  />
-
-  {/* Employee List */}
-  <Route
-    path="/admin/employees"
-    element={
-      user ? (
-        <EmployeeListPage />
-      ) : (
-        <Navigate to="/login" replace />
-      )
-    }
-  />
-
-  {/* Unknown URL */}
-  <Route
-    path="*"
-    element={
-      <Navigate to="/login" replace />
-    }
-  />
-</Routes>
-
+      {/* Main Authenticated Pages inside DashboardPage shell */}
+      <Route
+        path="/*"
+        element={
+          user ? (
+            <DashboardPage
+              user={user}
+              onLogout={handleLogout}
+            />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+    </Routes>
   );
 }
