@@ -68,6 +68,7 @@ router.post('/', requireAdmin, async (req, res) => {
       mobileNumber,
       password,
       designation = '',
+      status = 'active',
     } = req.body;
 
     if (!name || !email || !mobileNumber || !password) {
@@ -106,6 +107,7 @@ router.post('/', requireAdmin, async (req, res) => {
       password: hashedPassword,
       role: 'employee',
       designation: String(designation || '').trim(),
+      status: status === 'inactive' ? 'inactive' : 'active',
     };
 
     addUser(employee);
@@ -119,6 +121,7 @@ router.post('/', requireAdmin, async (req, res) => {
         mobileNumber: employee.mobileNumber,
         role: employee.role,
         designation: employee.designation || '',
+        status: employee.status || 'active',
       },
     });
   } catch (error) {
@@ -150,6 +153,7 @@ router.get('/', authenticate, (req, res) => {
         mobileNumber: user.mobileNumber,
         role: user.role,
         designation: user.designation || '',
+        status: user.status === 'inactive' ? 'inactive' : 'active',
       }));
 
     return res.json({
@@ -219,7 +223,7 @@ router.delete('/:id', requireAdmin, (req, res) => {
 router.put('/:id', requireAdmin, async (req, res) => {
   try {
     const employeeId = Number(req.params.id);
-    const { name, email, mobileNumber, password, designation } = req.body;
+    const { name, email, mobileNumber, password, designation, status } = req.body;
 
     if (!Number.isInteger(employeeId)) {
       return res.status(400).json({
@@ -274,6 +278,10 @@ router.put('/:id', requireAdmin, async (req, res) => {
         designation !== undefined
           ? String(designation).trim()
           : (users[employeeIndex].designation || ''),
+      status:
+        status !== undefined
+          ? (status === 'inactive' ? 'inactive' : 'active')
+          : (users[employeeIndex].status || 'active'),
     };
 
     if (password && typeof password === 'string' && password.trim()) {
@@ -296,6 +304,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
         mobileNumber: users[employeeIndex].mobileNumber,
         role: users[employeeIndex].role,
         designation: users[employeeIndex].designation || '',
+        status: users[employeeIndex].status || 'active',
       },
     });
   } catch (error) {
@@ -304,6 +313,61 @@ router.put('/:id', requireAdmin, async (req, res) => {
     return res.status(500).json({
       error: 'Failed to update employee.',
     });
+  }
+});
+
+/* ─────────────────────────────────────────────
+   Partial update employee (e.g. status)
+───────────────────────────────────────────── */
+
+router.patch('/:id', requireAdmin, async (req, res) => {
+  try {
+    const employeeId = Number(req.params.id);
+    const { status, designation, name, email } = req.body;
+
+    if (!Number.isInteger(employeeId)) {
+      return res.status(400).json({ error: 'Invalid employee ID.' });
+    }
+
+    const users = getAllUsers();
+    const employeeIndex = users.findIndex(
+      (user) => Number(user.id) === employeeId && user.role === 'employee'
+    );
+
+    if (employeeIndex === -1) {
+      return res.status(404).json({ error: 'Employee not found.' });
+    }
+
+    if (status !== undefined) {
+      users[employeeIndex].status = status === 'inactive' ? 'inactive' : 'active';
+    }
+    if (designation !== undefined) {
+      users[employeeIndex].designation = String(designation).trim();
+    }
+    if (name !== undefined && name.trim()) {
+      users[employeeIndex].name = name.trim();
+    }
+    if (email !== undefined && email.trim()) {
+      users[employeeIndex].email = email.trim();
+    }
+
+    saveAllUsers(users);
+
+    return res.json({
+      message: 'Employee updated successfully.',
+      employee: {
+        id: users[employeeIndex].id,
+        name: users[employeeIndex].name,
+        email: users[employeeIndex].email,
+        mobileNumber: users[employeeIndex].mobileNumber,
+        role: users[employeeIndex].role,
+        designation: users[employeeIndex].designation || '',
+        status: users[employeeIndex].status || 'active',
+      },
+    });
+  } catch (error) {
+    console.error('Patch employee error:', error);
+    return res.status(500).json({ error: 'Failed to update employee.' });
   }
 });
 

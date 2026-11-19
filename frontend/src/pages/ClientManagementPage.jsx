@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { getToken } from '../api/authApi.js';
+import ContactClientDialog from '../components/ContactClientDialog.jsx';
 import './ClientManagementPage.css';
 
 const API_URL = 'http://localhost:4000/api/clients';
@@ -98,12 +99,14 @@ export default function ClientManagementPage({ isAdmin = true }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [serviceFilter, setServiceFilter] = useState('all');
   const [featureFilter, setFeatureFilter] = useState('all');
+  const [cardFilter, setCardFilter] = useState(null);
 
   // Modals
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
   const [viewingClient, setViewingClient] = useState(null);
   const [clientToDelete, setClientToDelete] = useState(null);
+  const [contactDialog, setContactDialog] = useState(null);
 
   // Form state
   const [form, setForm] = useState(EMPTY_FORM);
@@ -346,6 +349,43 @@ export default function ClientManagementPage({ isAdmin = true }) {
     }
   }
 
+  // Instant inline client status toggle (Active / Inactive)
+  async function handleStatusChange(client, newStatus) {
+    if (!client || !newStatus) return;
+    const oldStatus = client.status || 'active';
+    if (oldStatus === newStatus) return;
+
+    // Optimistic UI update
+    setClients((prev) =>
+      prev.map((c) => (c.id === client.id ? { ...c, status: newStatus } : c))
+    );
+
+    try {
+      const response = await fetch(
+        `${API_URL}/${encodeURIComponent(client.id)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${getToken()}`,
+          },
+          body: JSON.stringify({ status: newStatus }),
+        }
+      );
+
+      await readResponse(response);
+      showNotice(
+        `✓ Status set to ${newStatus === 'active' ? 'Active' : 'Inactive'} for ${client.companyName || client.name}.`
+      );
+    } catch (err) {
+      // Revert optimistic update on error
+      setClients((prev) =>
+        prev.map((c) => (c.id === client.id ? { ...c, status: oldStatus } : c))
+      );
+      alert(err.message || 'Failed to update client status.');
+    }
+  }
+
   // Catalogs across active clients for filter dropdowns
   const allUsedServices = useMemo(() => {
     const set = new Set(PREDEFINED_SERVICES);
@@ -381,7 +421,17 @@ export default function ClientManagementPage({ isAdmin = true }) {
   // Filtered clients list
   const filteredClients = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return clients.filter((client) => {
+    let result = clients.filter((client) => {
+      // Interactive card filter
+      if (cardFilter === 'active' && client.status !== 'active') return false;
+      if (cardFilter === 'revenue' && (Number(client.monthlyRental) || 0) <= 0) return false;
+      if (
+        cardFilter === 'services' &&
+        (!Array.isArray(client.services) || client.services.length === 0)
+      ) {
+        return false;
+      }
+
       if (statusFilter !== 'all' && client.status !== statusFilter) return false;
 
       if (serviceFilter !== 'all') {
@@ -421,14 +471,22 @@ export default function ClientManagementPage({ isAdmin = true }) {
         matchFeatures
       );
     });
-  }, [clients, search, statusFilter, serviceFilter, featureFilter]);
+
+    if (cardFilter === 'revenue') {
+      result = [...result].sort(
+        (a, b) => (Number(b.monthlyRental) || 0) - (Number(a.monthlyRental) || 0)
+      );
+    }
+
+    return result;
+  }, [clients, search, statusFilter, serviceFilter, featureFilter, cardFilter]);
 
   return (
     <div className="client-page">
       {/* ── Page Header ── */}
       <div className="client-page-header">
         <div>
-          <h1 className="db-page-title">Client Management</h1>
+          <h1 className="db-page-title">Manage Clients</h1>
           <p className="db-page-sub">
             Manage company profiles, monthly rentals, subscribed services, and active features.
           </p>
@@ -452,38 +510,182 @@ export default function ClientManagementPage({ isAdmin = true }) {
         </div>
       )}
 
-      {/* ── Overview Statistics Cards ── */}
-      <div className="client-stat-grid">
-        <div className="client-stat-card">
+      {/* ── Overview Statistics Cards (Accessible & Filterable) ── */}
+      <div className="client-stat-grid" role="region" aria-label="Client statistics overview">
+        {/* Total Clients Card */}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-pressed={cardFilter === 'total'}
+          aria-label={`Total Clients: ${clients.length}. Click to view all clients.`}
+          title={`Click to view all ${clients.length} clients`}
+          className={`client-stat-card ${cardFilter === 'total' ? 'active' : ''}`}
+          style={{
+            '--card-accent': '#4f46e5',
+            '--card-bg': '#f5f3ff',
+            '--card-border': '#c7d2fe',
+          }}
+          onClick={() => {
+            setCardFilter(null);
+            setStatusFilter('all');
+            setServiceFilter('all');
+            setFeatureFilter('all');
+            showNotice('Showing all clients.');
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setCardFilter(null);
+              setStatusFilter('all');
+              setServiceFilter('all');
+              setFeatureFilter('all');
+              showNotice('Showing all clients.');
+            }
+          }}
+        >
           <div className="client-stat-label">Total Clients</div>
           <div className="client-stat-num">{clients.length}</div>
-          <div className="client-stat-sub">Registered accounts</div>
         </div>
 
-        <div className="client-stat-card stat-accent-green">
+        {/* Active Clients Card */}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-pressed={cardFilter === 'active'}
+          aria-label={`Active Clients: ${activeClientsCount}. Click to filter active clients.`}
+          title={`Click to filter active clients (${activeClientsCount})`}
+          className={`client-stat-card stat-accent-green ${cardFilter === 'active' ? 'active' : ''}`}
+          style={{
+            '--card-accent': '#059669',
+            '--card-bg': '#ecfdf5',
+            '--card-border': '#a7f3d0',
+          }}
+          onClick={() => {
+            const next = cardFilter === 'active' ? null : 'active';
+            setCardFilter(next);
+            setStatusFilter(next ? 'active' : 'all');
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              const next = cardFilter === 'active' ? null : 'active';
+              setCardFilter(next);
+              setStatusFilter(next ? 'active' : 'all');
+            }
+          }}
+        >
           <div className="client-stat-label">Active Clients</div>
           <div className="client-stat-num">{activeClientsCount}</div>
-          <div className="client-stat-sub">Active billing accounts</div>
         </div>
 
-        <div className="client-stat-card stat-accent-indigo">
+        {/* Monthly Rental Revenue Card */}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-pressed={cardFilter === 'revenue'}
+          aria-label={`Monthly Rental Revenue: ${formatCurrency(totalRevenue)}. Click to view paying clients.`}
+          title={`Click to filter paying clients (${clients.filter((c) => Number(c.monthlyRental) > 0).length} clients)`}
+          className={`client-stat-card stat-accent-indigo ${cardFilter === 'revenue' ? 'active' : ''}`}
+          style={{
+            '--card-accent': '#4f46e5',
+            '--card-bg': '#eef2ff',
+            '--card-border': '#c7d2fe',
+          }}
+          onClick={() => {
+            setCardFilter((prev) => (prev === 'revenue' ? null : 'revenue'));
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setCardFilter((prev) => (prev === 'revenue' ? null : 'revenue'));
+            }
+          }}
+        >
           <div className="client-stat-label">Monthly Rental Revenue</div>
           <div className="client-stat-num">{formatCurrency(totalRevenue)}</div>
-          <div className="client-stat-sub">Recurring monthly billings</div>
         </div>
 
-        <div className="client-stat-card stat-accent-blue">
+        {/* Total Services Card */}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-pressed={cardFilter === 'services'}
+          aria-label={`Total Services: ${allUsedServices.length}. Click to filter clients with services.`}
+          title="Click to filter clients with subscribed services"
+          className={`client-stat-card stat-accent-blue ${cardFilter === 'services' ? 'active' : ''}`}
+          style={{
+            '--card-accent': '#2563eb',
+            '--card-bg': '#eff6ff',
+            '--card-border': '#bfdbfe',
+          }}
+          onClick={() => {
+            setCardFilter((prev) => (prev === 'services' ? null : 'services'));
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setCardFilter((prev) => (prev === 'services' ? null : 'services'));
+            }
+          }}
+        >
           <div className="client-stat-label">Total Services</div>
           <div className="client-stat-num">{allUsedServices.length}</div>
-          <div className="client-stat-sub">Active solution types</div>
         </div>
 
-        <div className="client-stat-card stat-accent-emerald">
+        {/* Total Features Card */}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-pressed={cardFilter === 'features'}
+          aria-label={`Total Features: ${allUsedFeatures.length}. Click to filter clients with features.`}
+          title="Click to filter clients with active features"
+          className={`client-stat-card stat-accent-emerald ${cardFilter === 'features' ? 'active' : ''}`}
+          style={{
+            '--card-accent': '#0d9488',
+            '--card-bg': '#f0fdfa',
+            '--card-border': '#99f6e4',
+          }}
+          onClick={() => {
+            setCardFilter((prev) => (prev === 'features' ? null : 'features'));
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setCardFilter((prev) => (prev === 'features' ? null : 'features'));
+            }
+          }}
+        >
           <div className="client-stat-label">Total Features</div>
           <div className="client-stat-num">{allUsedFeatures.length}</div>
-          <div className="client-stat-sub">Add-ons deployed</div>
         </div>
       </div>
+
+      {/* ── Active Card Filter Banner ── */}
+      {cardFilter && (
+        <div className="client-active-filter-banner" role="status">
+          <span>
+            Showing:{' '}
+            <strong>
+              {cardFilter === 'total' && 'All Registered Clients'}
+              {cardFilter === 'active' && `Active Clients (${filteredClients.length})`}
+              {cardFilter === 'revenue' && `Paying Clients Sorted by Highest Rental (${filteredClients.length})`}
+              {cardFilter === 'services' && `Clients with Subscribed Services (${filteredClients.length})`}
+              {cardFilter === 'features' && `Clients with Active Features (${filteredClients.length})`}
+            </strong>
+          </span>
+          <button
+            type="button"
+            className="client-clear-card-filter-btn"
+            onClick={() => {
+              setCardFilter(null);
+              setStatusFilter('all');
+            }}
+            aria-label="Clear active card filter"
+          >
+            ✕ Reset Filter
+          </button>
+        </div>
+      )}
 
       {/* ── Filter & Search Toolbar ── */}
       <div className="client-toolbar">
@@ -506,7 +708,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
           <input
             type="search"
             className="client-search-input"
-            placeholder="Search by name, company, mobile, email, services or features..."
+           
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             aria-label="Search clients"
@@ -553,7 +755,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
             ))}
           </select>
 
-          {(search || statusFilter !== 'all' || serviceFilter !== 'all' || featureFilter !== 'all') && (
+          {(search || statusFilter !== 'all' || serviceFilter !== 'all' || featureFilter !== 'all' || cardFilter) && (
             <button
               type="button"
               className="client-clear-filters-btn"
@@ -562,6 +764,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
                 setStatusFilter('all');
                 setServiceFilter('all');
                 setFeatureFilter('all');
+                setCardFilter(null);
               }}
             >
               Clear
@@ -607,17 +810,15 @@ export default function ClientManagementPage({ isAdmin = true }) {
             <table className="client-table">
               <thead>
                 <tr>
-                  <th style={{ width: 95 }}>Client ID</th>
-                  <th>Company &amp; Contact Person</th>
+                  <th style={{ width: 75 }}>Client ID</th>
+                  <th>Company &amp; Contact</th>
                   <th>Contact Details</th>
-                  <th>City / State</th>
-                  <th style={{ width: 135 }}>Monthly Rental</th>
-                  {/* Distinct Block 1: Services */}
-                  <th style={{ minWidth: 170 }}>Services</th>
-                  {/* Distinct Block 2: Features */}
-                  <th style={{ minWidth: 180 }}>Features</th>
-                  <th style={{ width: 85, textAlign: 'center' }}>Status</th>
-                  <th style={{ width: 105, textAlign: 'center' }}>Actions</th>
+                  <th style={{ width: 90 }}>City / State</th>
+                  <th style={{ width: 100 }}>Monthly Rental</th>
+                  <th>Services</th>
+                  <th>Features</th>
+                  <th style={{ width: 105, textAlign: 'center' }}>Client Status</th>
+                  <th style={{ width: 95, textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -634,8 +835,8 @@ export default function ClientManagementPage({ isAdmin = true }) {
                   return (
                     <tr key={client.id} className="client-table-row">
                       {/* ID */}
-                      <td>
-                        <span className="client-id-badge">{client.id}</span>
+                      <td className="client-id-cell">
+                        <span className="client-id-text">{client.id}</span>
                       </td>
 
                       {/* Company & Name */}
@@ -650,14 +851,13 @@ export default function ClientManagementPage({ isAdmin = true }) {
                             {client.companyName}
                           </button>
                           <div className="client-contact-person">
-                            <span className="client-person-dot">•</span>
                             <span>{client.name}</span>
                             {client.ticketCount !== undefined && client.ticketCount > 0 && (
                               <span
                                 className="client-ticket-pill"
                                 title={`${client.ticketCount} ticket(s) registered in RI-Desk`}
                               >
-                                🎫 {client.ticketCount} {client.ticketCount === 1 ? 'ticket' : 'tickets'}
+                                {client.ticketCount} {client.ticketCount === 1 ? 'ticket' : 'tickets'}
                               </span>
                             )}
                           </div>
@@ -666,46 +866,61 @@ export default function ClientManagementPage({ isAdmin = true }) {
 
                       {/* Contact Info */}
                       <td>
-                        <div className="client-contacts-block">
-                          <div className="client-contact-line">
-                            <svg
-                              width="12"
-                              height="12"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              aria-hidden="true"
-                            >
-                              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                            </svg>
-                            <strong>{client.mobileNumber}</strong>
-                            {client.whatsappNumber && (
-                              <span
-                                className="client-wa-badge"
-                                title={`WhatsApp: ${client.whatsappNumber}`}
-                              >
-                                WA
-                              </span>
-                            )}
-                          </div>
-                          {client.email && (
-                            <div className="client-contact-subline">{client.email}</div>
-                          )}
-                          {client.website && (
-                            <a
-                              href={
-                                client.website.startsWith('http')
-                                  ? client.website
-                                  : `https://${client.website}`
+                        <div className="client-contacts-cell">
+                          {client.mobileNumber ? (
+                            <button
+                              type="button"
+                              className="client-phone-btn"
+                              title={`Contact ${client.name || client.companyName} (${client.mobileNumber})`}
+                              onClick={() =>
+                                setContactDialog({
+                                  name: client.name || client.companyName || 'Client',
+                                  phone: client.mobileNumber,
+                                  email: client.email || '',
+                                })
                               }
-                              target="_blank"
-                              rel="noreferrer"
-                              className="client-website-link"
                             >
-                              {client.website.replace(/^https?:\/\//i, '')} ↗
+                              <svg
+                                width="11"
+                                height="11"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.4"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                              </svg>
+                              <span>{client.mobileNumber}</span>
+                            </button>
+                          ) : (
+                            <span style={{ color: '#94a3b8' }}>—</span>
+                          )}
+
+                          {client.email && (
+                            <a
+                              href={`mailto:${client.email}`}
+                              className="client-email-link"
+                              title={`Send email to ${client.name || client.companyName} (${client.email})`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <svg
+                                width="11"
+                                height="11"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.4"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <rect width="20" height="16" x="2" y="4" rx="2" />
+                                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                              </svg>
+                              <span>{client.email}</span>
                             </a>
                           )}
                         </div>
@@ -713,82 +928,80 @@ export default function ClientManagementPage({ isAdmin = true }) {
 
                       {/* Location */}
                       <td>
-                        <div className="client-location-cell">
-                          <span className="client-city-text">
-                            {client.cityState || '—'}
-                          </span>
-                          {client.address && (
-                            <span className="client-address-text" title={client.address}>
-                              {client.address}
-                            </span>
-                          )}
-                        </div>
+                        <span className="client-city-text">
+                          {client.cityState || '—'}
+                        </span>
                       </td>
 
                       {/* Monthly Rental */}
                       <td>
-                        <span className="client-rental-badge">
-                          {formatCurrency(client.monthlyRental)}
+                        <div className="client-rental-cell">
+                          <span className="client-rental-amount">
+                            {formatCurrency(client.monthlyRental)}
+                          </span>
                           <span className="client-rental-period">/mo</span>
-                        </span>
+                        </div>
                       </td>
 
-                      {/* ── Dedicated Block 1: Services ── */}
+                      {/* ── Services ── */}
                       <td>
-                        <div className="client-tags-cell-block services-cell-block">
+                        <div className="client-tags-cell-block">
                           {dispServices.map((svc) => (
-                            <span key={svc} className="client-service-pill">
-                              <span className="service-bullet">◆</span>
+                            <span key={svc} className="client-tag-pill">
                               {svc}
                             </span>
                           ))}
                           {extraServices > 0 && (
                             <span
-                              className="client-service-pill pill-more"
+                              className="client-tag-pill pill-more"
                               title={servicesList.slice(2).join(', ')}
                             >
-                              +{extraServices} more
+                              +{extraServices}
                             </span>
                           )}
                           {servicesList.length === 0 && (
-                            <span className="client-no-items">None</span>
+                            <span className="client-no-items">—</span>
                           )}
                         </div>
                       </td>
 
-                      {/* ── Dedicated Block 2: Features ── */}
+                      {/* ── Features ── */}
                       <td>
-                        <div className="client-tags-cell-block features-cell-block">
+                        <div className="client-tags-cell-block">
                           {dispFeatures.map((feat) => (
-                            <span key={feat} className="client-feature-pill">
-                              <span className="feature-bullet">✓</span>
+                            <span key={feat} className="client-tag-pill">
                               {feat}
                             </span>
                           ))}
                           {extraFeatures > 0 && (
                             <span
-                              className="client-feature-pill pill-more"
+                              className="client-tag-pill pill-more"
                               title={featuresList.slice(2).join(', ')}
                             >
-                              +{extraFeatures} more
+                              +{extraFeatures}
                             </span>
                           )}
                           {featuresList.length === 0 && (
-                            <span className="client-no-items">None</span>
+                            <span className="client-no-items">—</span>
                           )}
                         </div>
                       </td>
 
-                      {/* Status */}
+                      {/* Client Status */}
                       <td style={{ textAlign: 'center' }}>
-                        <span
-                          className={`client-status-badge ${
-                            client.status === 'active' ? 'status-active' : 'status-inactive'
+                        <select
+                          className={`client-status-badge-select ${
+                            (client.status || 'active') === 'active'
+                              ? 'status-active'
+                              : 'status-inactive'
                           }`}
+                          value={client.status || 'active'}
+                          onChange={(e) => handleStatusChange(client, e.target.value)}
+                          title={`Change status for ${client.companyName || client.name}`}
                         >
-                          <span className="client-status-dot" />
-                          {client.status === 'active' ? 'Active' : 'Inactive'}
-                        </span>
+                          <option value="active">● Active</option>
+                          <option value="inactive">● Inactive</option>
+                        </select>
                       </td>
 
                       {/* Actions */}
@@ -802,8 +1015,8 @@ export default function ClientManagementPage({ isAdmin = true }) {
                             aria-label="View Details"
                           >
                             <svg
-                              width="16"
-                              height="16"
+                              width="15"
+                              height="15"
                               viewBox="0 0 24 24"
                               fill="none"
                               stroke="currentColor"
@@ -818,14 +1031,14 @@ export default function ClientManagementPage({ isAdmin = true }) {
 
                           <button
                             type="button"
-                            className="ticket-icon-button ticket-edit-icon client-icon-btn edit-btn"
+                            className="client-icon-btn edit-btn"
                             onClick={() => openEditDialog(client)}
                             title="Edit Client"
                             aria-label="Edit Client"
                           >
                             <svg
-                              width="18"
-                              height="18"
+                              width="15"
+                              height="15"
                               viewBox="0 0 24 24"
                               fill="none"
                               stroke="currentColor"
@@ -841,14 +1054,14 @@ export default function ClientManagementPage({ isAdmin = true }) {
 
                           <button
                             type="button"
-                            className="ticket-icon-button ticket-delete-icon client-icon-btn delete-btn"
+                            className="client-icon-btn delete-btn"
                             onClick={() => setClientToDelete(client)}
                             title="Delete Client"
                             aria-label="Delete Client"
                           >
                             <svg
-                              width="18"
-                              height="18"
+                              width="15"
+                              height="15"
                               viewBox="0 0 24 24"
                               fill="none"
                               stroke="currentColor"
@@ -1045,35 +1258,18 @@ export default function ClientManagementPage({ isAdmin = true }) {
                 />
               </div>
 
-              {/* Status Radio / Select */}
+              {/* Client Status Dropdown */}
               <div className="client-form-field">
-                <label>Account Status</label>
-                <div className="client-status-radios">
-                  <label className="client-radio-opt">
-                    <input
-                      type="radio"
-                      name="client-status"
-                      value="active"
-                      checked={form.status === 'active'}
-                      onChange={() => handleFormChange('status', 'active')}
-                    />
-                    <span className="client-radio-label">
-                      <span className="client-status-dot dot-active" /> Active
-                    </span>
-                  </label>
-                  <label className="client-radio-opt">
-                    <input
-                      type="radio"
-                      name="client-status"
-                      value="inactive"
-                      checked={form.status === 'inactive'}
-                      onChange={() => handleFormChange('status', 'inactive')}
-                    />
-                    <span className="client-radio-label">
-                      <span className="client-status-dot dot-inactive" /> Inactive
-                    </span>
-                  </label>
-                </div>
+                <label htmlFor="client-form-status">Client Status</label>
+                <select
+                  id="client-form-status"
+                  className="client-form-input"
+                  value={form.status || 'active'}
+                  onChange={(e) => handleFormChange('status', e.target.value)}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
               </div>
 
               {/* ════════════════════════════════════════════════════════
@@ -1277,7 +1473,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
                 </div>
 
                 <div className="client-metric-item">
-                  <span className="client-metric-lbl">Account Status</span>
+                  <span className="client-metric-lbl">Client Status</span>
                   <span
                     className={`client-status-badge ${
                       viewingClient.status === 'active' ? 'status-active' : 'status-inactive'
@@ -1531,6 +1727,14 @@ export default function ClientManagementPage({ isAdmin = true }) {
           </div>
         </div>
       )}
+
+      {/* ────────────────────────────────────────────────────────
+          CONTACT CLIENT DIALOG (PHONE CALL, WHATSAPP, EMAIL)
+      ──────────────────────────────────────────────────────── */}
+      <ContactClientDialog
+        contact={contactDialog}
+        onClose={() => setContactDialog(null)}
+      />
     </div>
   );
 }

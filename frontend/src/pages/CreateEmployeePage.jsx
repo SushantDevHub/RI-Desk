@@ -58,6 +58,7 @@ export default function CreateEmployeePage({ onBack }) {
     email: '',
     mobileNumber: '',
     designation: '',
+    status: 'active',
     password: '',
     confirmPassword: '',
   });
@@ -177,6 +178,7 @@ export default function CreateEmployeePage({ onBack }) {
             email: form.email.trim(),
             mobileNumber: form.mobileNumber.trim(),
             designation: form.designation.trim(),
+            status: form.status || 'active',
             password: form.password,
           }),
         }
@@ -202,6 +204,7 @@ export default function CreateEmployeePage({ onBack }) {
         email: '',
         mobileNumber: '',
         designation: '',
+        status: 'active',
         password: '',
         confirmPassword: '',
       });
@@ -218,8 +221,8 @@ export default function CreateEmployeePage({ onBack }) {
     <div className="employee-page">
       <div className="employee-page-header">
         <div>
-          <h1>Add Employee</h1>
-          <p>
+          <h1 className="db-page-title">Add Employee</h1>
+          <p className="db-page-sub">
             Register a new team member and grant dashboard access.
           </p>
         </div>
@@ -528,6 +531,21 @@ export default function CreateEmployeePage({ onBack }) {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Employee Status */}
+          <div className="form-group">
+            <label htmlFor="create-employee-status">Employee Status</label>
+            <select
+              id="create-employee-status"
+              name="status"
+              value={form.status || 'active'}
+              onChange={handleChange}
+              className="employee-status-select"
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
           </div>
 
           {/* Password */}

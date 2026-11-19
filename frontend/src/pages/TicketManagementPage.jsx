@@ -205,7 +205,7 @@ function isTicketNew(createdAt, status) {
 }
 
 // Returns an error message, or '' when the form is valid.
-function validateTicket(ticket) {
+export function validateTicket(ticket) {
   const clientName = (ticket.client || ticket.customer || '').trim();
   const mobile = (ticket.clientMobile || ticket.customerMobile || '').trim();
   const email = (ticket.clientEmail || ticket.customerEmail || ticket.email || '').trim();
@@ -239,7 +239,7 @@ function validateTicket(ticket) {
 }
 
 // Builds the request body used by both create and edit.
-function buildPayload(ticket) {
+export function buildPayload(ticket) {
   const clientName = (ticket.client || ticket.customer || '').trim();
   const mobile = (ticket.clientMobile || ticket.customerMobile || '').trim();
   const email = (ticket.clientEmail || ticket.customerEmail || ticket.email || '').trim();
@@ -266,7 +266,7 @@ function buildPayload(ticket) {
 /* Small components                                   */
 /* -------------------------------------------------- */
 
-function TicketIcon({ type }) {
+export function TicketIcon({ type }) {
   const common = {
     width: 18,
     height: 18,
@@ -324,7 +324,7 @@ function TicketIcon({ type }) {
  * Because both dialogs use this one component, the Assign To dropdown
  * can never be wired to the wrong state again.
  */
-function TicketFormFields({ values, onChange, employees, idPrefix, isAdmin }) {
+export function TicketFormFields({ values, onChange, employees, idPrefix, isAdmin }) {
   const id = (name) => `${idPrefix}-ticket-${name}`;
   const isCustomCategory =
     !['recharge', 'payment', 'wallet', 'technical'].includes(values.category);
@@ -1176,7 +1176,7 @@ export default function TicketManagementPage() {
     <div className="ticket-management">
       <div className="ticket-page-header">
         <div>
-          <h1 className="db-page-title">Ticket Management</h1>
+          <h1 className="db-page-title">Manage Tickets</h1>
           <p className="db-page-sub">
             {isAdmin
               ? 'View tickets, manage details and assign them to employees.'

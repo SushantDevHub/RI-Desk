@@ -23,6 +23,7 @@ const EMPTY_FORM = {
   email: '',
   mobileNumber: '',
   designation: '',
+  status: 'active',
   password: '',
   confirmPassword: '',
 };
@@ -116,37 +117,9 @@ export default function EmployeeListPage({ onCreateEmployee }) {
   const [customCreateInput, setCustomCreateInput] = useState('');
   const [isCustomEdit, setIsCustomEdit] = useState(false);
   const [customEditInput, setCustomEditInput] = useState('');
-  const [copiedEmail, setCopiedEmail] = useState('');
-  const [copiedMobile, setCopiedMobile] = useState('');
   const [contactDialog, setContactDialog] = useState(null);
 
   const messageTimeoutRef = useRef(null);
-
-  function handleCopyEmail(email) {
-    if (!email) return;
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(email);
-      }
-      setCopiedEmail(email);
-      setTimeout(() => setCopiedEmail(''), 1500);
-    } catch {
-      // ignore
-    }
-  }
-
-  function handleCopyMobile(mobile) {
-    if (!mobile) return;
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(mobile);
-      }
-      setCopiedMobile(mobile);
-      setTimeout(() => setCopiedMobile(''), 1500);
-    } catch {
-      // ignore
-    }
-  }
 
   function showTemporaryMessage(msg, duration = 1000) {
     if (messageTimeoutRef.current) {
@@ -253,6 +226,7 @@ export default function EmployeeListPage({ onCreateEmployee }) {
     setCustomEditInput(existingDesig);
     setEditingEmployee({
       ...employee,
+      status: employee.status || 'active',
       designation: existingDesig,
       password: '',
       confirmPassword: '',
@@ -315,6 +289,7 @@ export default function EmployeeListPage({ onCreateEmployee }) {
           email: createForm.email.trim(),
           mobileNumber: mobile,
           designation: (createForm.designation || '').trim(),
+          status: createForm.status || 'active',
           password: createForm.password,
           role: 'employee',
         }),
@@ -366,6 +341,7 @@ export default function EmployeeListPage({ onCreateEmployee }) {
         email: (editingEmployee.email || '').trim(),
         mobileNumber: String(editingEmployee.mobileNumber || '').trim(),
         designation: (editingEmployee.designation || '').trim(),
+        status: editingEmployee.status || 'active',
       };
       if (trimmedPassword) {
         updatePayload.password = trimmedPassword;
@@ -395,6 +371,47 @@ export default function EmployeeListPage({ onCreateEmployee }) {
       setError(err.message || 'Failed to update employee.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  // Instant inline employee status toggle (Active / Inactive)
+  async function handleStatusChange(employee, newStatus) {
+    if (!employee || !newStatus) return;
+    const oldStatus = employee.status || 'active';
+    if (oldStatus === newStatus) return;
+
+    // Optimistic UI update
+    setEmployees((prev) =>
+      prev.map((emp) =>
+        emp.id === employee.id ? { ...emp, status: newStatus } : emp
+      )
+    );
+
+    try {
+      const response = await fetch(
+        `${API_URL}/${encodeURIComponent(employee.id)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${getToken()}`,
+          },
+          body: JSON.stringify({ status: newStatus }),
+        }
+      );
+
+      await readResponse(response);
+      showTemporaryMessage(
+        `Status set to ${newStatus === 'active' ? 'Active' : 'Inactive'} for ${employee.name}.`
+      );
+    } catch (err) {
+      // Revert optimistic update on error
+      setEmployees((prev) =>
+        prev.map((emp) =>
+          emp.id === employee.id ? { ...emp, status: oldStatus } : emp
+        )
+      );
+      setError(err.message || 'Failed to update employee status.');
     }
   }
 
@@ -440,8 +457,8 @@ export default function EmployeeListPage({ onCreateEmployee }) {
       {/* Page heading */}
       <header className="employee-page-header">
         <div>
-          <h1>Employees</h1>
-          <p>View and manage your support team.</p>
+          <h1 className="db-page-title">Manage Employees</h1>
+          <p className="db-page-sub">View and manage your support team.</p>
         </div>
 
         <button
@@ -492,11 +509,12 @@ export default function EmployeeListPage({ onCreateEmployee }) {
             <table className="employee-table">
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th>Employee</th>
                   <th>Name</th>
                   <th>Email</th>
                   <th>Mobile Number</th>
                   <th>Designation</th>
+                  <th style={{ width: 120, textAlign: 'center' }}>Employee Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -537,48 +555,6 @@ export default function EmployeeListPage({ onCreateEmployee }) {
                             </svg>
                             <span>{employee.email}</span>
                           </a>
-                          <button
-                            type="button"
-                            className={`employee-email-copy-btn ${
-                              copiedEmail === employee.email ? 'copied' : ''
-                            }`}
-                            onClick={() => handleCopyEmail(employee.email)}
-                            title={
-                              copiedEmail === employee.email
-                                ? 'Copied to clipboard!'
-                                : 'Copy email address'
-                            }
-                            aria-label={`Copy email ${employee.email}`}
-                          >
-                            {copiedEmail === employee.email ? (
-                              <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                            ) : (
-                              <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                              </svg>
-                            )}
-                          </button>
                         </div>
                       ) : (
                         <span style={{ color: '#94a3b8' }}>—</span>
@@ -616,48 +592,6 @@ export default function EmployeeListPage({ onCreateEmployee }) {
                             </svg>
                             <span>{employee.mobileNumber}</span>
                           </button>
-                          <button
-                            type="button"
-                            className={`employee-email-copy-btn ${
-                              copiedMobile === employee.mobileNumber ? 'copied' : ''
-                            }`}
-                            onClick={() => handleCopyMobile(employee.mobileNumber)}
-                            title={
-                              copiedMobile === employee.mobileNumber
-                                ? 'Copied to clipboard!'
-                                : 'Copy mobile number'
-                            }
-                            aria-label={`Copy mobile number ${employee.mobileNumber}`}
-                          >
-                            {copiedMobile === employee.mobileNumber ? (
-                              <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                            ) : (
-                              <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                              </svg>
-                            )}
-                          </button>
                         </div>
                       ) : (
                         <span style={{ color: '#94a3b8' }}>—</span>
@@ -673,6 +607,22 @@ export default function EmployeeListPage({ onCreateEmployee }) {
                       ) : (
                         <span style={{ color: '#94a3b8' }}>—</span>
                       )}
+                    </td>
+
+                    <td style={{ textAlign: 'center' }}>
+                      <select
+                        className={`employee-status-badge-select ${
+                          (employee.status || 'active') === 'active'
+                            ? 'status-active'
+                            : 'status-inactive'
+                        }`}
+                        value={employee.status || 'active'}
+                        onChange={(e) => handleStatusChange(employee, e.target.value)}
+                        title={`Change status for ${employee.name}`}
+                      >
+                        <option value="active">● Active</option>
+                        <option value="inactive">● Inactive</option>
+                      </select>
                     </td>
 
                     <td>
@@ -928,6 +878,20 @@ export default function EmployeeListPage({ onCreateEmployee }) {
                   </div>
                 )}
               </div>
+
+              {/* Employee Status in Create Dialog */}
+              <label>
+                Employee Status
+                <select
+                  name="status"
+                  className="employee-form-select"
+                  value={createForm.status || 'active'}
+                  onChange={updateCreateField}
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </label>
 
               <label>
                 Password
@@ -1215,6 +1179,25 @@ export default function EmployeeListPage({ onCreateEmployee }) {
                   </div>
                 )}
               </div>
+
+              {/* Employee Status in Edit Dialog */}
+              <label>
+                Employee Status
+                <select
+                  name="status"
+                  className="employee-form-select"
+                  value={editingEmployee.status || 'active'}
+                  onChange={(e) =>
+                    setEditingEmployee({
+                      ...editingEmployee,
+                      status: e.target.value,
+                    })
+                  }
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </label>
 
               <label>
                 Password

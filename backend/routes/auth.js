@@ -48,6 +48,13 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    // Check if employee account is inactive
+    if (user.role === 'employee' && user.status === 'inactive') {
+      return res.status(403).json({
+        error: 'Your account is currently inactive. Please contact your administrator.',
+      });
+    }
+
     // Auto-migrate legacy plain text password to bcrypt hash on successful login
     if (!isBcrypt && user.password) {
       const newHash = await bcrypt.hash(password, 10);

@@ -180,9 +180,9 @@ router.post('/', authenticate, (req, res) => {
 });
 
 // --------------------------------------------------
-// PUT /api/clients/:id - update an existing client
+// PUT & PATCH /api/clients/:id - update an existing client
 // --------------------------------------------------
-router.put('/:id', authenticate, (req, res) => {
+const handleUpdateClient = (req, res) => {
   try {
     const existing = findClientById(req.params.id);
     if (!existing) {
@@ -284,7 +284,10 @@ router.put('/:id', authenticate, (req, res) => {
     console.error('Update client error:', error);
     return res.status(500).json({ error: 'Failed to update client.' });
   }
-});
+};
+
+router.put('/:id', authenticate, handleUpdateClient);
+router.patch('/:id', authenticate, handleUpdateClient);
 
 // --------------------------------------------------
 // DELETE /api/clients/:id - delete a client

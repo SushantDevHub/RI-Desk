@@ -397,6 +397,7 @@ router.get('/employees', authenticate, (req, res) => {
         email: user.email || '',
         mobileNumber: user.mobileNumber,
         role: user.role,
+        status: user.status === 'inactive' ? 'inactive' : 'active',
       }));
 
     return res.json({ employees });

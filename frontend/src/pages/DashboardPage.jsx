@@ -6,7 +6,12 @@ import {
   getToken,
   changePassword,
 } from '../api/authApi.js';
-import TicketManagementPage from './TicketManagementPage.jsx';
+import TicketManagementPage, {
+  validateTicket,
+  buildPayload,
+  TicketIcon,
+  TicketFormFields,
+} from './TicketManagementPage.jsx';
 import EmployeeListPage from './EmployeeListPage.jsx';
 import CreateEmployeePage from './CreateEmployeePage.jsx';
 import ClientManagementPage from './ClientManagementPage.jsx';
@@ -14,6 +19,7 @@ import ExtrasPage from './ExtrasPage.jsx';
 import { getActiveAnnouncements } from '../api/announcementApi.js';
 import ContactClientDialog from '../components/ContactClientDialog.jsx';
 import TicketLogsDialog from '../components/TicketLogsDialog.jsx';
+import './TicketManagementPage.css';
 import './DashboardPage.css';
 
 /* ─────────────────────────────────────────────
@@ -393,9 +399,16 @@ export default function DashboardPage({
   const [noticeMessage, setNoticeMessage] = useState('');
   const [liveAnnouncements, setLiveAnnouncements] = useState([]);
   const [dismissedAnnouncements, setDismissedAnnouncements] = useState([]);
-  const [viewingTicket, setViewingTicket] = useState(null);
   const [viewingLogsTicket, setViewingLogsTicket] = useState(null);
   const [selectedStat, setSelectedStat] = useState(null);
+
+  const [editingTicket, setEditingTicket] = useState(null);
+  const [savingTicket, setSavingTicket] = useState(false);
+  const [editActionError, setEditActionError] = useState('');
+
+  const [ticketToDelete, setTicketToDelete] = useState(null);
+  const [deletingTicket, setDeletingTicket] = useState(false);
+  const [deleteActionError, setDeleteActionError] = useState('');
 
   /* ── Load real-time active announcements ── */
   useEffect(() => {
@@ -648,35 +661,40 @@ export default function DashboardPage({
       label: 'Open Tickets',
       num: openStatTickets.length,
       accent: '#4f46e5',
-     
+      bg: '#f5f3ff',
+      border: '#c7d2fe',
     },
     {
       key: 'high',
       label: 'High Priority',
       num: highStatTickets.length,
       accent: '#e11d48',
-    
+      bg: '#fff1f2',
+      border: '#fecdd3',
     },
     {
       key: 'medium',
       label: 'Medium Priority',
       num: mediumStatTickets.length,
       accent: '#d97706',
-   
+      bg: '#fffbeb',
+      border: '#fde68a',
     },
     {
       key: 'low',
       label: 'Low Priority',
       num: lowStatTickets.length,
       accent: '#059669',
-     
+      bg: '#ecfdf5',
+      border: '#a7f3d0',
     },
     {
       key: 'resolved',
       label: 'Resolved Tickets',
       num: resolvedStatTickets.length,
       accent: '#0891b2',
-      
+      bg: '#ecfeff',
+      border: '#a5f3fc',
     },
   ];
 
@@ -823,6 +841,174 @@ export default function DashboardPage({
     }
   }
 
+  /* ---------- Edit Ticket Modal Handlers ---------- */
+  function openEditTicket(ticket) {
+    setEditActionError('');
+    setEditingTicket({
+      id: ticket.id,
+      subject: ticket.subject || '',
+      userType: ticket.userType || 'client',
+      client: ticket.client || ticket.customer || '',
+      customer: ticket.client || ticket.customer || '',
+      clientMobile: ticket.clientMobile || ticket.customerMobile || '',
+      customerMobile: ticket.clientMobile || ticket.customerMobile || '',
+      clientEmail: ticket.clientEmail || ticket.customerEmail || ticket.email || '',
+      customerEmail: ticket.clientEmail || ticket.customerEmail || ticket.email || '',
+      category: ticket.category || 'recharge',
+      priority: ticket.priority || 'medium',
+      description: ticket.description || '',
+      assignedToId:
+        ticket.assignedToId !== null && ticket.assignedToId !== undefined
+          ? String(ticket.assignedToId)
+          : '',
+      status: ticket.status || 'open',
+      originalStatus: ticket.status || 'open',
+    });
+  }
+
+  function closeEditTicket() {
+    if (savingTicket) return;
+    setEditingTicket(null);
+    setEditActionError('');
+  }
+
+  function updateEditingTicket(field, value) {
+    setEditingTicket((previous) => ({ ...previous, [field]: value }));
+  }
+
+  async function handleUpdateTicket(event) {
+    event.preventDefault();
+    if (!editingTicket) return;
+
+    setEditActionError('');
+
+    if (
+      editingTicket.originalStatus === 'resolved' &&
+      editingTicket.status !== 'resolved' &&
+      !isAdmin
+    ) {
+      setEditActionError(
+        'Only administrators can re-open or change the status of a resolved ticket.'
+      );
+      return;
+    }
+
+    const validationError = validateTicket(editingTicket);
+    if (validationError) {
+      setEditActionError(validationError);
+      return;
+    }
+
+    try {
+      setSavingTicket(true);
+      const matchedEmployee = employees.find(
+        (e) => String(e.id) === String(editingTicket.assignedToId)
+      );
+
+      const payload = buildPayload(editingTicket);
+      const optimisticUpdate = {
+        ...editingTicket,
+        ...payload,
+        assignedTo: matchedEmployee ? matchedEmployee.name : null,
+      };
+
+      setTickets((prev) =>
+        prev.map((t) => (t.id === editingTicket.id ? { ...t, ...optimisticUpdate } : t))
+      );
+
+      const response = await fetch(
+        `http://localhost:4000/api/tickets/${encodeURIComponent(editingTicket.id)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${getToken()}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update ticket.');
+      }
+
+      if (data.ticket) {
+        setTickets((prev) =>
+          prev.map((t) => (t.id === editingTicket.id ? { ...t, ...data.ticket } : t))
+        );
+      }
+
+      window.dispatchEvent(
+        new CustomEvent('tickets-updated', {
+          detail: data.ticket || optimisticUpdate,
+        })
+      );
+      try {
+        localStorage.setItem('tickets_last_sync', String(Date.now()));
+      } catch (e) {}
+
+      closeEditTicket();
+    } catch (err) {
+      setEditActionError(err.message || 'Failed to update ticket.');
+    } finally {
+      setSavingTicket(false);
+    }
+  }
+
+  /* ---------- Delete Ticket Modal Handlers ---------- */
+  function openDeleteTicket(ticket) {
+    setDeleteActionError('');
+    setTicketToDelete(ticket);
+  }
+
+  function closeDeleteTicket() {
+    if (deletingTicket) return;
+    setTicketToDelete(null);
+    setDeleteActionError('');
+  }
+
+  async function handleDeleteTicket() {
+    if (!ticketToDelete) return;
+
+    try {
+      setDeletingTicket(true);
+      setDeleteActionError('');
+
+      const response = await fetch(
+        `http://localhost:4000/api/tickets/${encodeURIComponent(ticketToDelete.id)}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete ticket.');
+      }
+
+      setTickets((prev) => prev.filter((t) => t.id !== ticketToDelete.id));
+
+      window.dispatchEvent(
+        new CustomEvent('tickets-updated', {
+          detail: { id: ticketToDelete.id, deleted: true },
+        })
+      );
+      try {
+        localStorage.setItem('tickets_last_sync', String(Date.now()));
+      } catch (e) {}
+
+      closeDeleteTicket();
+    } catch (err) {
+      setDeleteActionError(err.message || 'Failed to delete ticket.');
+    } finally {
+      setDeletingTicket(false);
+    }
+  }
+
   function renderTicketTable(ticketList, emptyText) {
     if (loading) {
       return (
@@ -859,7 +1045,7 @@ export default function DashboardPage({
               <th style={{ width: 140 }}>Resolution time</th>
               <th style={{ minWidth: 150 }}>Assigned To</th>
               <th>Created at / Solved at</th>
-              <th style={{ width: 80, textAlign: 'center' }}>Actions</th>
+              <th style={{ width: 105, textAlign: 'center' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1217,11 +1403,31 @@ export default function DashboardPage({
                       <button
                         type="button"
                         className="ticket-icon-button ticket-log-icon"
-                        title="View Ticket Logs (Priority, Status, Assignment history)"
-                        aria-label={`View logs for ticket ${ticket.id}`}
+                        title="View Log Details (Priority, Status, Assignment history)"
+                        aria-label={`View log details for ticket ${ticket.id}`}
                         onClick={() => setViewingLogsTicket(ticket)}
                       >
-                        <span className="ticket-log-l-symbol">L</span>
+                        <TicketIcon type="log" />
+                      </button>
+
+                      <button
+                        type="button"
+                        className="ticket-icon-button ticket-edit-icon"
+                        title="Edit ticket"
+                        aria-label={`Edit ticket ${ticket.id}`}
+                        onClick={() => openEditTicket(ticket)}
+                      >
+                        <TicketIcon type="edit" />
+                      </button>
+
+                      <button
+                        type="button"
+                        className="ticket-icon-button ticket-delete-icon"
+                        title="Delete ticket"
+                        aria-label={`Delete ticket ${ticket.id}`}
+                        onClick={() => openDeleteTicket(ticket)}
+                      >
+                        <TicketIcon type="delete" />
                       </button>
                     </div>
                   </td>
@@ -1620,12 +1826,12 @@ export default function DashboardPage({
                   <div
                     className={`db-announcement-ticker ${hasUrgent ? 'urgent' : ''}`}
                   >
-                    <div className="db-ticker-tag">
+                    <div className="db-ticker-tag" title="Live Announcements">
                       <span className="db-ticker-pulse-dot" />
                       <svg
                         className="db-ticker-icon"
-                        width="13"
-                        height="13"
+                        width="14"
+                        height="14"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
@@ -1636,9 +1842,6 @@ export default function DashboardPage({
                         <path d="m3 11 18-5v12L3 14v-3z" />
                         <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
                       </svg>
-                      <span className="db-ticker-tag-label">
-                        {hasUrgent ? 'URGENT' : 'ANNOUNCEMENT'}
-                      </span>
                     </div>
 
                     <div className="db-ticker-track-wrap" title="Hover to pause scroll">
@@ -1648,34 +1851,21 @@ export default function DashboardPage({
                             {idx > 0 && (
                               <span className="db-ticker-bulk-divider">✦</span>
                             )}
-                            <span className="db-ticker-category">
-                              [{announcement.category || 'Notice'}]
-                            </span>
                             <span className="db-ticker-title">
                               {announcement.title}
                             </span>
-                            <span className="db-ticker-separator">—</span>
-                            <span className="db-ticker-content">
-                              {announcement.content}
-                            </span>
+                            {announcement.content && (
+                              <>
+                                <span className="db-ticker-separator">—</span>
+                                <span className="db-ticker-content">
+                                  {announcement.content}
+                                </span>
+                              </>
+                            )}
                           </span>
                         ))}
                       </div>
                     </div>
-
-                    <button
-                      type="button"
-                      className="db-ticker-dismiss"
-                      onClick={() =>
-                        setDismissedAnnouncements((prev) => [
-                          ...prev,
-                          ...activeAlerts.map((a) => a.id),
-                        ])
-                      }
-                      title="Dismiss announcement"
-                    >
-                      ✕
-                    </button>
                   </div>
                 );
               })()}
@@ -1693,7 +1883,7 @@ export default function DashboardPage({
 
               {/* ── Statistics (Clickable for anyone to view as a list) ── */}
 
-              <div className="db-stat-grid">
+              <div className="db-stat-grid" role="region" aria-label="Dashboard statistics overview">
                 {STAT_CARDS.map((stat) => {
                   const isSelected = selectedStat === stat.key;
                   return (
@@ -1702,6 +1892,7 @@ export default function DashboardPage({
                       role="button"
                       tabIndex={0}
                       aria-pressed={isSelected}
+                      aria-label={`${stat.label}: ${stat.num}. Click to view list.`}
                       title={`Click to view ${stat.label} list (${stat.num} tickets)`}
                       className={`db-stat-card db-stat-card-clickable ${isSelected ? 'active' : ''}`}
                       style={{
@@ -1719,31 +1910,8 @@ export default function DashboardPage({
                         }
                       }}
                     >
-                      <div className="db-stat-card-top">
-                        <div className="db-stat-num">
-                          {stat.num}
-                        </div>
-                        {stat.icon && (
-                          <div
-                            className="db-stat-icon-wrap"
-                            style={{
-                              backgroundColor: stat.bg,
-                              color: stat.accent,
-                              border: `1px solid ${stat.border}`,
-                            }}
-                          >
-                            {stat.icon}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="db-stat-label">
-                        {stat.label}
-                      </div>
-
-                      <div className="db-stat-sub">
-                        {isSelected ? '● Viewing list (Click to reset)' : stat.sub}
-                      </div>
+                      <div className="db-stat-label">{stat.label}</div>
+                      <div className="db-stat-num">{stat.num}</div>
                     </div>
                   );
                 })}
@@ -1974,222 +2142,7 @@ export default function DashboardPage({
 
       </div>
 
-      {/* VIEW DESCRIPTION DIALOG */}
-      {viewingTicket && (
-        <div
-          className="ticket-dialog-overlay"
-          onClick={() => setViewingTicket(null)}
-        >
-          <section
-            className="ticket-dialog ticket-desc-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="view-desc-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="ticket-dialog-header">
-              <div>
-                <h2 id="view-desc-title">Ticket Details</h2>
-                <p>
-                  Ticket #{viewingTicket.id}
-                  {viewingTicket.subject ? ` — ${viewingTicket.subject}` : ''}
-                </p>
-              </div>
 
-              <button
-                type="button"
-                className="ticket-dialog-close"
-                onClick={() => setViewingTicket(null)}
-                aria-label="Close details dialog"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="ticket-desc-content">
-              <div className="ticket-desc-meta">
-                <div className="ticket-desc-meta-item">
-                  <span className="ticket-desc-meta-label">Category:</span>
-                  <span
-                    className="ticket-category"
-                    style={{
-                      color: '#334155',
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      padding: '2px 8px',
-                      fontSize: '11px',
-                    }}
-                  >
-                    {capitalize(viewingTicket.category)}
-                  </span>
-                </div>
-
-                <div className="ticket-desc-meta-item">
-                  <span className="ticket-desc-meta-label">Priority:</span>
-                  <span
-                    className="ticket-priority"
-                    style={{
-                      color: viewingTicket.priority === 'high' ? '#dc2626' : '#334155',
-                      fontWeight: viewingTicket.priority === 'high' ? 600 : 500,
-                    }}
-                  >
-                    <span
-                      className="ticket-status-dot"
-                      style={{
-                        background: viewingTicket.priority === 'high' ? '#dc2626' : '#94a3b8',
-                      }}
-                    />
-                    {capitalize(viewingTicket.priority)}
-                  </span>
-                </div>
-
-                <div className="ticket-desc-meta-item">
-                  <span className="ticket-desc-meta-label">Status:</span>
-                  <span
-                    className="ticket-status"
-                    style={{
-                      color: '#334155',
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      padding: '2px 8px',
-                      fontSize: '11px',
-                    }}
-                  >
-                    {formatStatus(viewingTicket.status)}
-                  </span>
-                </div>
-
-                <div className="ticket-desc-meta-item">
-                  <span className="ticket-desc-meta-label">Assigned:</span>
-                  <span
-                    className="ticket-assigned-status"
-                    style={{
-                      color: viewingTicket.assignedTo ? '#0f172a' : '#64748b',
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      padding: '2px 8px',
-                      fontSize: '11px',
-                      borderRadius: '6px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      fontWeight: viewingTicket.assignedTo ? 600 : 500,
-                    }}
-                  >
-                    <span
-                      className="ticket-status-dot"
-                      style={{
-                        background: viewingTicket.assignedTo ? '#10b981' : '#94a3b8',
-                      }}
-                    />
-                    {viewingTicket.assignedTo
-                      ? `Assigned (${viewingTicket.assignedTo})`
-                      : 'Not Assigned'}
-                  </span>
-                </div>
-
-                {(viewingTicket.client || viewingTicket.customer) && (
-                  <div className="ticket-desc-meta-item">
-                    <span className="ticket-desc-meta-label">Client:</span>
-                    <span>{viewingTicket.client || viewingTicket.customer}</span>
-                  </div>
-                )}
-
-                {(viewingTicket.clientMobile || viewingTicket.customerMobile) && (
-                  <div className="ticket-desc-meta-item">
-                    <span className="ticket-desc-meta-label">Mobile:</span>
-                    <button
-                      type="button"
-                      className="ticket-client-phone"
-                      title={`Contact ${viewingTicket.client || viewingTicket.customer || 'client'} (${viewingTicket.clientMobile || viewingTicket.customerMobile})`}
-                      onClick={() =>
-                        setContactDialog({
-                          name: viewingTicket.client || viewingTicket.customer || 'Client',
-                          phone: viewingTicket.clientMobile || viewingTicket.customerMobile,
-                          email: viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email || '',
-                        })
-                      }
-                    >
-                      <svg
-                        width="11"
-                        height="11"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.4"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                      </svg>
-                      <span>{viewingTicket.clientMobile || viewingTicket.customerMobile}</span>
-                    </button>
-                  </div>
-                )}
-
-                {(viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email) && (
-                  <div className="ticket-desc-meta-item">
-                    <span className="ticket-desc-meta-label">Email:</span>
-                    <a
-                      href={`mailto:${viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email}`}
-                      className="ticket-client-email"
-                      title={`Send email to ${viewingTicket.client || viewingTicket.customer || 'client'} (${viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email})`}
-                      aria-label={`Send email to ${viewingTicket.client || viewingTicket.customer || 'client'} at ${viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email}`}
-                    >
-                      <svg
-                        width="11"
-                        height="11"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.4"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <rect width="20" height="16" x="2" y="4" rx="2" />
-                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                      </svg>
-                      <span>{viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email}</span>
-                    </a>
-                  </div>
-                )}
-              </div>
-
-              <div className="ticket-desc-body">
-                <label className="ticket-desc-label">Description</label>
-                <div className="ticket-desc-text">
-                  {viewingTicket.description || 'No description provided.'}
-                </div>
-              </div>
-            </div>
-
-            <div className="ticket-dialog-actions">
-              <button
-                type="button"
-                className="ticket-view-logs-btn"
-                onClick={() => {
-                  const t = viewingTicket;
-                  setViewingTicket(null);
-                  setViewingLogsTicket(t);
-                }}
-                title="View complete audit & change logs for this ticket"
-              >
-                <span className="ticket-log-l-symbol">L</span>
-                <span>View Ticket Logs</span>
-              </button>
-
-              <button
-                type="button"
-                className="ticket-create-button"
-                onClick={() => setViewingTicket(null)}
-              >
-                Close
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
 
       {/* ═══════════════════════════════════════
           TICKET LOGS POP-UP DIALOG
@@ -2199,6 +2152,125 @@ export default function DashboardPage({
           ticket={viewingLogsTicket}
           onClose={() => setViewingLogsTicket(null)}
         />
+      )}
+
+      {/* ═══════════════════════════════════════
+          EDIT TICKET POP-UP DIALOG
+      ═══════════════════════════════════════ */}
+      {editingTicket && (
+        <div className="ticket-dialog-overlay">
+          <section
+            className="ticket-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dashboard-edit-ticket-title"
+          >
+            <div className="ticket-dialog-header">
+              <div>
+                <h2 id="dashboard-edit-ticket-title">Edit Ticket</h2>
+                <p>Update ticket #{editingTicket.id} details.</p>
+              </div>
+
+              <button
+                type="button"
+                className="ticket-dialog-close"
+                onClick={closeEditTicket}
+                disabled={savingTicket}
+                aria-label="Close edit dialog"
+              >
+                ×
+              </button>
+            </div>
+
+            {editActionError && (
+              <div className="ticket-dialog-error" role="alert">
+                {editActionError}
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateTicket}>
+              <TicketFormFields
+                idPrefix="db-edit"
+                values={editingTicket}
+                onChange={updateEditingTicket}
+                employees={employees}
+                isAdmin={isAdmin}
+              />
+
+              <div className="ticket-dialog-actions">
+                <button
+                  type="button"
+                  className="ticket-cancel-button"
+                  onClick={closeEditTicket}
+                  disabled={savingTicket}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="ticket-create-button"
+                  disabled={savingTicket}
+                >
+                  {savingTicket ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════
+          DELETE CONFIRMATION DIALOG
+      ═══════════════════════════════════════ */}
+      {ticketToDelete && (
+        <div className="ticket-dialog-overlay">
+          <section
+            className="ticket-delete-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dashboard-delete-ticket-title"
+          >
+            <div className="ticket-delete-symbol">
+              <TicketIcon type="delete" />
+            </div>
+
+            <h2 id="dashboard-delete-ticket-title">Delete Ticket?</h2>
+
+            <p>
+              Are you sure you want to delete ticket{' '}
+              <strong>#{ticketToDelete.id}</strong>
+              {ticketToDelete.subject ? ` — "${ticketToDelete.subject}"` : ''}?{' '}
+              This action cannot be undone.
+            </p>
+
+            {deleteActionError && (
+              <div className="ticket-dialog-error" role="alert">
+                {deleteActionError}
+              </div>
+            )}
+
+            <div className="ticket-dialog-actions">
+              <button
+                type="button"
+                className="ticket-cancel-button"
+                onClick={closeDeleteTicket}
+                disabled={deletingTicket}
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className="ticket-confirm-delete"
+                onClick={handleDeleteTicket}
+                disabled={deletingTicket}
+              >
+                {deletingTicket ? 'Deleting...' : 'Yes, Delete'}
+              </button>
+            </div>
+          </section>
+        </div>
       )}
       {/* ═══════════════════════════════════════
           CHANGE PASSWORD POP-UP DIALOG
