@@ -595,3 +595,185 @@
   }
 }
 
+/* ── Screenshot-Matched Form Layout (Manage News & Send Mobile Notification) ── */
+.extras-screenshot-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 580px;
+}
+
+.extras-screenshot-title {
+  margin: 2px 0 6px 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: #4f46e5;
+  letter-spacing: -0.2px;
+}
+
+.extras-screenshot-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.extras-screenshot-subtitle {
+  margin: 0 0 2px 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #4338ca;
+  letter-spacing: -0.1px;
+}
+
+.extras-screenshot-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.extras-screenshot-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.extras-req-star {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.extras-screenshot-select {
+  width: 100%;
+  padding: 9px 14px;
+  background-color: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #1e293b;
+  font-weight: 500;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 14px;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.extras-screenshot-select:focus {
+  outline: none;
+  background-color: #ffffff;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+.extras-screenshot-textarea {
+  width: 100%;
+  padding: 9px 14px;
+  background-color: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #1e293b;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 42px;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.extras-screenshot-textarea::placeholder {
+  color: #94a3b8;
+  font-size: 12.5px;
+}
+
+.extras-screenshot-textarea:focus {
+  outline: none;
+  background-color: #ffffff;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+.extras-screenshot-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 14px;
+  margin-bottom: 8px;
+}
+
+/* Submit button: matching DashboardPage.jsx */
+.extras-screenshot-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #4f46e5;
+  color: #ffffff;
+  border: 1px solid #4f46e5;
+  border-radius: 7px;
+  padding: 7px 22px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.2);
+}
+
+.extras-screenshot-submit:hover:not(:disabled) {
+  background: #4338ca;
+  border-color: #4338ca;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(79, 70, 229, 0.3);
+}
+
+.extras-screenshot-submit:active {
+  transform: translateY(0);
+}
+
+.extras-screenshot-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Reset button: matching DashboardPage.jsx */
+.extras-screenshot-reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #dc2626;
+  color: #ffffff;
+  border: 1px solid #dc2626;
+  border-radius: 7px;
+  padding: 7px 22px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(220, 38, 38, 0.2);
+}
+
+.extras-screenshot-reset:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(220, 38, 38, 0.3);
+}
+
+.extras-screenshot-reset:active {
+  transform: translateY(0);
+}
+
+

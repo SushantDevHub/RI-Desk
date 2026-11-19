@@ -1,14 +1,28 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { getToken } from '../api/authApi.js';
+import ContactClientDialog from '../components/ContactClientDialog.jsx';
 import '../pages/DashboardPage.css';
 
 const API_URL = 'http://localhost:4000/api/users';
+
+const STANDARD_DESIGNATIONS = [
+  'Support Specialist',
+  'Technical Support Engineer',
+  'Senior Support Executive',
+  'Helpdesk Analyst',
+  'Client Relationship Executive',
+  'Operations Executive',
+  'Billing & Accounts Executive',
+  'System Administrator',
+  'Team Lead',
+];
 
 const EMPTY_FORM = {
   name: '',
   email: '',
   mobileNumber: '',
+  designation: '',
   password: '',
   confirmPassword: '',
 };
@@ -74,7 +88,7 @@ function EyeIcon({ visible }) {
   );
 }
 
-export default function EmployeeListPage() {
+export default function EmployeeListPage({ onCreateEmployee }) {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -97,7 +111,42 @@ export default function EmployeeListPage() {
   const [deleting, setDeleting] = useState(false);
   const [highlightedEmployeeId, setHighlightedEmployeeId] = useState(null);
 
+  const [orgDesignations, setOrgDesignations] = useState([]);
+  const [isCustomCreate, setIsCustomCreate] = useState(false);
+  const [customCreateInput, setCustomCreateInput] = useState('');
+  const [isCustomEdit, setIsCustomEdit] = useState(false);
+  const [customEditInput, setCustomEditInput] = useState('');
+  const [copiedEmail, setCopiedEmail] = useState('');
+  const [copiedMobile, setCopiedMobile] = useState('');
+  const [contactDialog, setContactDialog] = useState(null);
+
   const messageTimeoutRef = useRef(null);
+
+  function handleCopyEmail(email) {
+    if (!email) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(email);
+      }
+      setCopiedEmail(email);
+      setTimeout(() => setCopiedEmail(''), 1500);
+    } catch {
+      // ignore
+    }
+  }
+
+  function handleCopyMobile(mobile) {
+    if (!mobile) return;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(mobile);
+      }
+      setCopiedMobile(mobile);
+      setTimeout(() => setCopiedMobile(''), 1500);
+    } catch {
+      // ignore
+    }
+  }
 
   function showTemporaryMessage(msg, duration = 1000) {
     if (messageTimeoutRef.current) {
@@ -145,11 +194,35 @@ export default function EmployeeListPage() {
 
   useEffect(() => {
     fetchEmployees();
+    fetchOrgDesignations();
   }, []);
+
+  async function fetchOrgDesignations() {
+    try {
+      const res = await fetch('http://localhost:4000/api/designations', {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data.designations)) {
+        const titles = data.designations
+          .map((d) => d.title?.trim())
+          .filter(Boolean);
+        const customOnly = titles.filter(
+          (t) => !STANDARD_DESIGNATIONS.includes(t)
+        );
+        setOrgDesignations(Array.from(new Set(customOnly)));
+      }
+    } catch {
+      // ignore
+    }
+  }
 
   // Open the Create Employee popup.
   function openCreateDialog() {
     setCreateForm({ ...EMPTY_FORM });
+    setIsCustomCreate(false);
+    setCustomCreateInput('');
     setCreateError('');
     setMessage('');
     setError('');
@@ -173,8 +246,14 @@ export default function EmployeeListPage() {
     setMessage('');
     setShowEditPassword(false);
     setShowEditConfirmPassword(false);
+    const existingDesig = employee.designation || '';
+    const allKnown = [...STANDARD_DESIGNATIONS, ...orgDesignations];
+    const isCustom = existingDesig && !allKnown.includes(existingDesig);
+    setIsCustomEdit(Boolean(isCustom));
+    setCustomEditInput(existingDesig);
     setEditingEmployee({
       ...employee,
+      designation: existingDesig,
       password: '',
       confirmPassword: '',
     });
@@ -235,6 +314,7 @@ export default function EmployeeListPage() {
           name: createForm.name.trim(),
           email: createForm.email.trim(),
           mobileNumber: mobile,
+          designation: (createForm.designation || '').trim(),
           password: createForm.password,
           role: 'employee',
         }),
@@ -285,6 +365,7 @@ export default function EmployeeListPage() {
         name: (editingEmployee.name || '').trim(),
         email: (editingEmployee.email || '').trim(),
         mobileNumber: String(editingEmployee.mobileNumber || '').trim(),
+        designation: (editingEmployee.designation || '').trim(),
       };
       if (trimmedPassword) {
         updatePayload.password = trimmedPassword;
@@ -415,7 +496,7 @@ export default function EmployeeListPage() {
                   <th>Name</th>
                   <th>Email</th>
                   <th>Mobile Number</th>
-                  <th>Role</th>
+                  <th>Designation</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -432,14 +513,166 @@ export default function EmployeeListPage() {
                       <strong>{employee.name}</strong>
                     </td>
 
-                    <td>{employee.email || '—'}</td>
-
-                    <td>{employee.mobileNumber || '—'}</td>
+                    <td>
+                      {employee.email ? (
+                        <div className="employee-email-cell">
+                          <a
+                            href={`mailto:${employee.email}`}
+                            className="employee-email-link"
+                            title={`Send email to ${employee.email}`}
+                          >
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                              <polyline points="22,6 12,13 2,6" />
+                            </svg>
+                            <span>{employee.email}</span>
+                          </a>
+                          <button
+                            type="button"
+                            className={`employee-email-copy-btn ${
+                              copiedEmail === employee.email ? 'copied' : ''
+                            }`}
+                            onClick={() => handleCopyEmail(employee.email)}
+                            title={
+                              copiedEmail === employee.email
+                                ? 'Copied to clipboard!'
+                                : 'Copy email address'
+                            }
+                            aria-label={`Copy email ${employee.email}`}
+                          >
+                            {copiedEmail === employee.email ? (
+                              <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            ) : (
+                              <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ color: '#94a3b8' }}>—</span>
+                      )}
+                    </td>
 
                     <td>
-                      <span className="employee-role">
-                        {employee.role || 'employee'}
-                      </span>
+                      {employee.mobileNumber ? (
+                        <div className="employee-contact-cell">
+                          <button
+                            type="button"
+                            className="employee-phone-btn"
+                            title={`Contact ${employee.name} via Phone Call or WhatsApp`}
+                            onClick={() =>
+                              setContactDialog({
+                                name: employee.name,
+                                phone: employee.mobileNumber,
+                                designation: employee.designation,
+                                isEmployee: true,
+                              })
+                            }
+                          >
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                            </svg>
+                            <span>{employee.mobileNumber}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className={`employee-email-copy-btn ${
+                              copiedMobile === employee.mobileNumber ? 'copied' : ''
+                            }`}
+                            onClick={() => handleCopyMobile(employee.mobileNumber)}
+                            title={
+                              copiedMobile === employee.mobileNumber
+                                ? 'Copied to clipboard!'
+                                : 'Copy mobile number'
+                            }
+                            aria-label={`Copy mobile number ${employee.mobileNumber}`}
+                          >
+                            {copiedMobile === employee.mobileNumber ? (
+                              <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            ) : (
+                              <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ color: '#94a3b8' }}>—</span>
+                      )}
+                    </td>
+
+                    <td>
+                      {employee.designation ? (
+                        <span className="employee-designation-plain">
+                          <span className="employee-designation-logo">💼</span>
+                          <span>{employee.designation}</span>
+                        </span>
+                      ) : (
+                        <span style={{ color: '#94a3b8' }}>—</span>
+                      )}
                     </td>
 
                     <td>
@@ -580,6 +813,121 @@ export default function EmployeeListPage() {
                   required
                 />
               </label>
+
+              {/* Designation Dropdown & Custom Option */}
+              <div className="employee-designation-field">
+                <div className="employee-label-action-row">
+                  <label htmlFor="create-designation-select">
+                    Designation
+                  </label>
+                  {!isCustomCreate ? (
+                    <button
+                      type="button"
+                      className="employee-label-action-btn"
+                      onClick={() => {
+                        setIsCustomCreate(true);
+                        setCustomCreateInput(createForm.designation || '');
+                      }}
+                      title="Add a custom designation"
+                    >
+                      + Add Custom
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="employee-label-action-btn"
+                      onClick={() => {
+                        setIsCustomCreate(false);
+                      }}
+                      title="Choose from standard dropdown"
+                    >
+                      ← From List
+                    </button>
+                  )}
+                </div>
+
+                {!isCustomCreate ? (
+                  <select
+                    id="create-designation-select"
+                    className="employee-form-select"
+                    value={
+                      [...STANDARD_DESIGNATIONS, ...orgDesignations].includes(createForm.designation)
+                        ? createForm.designation
+                        : createForm.designation
+                        ? '__custom_val__'
+                        : ''
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '__custom__') {
+                        setIsCustomCreate(true);
+                        setCustomCreateInput('');
+                      } else if (val === '__custom_val__') {
+                        setIsCustomCreate(true);
+                        setCustomCreateInput(createForm.designation);
+                      } else {
+                        setCreateForm((prev) => ({
+                          ...prev,
+                          designation: val,
+                        }));
+                      }
+                    }}
+                  >
+                    <option value="">Select Designation...</option>
+                    <optgroup label="Standard Designations">
+                      {STANDARD_DESIGNATIONS.map((desig) => (
+                        <option key={desig} value={desig}>
+                          {desig}
+                        </option>
+                      ))}
+                    </optgroup>
+                    {orgDesignations.length > 0 && (
+                      <optgroup label="Organization Designations">
+                        {orgDesignations.map((desig) => (
+                          <option key={desig} value={desig}>
+                            {desig}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    
+                  </select>
+                ) : (
+                  <div className="employee-custom-input-box">
+                    <input
+                      type="text"
+                      className="employee-custom-text-input"
+                      placeholder="Type custom designation..."
+                      value={customCreateInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCustomCreateInput(val);
+                        setCreateForm((prev) => ({
+                          ...prev,
+                          designation: val,
+                        }));
+                      }}
+                      autoFocus
+                    />
+                    {customCreateInput && (
+                      <button
+                        type="button"
+                        className="employee-custom-clear-btn"
+                        onClick={() => {
+                          setCustomCreateInput('');
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            designation: '',
+                          }));
+                        }}
+                        title="Clear"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <label>
                 Password
@@ -747,6 +1095,127 @@ export default function EmployeeListPage() {
                 />
               </label>
 
+              {/* Designation Dropdown & Custom Option in Edit Dialog */}
+              <div className="employee-designation-field">
+                <div className="employee-label-action-row">
+                  <label htmlFor="edit-designation-select">
+                    Designation
+                  </label>
+                  {!isCustomEdit ? (
+                    <button
+                      type="button"
+                      className="employee-label-action-btn"
+                      onClick={() => {
+                        setIsCustomEdit(true);
+                        setCustomEditInput(editingEmployee.designation || '');
+                      }}
+                      title="Add a custom designation"
+                    >
+                      + Add Custom
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="employee-label-action-btn"
+                      onClick={() => {
+                        setIsCustomEdit(false);
+                      }}
+                      title="Choose from standard dropdown"
+                    >
+                      ← From List
+                    </button>
+                  )}
+                </div>
+
+                {!isCustomEdit ? (
+                  <select
+                    id="edit-designation-select"
+                    className="employee-form-select"
+                    value={
+                      [...STANDARD_DESIGNATIONS, ...orgDesignations].includes(editingEmployee.designation)
+                        ? editingEmployee.designation
+                        : editingEmployee.designation
+                        ? '__custom_val__'
+                        : ''
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '__custom__') {
+                        setIsCustomEdit(true);
+                        setCustomEditInput('');
+                      } else if (val === '__custom_val__') {
+                        setIsCustomEdit(true);
+                        setCustomEditInput(editingEmployee.designation);
+                      } else {
+                        setEditingEmployee((prev) => ({
+                          ...prev,
+                          designation: val,
+                        }));
+                      }
+                    }}
+                  >
+                    <option value="">Select Designation...</option>
+                    <optgroup label="Standard Designations">
+                      {STANDARD_DESIGNATIONS.map((desig) => (
+                        <option key={desig} value={desig}>
+                          {desig}
+                        </option>
+                      ))}
+                    </optgroup>
+                    {orgDesignations.length > 0 && (
+                      <optgroup label="Organization Designations">
+                        {orgDesignations.map((desig) => (
+                          <option key={desig} value={desig}>
+                            {desig}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {editingEmployee.designation &&
+                      ![...STANDARD_DESIGNATIONS, ...orgDesignations].includes(editingEmployee.designation) && (
+                        <option value="__custom_val__">
+                          Custom: {editingEmployee.designation}
+                        </option>
+                      )}
+                    <option value="__custom__">+ Custom Designation...</option>
+                  </select>
+                ) : (
+                  <div className="employee-custom-input-box">
+                    <input
+                      type="text"
+                      className="employee-custom-text-input"
+                      placeholder="Type custom designation..."
+                      value={customEditInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCustomEditInput(val);
+                        setEditingEmployee((prev) => ({
+                          ...prev,
+                          designation: val,
+                        }));
+                      }}
+                      autoFocus
+                    />
+                    {customEditInput && (
+                      <button
+                        type="button"
+                        className="employee-custom-clear-btn"
+                        onClick={() => {
+                          setCustomEditInput('');
+                          setEditingEmployee((prev) => ({
+                            ...prev,
+                            designation: '',
+                          }));
+                        }}
+                        title="Clear"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <label>
                 Password
                 <div className="employee-password-wrap">
@@ -902,6 +1371,12 @@ export default function EmployeeListPage() {
           </section>
         </div>
       )}
+
+      {/* Contact Employee Popup (Phone Call & WhatsApp) */}
+      <ContactClientDialog
+        contact={contactDialog}
+        onClose={() => setContactDialog(null)}
+      />
     </div>
   );
 }

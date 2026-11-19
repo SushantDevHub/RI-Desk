@@ -165,8 +165,13 @@ export default function ExtrasPage({
   activeSubTab: propSubTab,
   onSelectSubTab: propOnSelect,
 }) {
-  const [internalSubTab, setInternalSubTab] = useState('all');
-  const activeSubTab = propSubTab !== undefined ? propSubTab : internalSubTab;
+  const [internalSubTab, setInternalSubTab] = useState('manage_news');
+  const activeSubTab =
+    propSubTab && propSubTab !== 'all'
+      ? propSubTab
+      : internalSubTab === 'all'
+      ? 'manage_news'
+      : internalSubTab;
   const onSelectSubTab = propOnSelect || setInternalSubTab;
 
   const [successBanner, setSuccessBanner] = useState('');
@@ -212,18 +217,20 @@ export default function ExtrasPage({
 
   // Publish Announcement in real-time
   const handlePublishNews = async (e) => {
-    e.preventDefault();
-    if (!newsTitle.trim() || !newsBody.trim()) return;
+    if (e) e.preventDefault();
+    const trimmed = newsBody.trim();
+    if (!trimmed) return;
 
     setPublishing(true);
     setErrorMessage('');
     try {
+      const derivedTitle = trimmed.length > 60 ? trimmed.slice(0, 60) + '...' : trimmed;
       const created = await createAnnouncement({
-        title: newsTitle.trim(),
-        category: newsCategory,
-        audience: newsAudience,
-        priority: newsPriority,
-        content: newsBody.trim(),
+        title: newsTitle.trim() || derivedTitle,
+        category: newsCategory || 'General',
+        audience: newsAudience || 'All',
+        priority: newsPriority || 'Normal',
+        content: trimmed,
         status: 'Active',
       });
 
@@ -236,6 +243,12 @@ export default function ExtrasPage({
     } finally {
       setPublishing(false);
     }
+  };
+
+  const handleResetNews = () => {
+    setNewsAudience('All');
+    setNewsTitle('');
+    setNewsBody('');
   };
 
   // Toggle Announcement Status
@@ -289,11 +302,13 @@ export default function ExtrasPage({
   const [emailLogs, setEmailLogs] = useState([]);
 
   const handleSendNotification = (e) => {
-    e.preventDefault();
-    if (!notifTitle.trim() || !notifBody.trim()) return;
+    if (e) e.preventDefault();
+    const trimmed = notifBody.trim();
+    if (!trimmed) return;
     const entry = {
       id: Date.now(),
-      title: notifTitle.trim(),
+      title: notifTitle.trim() || (trimmed.length > 50 ? trimmed.slice(0, 50) + '...' : trimmed),
+      message: trimmed,
       target: notifTarget,
       time: 'Just now',
       status: 'Delivered',
@@ -302,6 +317,12 @@ export default function ExtrasPage({
     setNotifTitle('');
     setNotifBody('');
     showSuccess(`Mobile push notification dispatched to ${notifTarget}!`);
+  };
+
+  const handleResetNotification = () => {
+    setNotifTarget('All Users');
+    setNotifTitle('');
+    setNotifBody('');
   };
 
   const handleSendSMS = (e) => {
@@ -359,27 +380,6 @@ export default function ExtrasPage({
     <div className="extras-page">
       {/* ── Tab Switcher Bar ── */}
       <div className="extras-tab-bar">
-        <button
-          type="button"
-          className={`extras-tab-btn ${activeSubTab === 'all' ? 'active' : ''}`}
-          onClick={() => onSelectSubTab('all')}
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <rect x="3" y="3" width="7" height="7" />
-            <rect x="14" y="3" width="7" height="7" />
-            <rect x="14" y="14" width="7" height="7" />
-            <rect x="3" y="14" width="7" height="7" />
-          </svg>
-          <span>All Tools</span>
-        </button>
-
         {EXTRAS_MODULE_CONFIG.map((mod) => (
           <button
             key={mod.id}
@@ -421,182 +421,106 @@ export default function ExtrasPage({
       )}
 
       {/* ═══════════════════════════════════════════════════════════
-          VIEW 1: OVERVIEW GRID OF ALL 5 MODULES
-      ═══════════════════════════════════════════════════════════ */}
-      {activeSubTab === 'all' && (
-        <div className="extras-grid">
-          {EXTRAS_MODULE_CONFIG.map((tool) => (
-            <div
-              key={tool.id}
-              className="extras-card"
-              style={{ '--card-accent': tool.accentColor }}
-            >
-              <div className="extras-card-top">
-                <div
-                  className="extras-card-icon-wrap"
-                  style={{
-                    backgroundColor: tool.iconBg,
-                    color: tool.iconColor,
-                  }}
-                >
-                  {tool.icon}
-                </div>
-                <span
-                  className="extras-card-tag"
-                  style={{
-                    backgroundColor: tool.iconBg,
-                    color: tool.tagColor,
-                  }}
-                >
-                  {tool.tag}
-                </span>
-              </div>
-
-              <div className="extras-card-content">
-                <h2 className="extras-card-title">{tool.title}</h2>
-                <p className="extras-card-desc">{tool.description}</p>
-              </div>
-
-              <button
-                type="button"
-                className="extras-card-open-btn"
-                onClick={() => onSelectSubTab(tool.id)}
-              >
-                <span>Open {tool.title}</span>
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════
-          VIEW 2: MANAGE NEWS MODULE (REAL-TIME ANNOUNCEMENTS)
+          VIEW 1: MANAGE NEWS MODULE (REAL-TIME ANNOUNCEMENTS)
       ═══════════════════════════════════════════════════════════ */}
       {activeSubTab === 'manage_news' && (
         <div className="extras-module-view">
-          <div className="extras-module-header">
-            <div className="extras-module-header-left">
-              <div
-                className="extras-module-header-icon"
-                style={{
-                  backgroundColor: currentModule?.iconBg,
-                  color: currentModule?.iconColor,
-                }}
-              >
-                {currentModule?.icon}
-              </div>
-              <div>
-                <h2 className="extras-module-title">Manage News & Announcements</h2>
-                <p className="extras-module-subtitle">
-                  Publish real-time announcements saved to the database and broadcasted across user dashboards.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              className="extras-back-btn"
-              onClick={() => onSelectSubTab('all')}
-            >
-              ← Back to Tools
-            </button>
-          </div>
+          <div className="extras-screenshot-container">
+            <h1 className="extras-screenshot-title">Add News</h1>
 
-          <div className="extras-workspace-grid">
-            {/* Create Real-time Announcement Form */}
-            <form className="extras-form-card" onSubmit={handlePublishNews}>
-              <h3 className="extras-card-heading">Create Real-Time Announcement</h3>
+            <form onSubmit={handlePublishNews}>
+              <div className="extras-screenshot-card">
+                <h2 className="extras-screenshot-subtitle">News's Details</h2>
 
-              <div className="extras-form-group">
-                <label className="extras-form-label">Announcement Title</label>
-                <input
-                  type="text"
-                  className="extras-form-input"
-                  placeholder="e.g., Scheduled Maintenance on Sunday 02:00 AM"
-                  value={newsTitle}
-                  onChange={(e) => setNewsTitle(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="extras-form-row">
-                <div className="extras-form-group">
-                  <label className="extras-form-label">Category</label>
+                <div className="extras-screenshot-field">
+                  <label className="extras-screenshot-label">
+                    Usertype <span className="extras-req-star">*</span>
+                  </label>
                   <select
-                    className="extras-form-select"
-                    value={newsCategory}
-                    onChange={(e) => setNewsCategory(e.target.value)}
-                  >
-                    <option value="General">General Notice</option>
-                    <option value="Maintenance">Maintenance</option>
-                    <option value="Update">Feature Update</option>
-                    <option value="Urgent">Urgent Alert</option>
-                    <option value="Holiday">Holiday Notice</option>
-                  </select>
-                </div>
-
-                <div className="extras-form-group">
-                  <label className="extras-form-label">Target Audience</label>
-                  <select
-                    className="extras-form-select"
+                    className="extras-screenshot-select"
                     value={newsAudience}
                     onChange={(e) => setNewsAudience(e.target.value)}
+                    required
                   >
-                    <option value="All">All (Clients & Employees)</option>
-                    <option value="Employees">Employees Only</option>
-                    <option value="Clients">Clients Only</option>
+                    <option value="All">All Users</option>
+                    <option value="Clients">Clients</option>
+                    <option value="Employees">Employees</option>
                   </select>
+                </div>
+
+                <div className="extras-screenshot-field">
+                  <label className="extras-screenshot-label">
+                    Message <span className="extras-req-star">*</span>
+                  </label>
+                  <textarea
+                    className="extras-screenshot-textarea"
+                    placeholder="Type news message"
+                    rows={2}
+                    value={newsBody}
+                    onChange={(e) => setNewsBody(e.target.value)}
+                    required
+                  />
                 </div>
               </div>
 
-              <div className="extras-form-group">
-                <label className="extras-form-label">Priority</label>
-                <select
-                  className="extras-form-select"
-                  value={newsPriority}
-                  onChange={(e) => setNewsPriority(e.target.value)}
+              <div className="extras-screenshot-actions">
+                <button
+                  type="submit"
+                  className="extras-screenshot-submit"
+                  disabled={publishing}
                 >
-                  <option value="Normal">Normal Notice</option>
-                  <option value="Urgent">Urgent (Highlighted Top Banner)</option>
-                </select>
+                  {publishing ? 'Submitting...' : 'Submit'}
+                </button>
+                <button
+                  type="button"
+                  className="extras-screenshot-reset"
+                  onClick={handleResetNews}
+                >
+                  Reset
+                </button>
               </div>
-
-              <div className="extras-form-group">
-                <label className="extras-form-label">Announcement Content</label>
-                <textarea
-                  className="extras-form-textarea"
-                  placeholder="Enter detailed message, instructions, or downtime schedule..."
-                  rows={4}
-                  value={newsBody}
-                  onChange={(e) => setNewsBody(e.target.value)}
-                  required
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="extras-submit-btn"
-                disabled={publishing}
-              >
-                {publishing ? 'Publishing...' : 'Publish Announcement Live'}
-              </button>
             </form>
 
-            {/* Real-time Announcements List (No Dummy Data) */}
-            <div className="extras-list-card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 className="extras-card-heading" style={{ borderBottom: 0, paddingBottom: 0 }}>
+            {/* Live Moving Ticker Preview (Right to Left) */}
+            {newsList.some((item) => item.status === 'Active') && (
+              <div
+                className="extras-live-ticker-preview"
+                title="Live Preview: Moving right to left (hover to pause)"
+              >
+                <div className="extras-live-ticker-label">
+                  <span className="extras-pulse-dot" />
+                  <span>LIVE TICKER</span>
+                </div>
+                <div className="extras-live-ticker-track-wrap">
+                  <div className="extras-live-ticker-track">
+                    {newsList
+                      .filter((item) => item.status === 'Active')
+                      .map((item, idx) => (
+                        <span key={item.id} className="extras-live-ticker-item">
+                          {idx > 0 && (
+                            <span style={{ opacity: 0.6, margin: '0 4px' }}>✦</span>
+                          )}
+                          <strong>[{item.audience === 'All' ? 'All Users' : item.audience}]</strong> {item.content}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Real-time Announcements List */}
+            <div className="extras-list-card" style={{ marginTop: '8px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <h3
+                  className="extras-card-heading"
+                  style={{ borderBottom: 0, paddingBottom: 0 }}
+                >
                   Published Announcements ({newsList.length})
                 </h3>
                 <button
@@ -609,28 +533,6 @@ export default function ExtrasPage({
                   {loadingNews ? 'Refreshing...' : '↻ Refresh'}
                 </button>
               </div>
-
-              {/* Live Moving Ticker Preview (Right to Left) */}
-              {newsList.some((item) => item.status === 'Active') && (
-                <div className="extras-live-ticker-preview" title="Live Preview: Moving right to left (hover to pause)">
-                  <div className="extras-live-ticker-label">
-                    <span className="extras-pulse-dot" />
-                    <span>LIVE TICKER</span>
-                  </div>
-                  <div className="extras-live-ticker-track-wrap">
-                    <div className="extras-live-ticker-track">
-                      {newsList
-                        .filter((item) => item.status === 'Active')
-                        .map((item, idx) => (
-                          <span key={item.id} className="extras-live-ticker-item">
-                            {idx > 0 && <span style={{ opacity: 0.6, margin: '0 4px' }}>✦</span>}
-                            <strong>[{item.category}]</strong> {item.title} — {item.content}
-                          </span>
-                        ))}
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {loadingNews && newsList.length === 0 ? (
                 <div className="extras-empty-state">
@@ -651,7 +553,7 @@ export default function ExtrasPage({
                   </svg>
                   <h4 className="extras-empty-title">No announcements published yet</h4>
                   <p className="extras-empty-sub">
-                    Fill out the form on the left to broadcast your first real-time announcement.
+                    Fill out the form above to broadcast your first real-time announcement.
                   </p>
                 </div>
               ) : (
@@ -659,8 +561,17 @@ export default function ExtrasPage({
                   {newsList.map((item) => (
                     <div key={item.id} className="extras-feed-item">
                       <div className="extras-feed-item-top">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <h4 className="extras-feed-item-title">{item.title}</h4>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <h4 className="extras-feed-item-title">
+                            {item.title || item.content}
+                          </h4>
                           {item.priority === 'Urgent' && (
                             <span
                               style={{
@@ -691,7 +602,8 @@ export default function ExtrasPage({
 
                       <div className="extras-feed-item-meta">
                         <span>
-                          <strong>Category:</strong> {item.category} • <strong>Audience:</strong> {item.audience}
+                          <strong>Audience:</strong>{' '}
+                          {item.audience === 'All' ? 'All Users' : item.audience}
                         </span>
                         <span>{formatTime(item.createdAt)}</span>
                       </div>
@@ -726,95 +638,62 @@ export default function ExtrasPage({
       ═══════════════════════════════════════════════════════════ */}
       {activeSubTab === 'send_notification' && (
         <div className="extras-module-view">
-          <div className="extras-module-header">
-            <div className="extras-module-header-left">
-              <div
-                className="extras-module-header-icon"
-                style={{
-                  backgroundColor: currentModule?.iconBg,
-                  color: currentModule?.iconColor,
-                }}
-              >
-                {currentModule?.icon}
-              </div>
-              <div>
-                <h2 className="extras-module-title">Send Mobile Notification</h2>
-                <p className="extras-module-subtitle">
-                  Push instant alert notifications directly to mobile app devices.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              className="extras-back-btn"
-              onClick={() => onSelectSubTab('all')}
-            >
-              ← Back to Tools
-            </button>
-          </div>
+          <div className="extras-screenshot-container">
+            <h1 className="extras-screenshot-title">Send Mobile Notification</h1>
 
-          <div className="extras-workspace-grid">
-            <form className="extras-form-card" onSubmit={handleSendNotification}>
-              <h3 className="extras-card-heading">Compose Push Notification</h3>
+            <form onSubmit={handleSendNotification}>
+              <div className="extras-screenshot-card">
+                <h2 className="extras-screenshot-subtitle">Notification's Details</h2>
 
-              <div className="extras-form-row">
-                <div className="extras-form-group">
-                  <label className="extras-form-label">Target Audience</label>
+                <div className="extras-screenshot-field">
+                  <label className="extras-screenshot-label">
+                    Usertype <span className="extras-req-star">*</span>
+                  </label>
                   <select
-                    className="extras-form-select"
+                    className="extras-screenshot-select"
                     value={notifTarget}
                     onChange={(e) => setNotifTarget(e.target.value)}
+                    required
                   >
-                    <option value="All Users">All Connected Devices</option>
-                    <option value="All Clients">All Clients</option>
-                    <option value="All Employees">All Employees</option>
+                    <option value="All Users">All Users</option>
+                    <option value="Clients">Clients</option>
+                    <option value="Employees">Employees</option>
                   </select>
                 </div>
-                <div className="extras-form-group">
-                  <label className="extras-form-label">Priority</label>
-                  <select
-                    className="extras-form-select"
-                    value={notifPriority}
-                    onChange={(e) => setNotifPriority(e.target.value)}
-                  >
-                    <option value="Normal">Normal</option>
-                    <option value="High">High Priority</option>
-                    <option value="Critical">Critical Alert</option>
-                  </select>
+
+                <div className="extras-screenshot-field">
+                  <label className="extras-screenshot-label">
+                    Message <span className="extras-req-star">*</span>
+                  </label>
+                  <textarea
+                    className="extras-screenshot-textarea"
+                    placeholder="Type notification message"
+                    rows={2}
+                    value={notifBody}
+                    onChange={(e) => setNotifBody(e.target.value)}
+                    required
+                  />
                 </div>
               </div>
 
-              <div className="extras-form-group">
-                <label className="extras-form-label">Notification Title</label>
-                <input
-                  type="text"
-                  className="extras-form-input"
-                  placeholder="e.g., Ticket Status Notification"
-                  value={notifTitle}
-                  onChange={(e) => setNotifTitle(e.target.value)}
-                  required
-                />
+              <div className="extras-screenshot-actions">
+                <button type="submit" className="extras-screenshot-submit">
+                  Submit
+                </button>
+                <button
+                  type="button"
+                  className="extras-screenshot-reset"
+                  onClick={handleResetNotification}
+                >
+                  Reset
+                </button>
               </div>
-
-              <div className="extras-form-group">
-                <label className="extras-form-label">Notification Message</label>
-                <textarea
-                  className="extras-form-textarea"
-                  placeholder="Enter message text sent to user devices..."
-                  rows={3}
-                  value={notifBody}
-                  onChange={(e) => setNotifBody(e.target.value)}
-                  required
-                />
-              </div>
-
-              <button type="submit" className="extras-submit-btn">
-                Send Mobile Notification
-              </button>
             </form>
 
-            <div className="extras-list-card">
-              <h3 className="extras-card-heading">Dispatch History ({notifLogs.length})</h3>
+            <div className="extras-list-card" style={{ marginTop: '8px' }}>
+              <h3 className="extras-card-heading">
+                Dispatch History ({notifLogs.length})
+              </h3>
               {notifLogs.length === 0 ? (
                 <div className="extras-empty-state">
                   <p className="extras-empty-sub">No mobile notifications sent yet.</p>
@@ -824,7 +703,9 @@ export default function ExtrasPage({
                   {notifLogs.map((log) => (
                     <div key={log.id} className="extras-feed-item">
                       <div className="extras-feed-item-top">
-                        <h4 className="extras-feed-item-title">{log.title}</h4>
+                        <h4 className="extras-feed-item-title">
+                          {log.message || log.title}
+                        </h4>
                         <span className="extras-feed-item-badge">{log.status}</span>
                       </div>
                       <div className="extras-feed-item-meta">
@@ -863,13 +744,6 @@ export default function ExtrasPage({
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              className="extras-back-btn"
-              onClick={() => onSelectSubTab('all')}
-            >
-              ← Back to Tools
-            </button>
           </div>
 
           <div className="extras-workspace-grid">
@@ -971,13 +845,6 @@ export default function ExtrasPage({
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              className="extras-back-btn"
-              onClick={() => onSelectSubTab('all')}
-            >
-              ← Back to Tools
-            </button>
           </div>
 
           <div className="extras-workspace-grid">
@@ -1077,13 +944,6 @@ export default function ExtrasPage({
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              className="extras-back-btn"
-              onClick={() => onSelectSubTab('all')}
-            >
-              ← Back to Tools
-            </button>
           </div>
 
           <div className="extras-workspace-grid">

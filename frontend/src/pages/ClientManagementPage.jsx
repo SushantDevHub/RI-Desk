@@ -17,8 +17,12 @@ const PREDEFINED_SERVICES = [
   'LPG Booking',
   'Landline',
   'Mobile',
+  'Payment',
   'Pipe Gas',
   'Postpaid',
+  'Recharge',
+  'Technical',
+  'Wallet',
   'Water',
 ];
 
@@ -433,15 +437,6 @@ export default function ClientManagementPage({ isAdmin = true }) {
         <div className="client-header-actions ticket-header-actions">
           <button
             type="button"
-            className="ticket-refresh-button client-refresh-btn"
-            onClick={fetchClients}
-            title="Refresh client list"
-          >
-            Refresh
-          </button>
-
-          <button
-            type="button"
             className="ticket-create-button client-create-btn"
             onClick={openCreateDialog}
           >
@@ -656,7 +651,15 @@ export default function ClientManagementPage({ isAdmin = true }) {
                           </button>
                           <div className="client-contact-person">
                             <span className="client-person-dot">•</span>
-                            {client.name}
+                            <span>{client.name}</span>
+                            {client.ticketCount !== undefined && client.ticketCount > 0 && (
+                              <span
+                                className="client-ticket-pill"
+                                title={`${client.ticketCount} ticket(s) registered in RI-Desk`}
+                              >
+                                🎫 {client.ticketCount} {client.ticketCount === 1 ? 'ticket' : 'tickets'}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -918,7 +921,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
                     id="client-company-name"
                     type="text"
                     required
-                    placeholder="e.g. Apex Technologies Pvt Ltd"
+                    placeholder="e.g. Acme Corp"
                     value={form.companyName}
                     onChange={(e) => handleFormChange('companyName', e.target.value)}
                   />
@@ -932,7 +935,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
                     id="client-contact-name"
                     type="text"
                     required
-                    placeholder="e.g. Amitabh Sharma"
+                    placeholder="e.g. Rahul Sharma"
                     value={form.name}
                     onChange={(e) => handleFormChange('name', e.target.value)}
                   />
@@ -1412,6 +1415,42 @@ export default function ClientManagementPage({ isAdmin = true }) {
                     <span className="client-no-items">No features or add-ons assigned.</span>
                   )}
                 </div>
+              </div>
+
+              {/* ── View Block 3: Associated Tickets ── */}
+              <div className="client-view-section">
+                <div className="client-section-heading">
+                  <span className="sec-icon">🎫</span> Associated Tickets (
+                  {Array.isArray(viewingClient.tickets) ? viewingClient.tickets.length : viewingClient.ticketCount || 0})
+                </div>
+                {Array.isArray(viewingClient.tickets) && viewingClient.tickets.length > 0 ? (
+                  <div className="client-tickets-list">
+                    {viewingClient.tickets.map((tkt) => (
+                      <div key={tkt.id} className="client-ticket-card">
+                        <div className="client-ticket-top">
+                          <span className="client-ticket-id">{tkt.id}</span>
+                          <span className={`client-status-badge ${tkt.status === 'resolved' ? 'status-active' : 'status-inactive'}`}>
+                            <span className="client-status-dot" />
+                            {tkt.status ? tkt.status.charAt(0).toUpperCase() + tkt.status.slice(1) : 'Open'}
+                          </span>
+                          <span className="client-service-pill" style={{ fontSize: 11, padding: '2px 8px' }}>
+                            <span className="service-bullet">◆</span>
+                            {tkt.priority ? tkt.priority.charAt(0).toUpperCase() + tkt.priority.slice(1) : 'Medium'}
+                          </span>
+                        </div>
+                        <div className="client-ticket-subject">{tkt.subject}</div>
+                        <div className="client-ticket-meta">
+                          <span className="client-ticket-cat">Category: <strong>{tkt.category}</strong></span>
+                          {tkt.createdAt && (
+                            <span className="client-ticket-date">{formatDate(tkt.createdAt)}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="client-no-items">No tickets linked to this client.</span>
+                )}
               </div>
             </div>
 

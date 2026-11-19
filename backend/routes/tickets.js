@@ -11,6 +11,7 @@ import {
   updateTicket,
 } from '../utils/ticketStore.js';
 
+import { syncClientsWithTickets } from '../utils/clientStore.js';
 import { getAllUsers } from '../utils/userStore.js';
 
 const router = express.Router();
@@ -360,12 +361,6 @@ router.get('/', authenticate, (req, res) => {
       ...t,
       logs: getOrSynthesizeLogs(t),
     })).sort((a, b) => {
-      const pA = PRIORITY_ORDER[String(a.priority).toLowerCase()] || 4;
-      const pB = PRIORITY_ORDER[String(b.priority).toLowerCase()] || 4;
-      if (pA !== pB) {
-        return pA - pB;
-      }
-
       const timeA = new Date(a.createdAt || 0).getTime();
       const timeB = new Date(b.createdAt || 0).getTime();
       if (!isNaN(timeA) && !isNaN(timeB) && timeB !== timeA) {
@@ -427,6 +422,9 @@ router.post('/', authenticate, (req, res) => {
       customer = '',
       clientMobile = '',
       customerMobile = '',
+      clientEmail = '',
+      customerEmail = '',
+      email = '',
       category = 'recharge',
       status = 'open',
       assignedToId,
@@ -554,6 +552,7 @@ router.post('/', authenticate, (req, res) => {
 
     const finalClient = String(client || customer || '').trim();
     const finalClientMobile = String(clientMobile || customerMobile || '').trim();
+    const finalEmail = String(clientEmail || customerEmail || email || '').trim();
 
     const ticket = {
       id: `TKT-${nextNumber}`,
@@ -563,6 +562,9 @@ router.post('/', authenticate, (req, res) => {
       customer: finalClient,
       clientMobile: finalClientMobile,
       customerMobile: finalClientMobile,
+      clientEmail: finalEmail,
+      customerEmail: finalEmail,
+      email: finalEmail,
       category: cleanedCategory,
       description: description.trim(),
       priority,
@@ -579,6 +581,11 @@ router.post('/', authenticate, (req, res) => {
     };
 
     addTicket(ticket);
+    try {
+      syncClientsWithTickets();
+    } catch (syncErr) {
+      console.warn('Ticket client sync error:', syncErr.message);
+    }
 
     return res.status(201).json({
       message: 'Ticket created successfully.',
@@ -984,6 +991,7 @@ router.put('/:id', authenticate, (req, res) => {
   try {
     const {
       subject, userType, client, customer, clientMobile, customerMobile,
+      clientEmail, customerEmail, email,
       category, priority, description, assignedToId, status,
     } = req.body;
 
@@ -1123,6 +1131,17 @@ router.put('/:id', authenticate, (req, res) => {
       });
     }
 
+    const incomingEmail = clientEmail !== undefined ? clientEmail : customerEmail !== undefined ? customerEmail : email;
+    const oldEmail = (existing.clientEmail || existing.customerEmail || existing.email || '').trim();
+    const newEmail = incomingEmail !== undefined ? String(incomingEmail).trim() : oldEmail;
+    if (oldEmail !== newEmail) {
+      changes.push({
+        field: 'Email',
+        oldValue: oldEmail || 'None',
+        newValue: newEmail || 'None',
+      });
+    }
+
     const currentLogs = getOrSynthesizeLogs(existing);
     let updatedLogs = currentLogs;
     if (changes.length > 0) {
@@ -1175,6 +1194,9 @@ router.put('/:id', authenticate, (req, res) => {
       customer: newClient,
       clientMobile: newMobile,
       customerMobile: newMobile,
+      clientEmail: newEmail,
+      customerEmail: newEmail,
+      email: newEmail,
       category: cleanedCategory,
       priority,
       description: description.trim(),

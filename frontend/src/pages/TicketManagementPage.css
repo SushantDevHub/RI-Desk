@@ -1350,6 +1350,11 @@
   padding: 6px 10px;
 }
 
+.ticket-row-assigned-select {
+  max-width: 165px;
+  width: 100%;
+}
+
 .ticket-status-locked-badge {
   display: inline-flex;
   align-items: center;
@@ -1452,15 +1457,15 @@
   display: inline-flex;
   align-items: center;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.4px;
   text-transform: uppercase;
   padding: 3px 6px;
   border-radius: 4px;
-  background: #f1f5f9;
-  color: #475569;
-  border: 1px solid #cbd5e1;
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
 }
 
 .db-row-resolved {
@@ -1474,7 +1479,7 @@
 .db-row-new {
   position: relative;
   background-color: transparent !important;
-  border-left: 3px solid #94a3b8;
+  border-left: 3.5px solid #2563eb !important;
 }
 
 .db-row-new:hover {
@@ -1593,6 +1598,38 @@
 .ticket-customer-phone:hover {
   color: #1d4ed8;
   text-decoration: underline;
+}
+
+.ticket-client-email,
+.ticket-customer-email {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: inherit;
+  max-width: 175px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticket-client-email:hover,
+.ticket-customer-email:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.ticket-client-email svg,
+.ticket-customer-email svg {
+  flex-shrink: 0;
 }
 
 /* =========================================
@@ -1812,6 +1849,36 @@
 
 .contact-dialog-btn.whatsapp:hover .contact-dialog-btn-icon.whatsapp {
   background: #16a34a;
+  color: #ffffff;
+}
+
+.contact-dialog-btn.email {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.contact-dialog-btn.email:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(100, 116, 139, 0.16);
+}
+
+.contact-dialog-btn-icon.email {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #e2e8f0;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.18s ease;
+}
+
+.contact-dialog-btn.email:hover .contact-dialog-btn-icon.email {
+  background: #4f46e5;
   color: #ffffff;
 }
 

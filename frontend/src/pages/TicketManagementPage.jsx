@@ -11,8 +11,10 @@ const INITIAL_FORM = {
   userType: 'admin',
   client: '',
   clientMobile: '',
+  clientEmail: '',
   customer: '',
   customerMobile: '',
+  customerEmail: '',
   category: 'recharge',
   priority: 'medium',
   description: '',
@@ -206,6 +208,7 @@ function isTicketNew(createdAt, status) {
 function validateTicket(ticket) {
   const clientName = (ticket.client || ticket.customer || '').trim();
   const mobile = (ticket.clientMobile || ticket.customerMobile || '').trim();
+  const email = (ticket.clientEmail || ticket.customerEmail || ticket.email || '').trim();
 
   if (
     !ticket.subject.trim() ||
@@ -228,6 +231,10 @@ function validateTicket(ticket) {
     return 'Enter a valid 10-digit mobile number.';
   }
 
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return 'Enter a valid email address.';
+  }
+
   return '';
 }
 
@@ -235,6 +242,7 @@ function validateTicket(ticket) {
 function buildPayload(ticket) {
   const clientName = (ticket.client || ticket.customer || '').trim();
   const mobile = (ticket.clientMobile || ticket.customerMobile || '').trim();
+  const email = (ticket.clientEmail || ticket.customerEmail || ticket.email || '').trim();
 
   return {
     subject: ticket.subject.trim(),
@@ -243,6 +251,9 @@ function buildPayload(ticket) {
     customer: clientName,
     clientMobile: mobile,
     customerMobile: mobile,
+    clientEmail: email,
+    customerEmail: email,
+    email: email,
     category: ticket.category,
     priority: ticket.priority,
     description: ticket.description.trim(),
@@ -363,6 +374,21 @@ function TicketFormFields({ values, onChange, employees, idPrefix, isAdmin }) {
             onChange('customerMobile', val);
           }}
           placeholder="10-digit mobile number"
+          required
+        />
+      </div>
+      <div className="ticket-form-field">
+        <label htmlFor={id('email')}>Email *</label>
+        <input
+          id={id('email')}
+          type="email"
+          value={values.clientEmail ?? values.customerEmail ?? ''}
+          onChange={(e) => {
+            const val = e.target.value;
+            onChange('clientEmail', val);
+            onChange('customerEmail', val);
+          }}
+          placeholder="Enter email address"
           required
         />
       </div>
@@ -786,6 +812,8 @@ export default function TicketManagementPage() {
       customer: ticket.client || ticket.customer || '',
       clientMobile: ticket.clientMobile || ticket.customerMobile || '',
       customerMobile: ticket.clientMobile || ticket.customerMobile || '',
+      clientEmail: ticket.clientEmail || ticket.customerEmail || ticket.email || '',
+      customerEmail: ticket.clientEmail || ticket.customerEmail || ticket.email || '',
       category: ticket.category || 'recharge',
       priority: ticket.priority || 'medium',
       description: ticket.description || '',
@@ -931,7 +959,15 @@ export default function TicketManagementPage() {
   /* ---------- Inline Row Updates ---------- */
 
   async function handleInlineUpdate(ticket, field, value) {
-    if (!ticket || !field || ticket[field] === value) return;
+    if (!ticket || !field) return;
+
+    if (field === 'assignedToId') {
+      const curId = ticket.assignedToId ? String(ticket.assignedToId) : '';
+      const nId = value ? String(value) : '';
+      if (curId === nId) return;
+    } else if (ticket[field] === value) {
+      return;
+    }
 
     if (ticket.status === 'resolved' && field === 'status' && !isAdmin) {
       setActionError('Only administrators can re-open or change the status of a resolved ticket.');
@@ -958,6 +994,12 @@ export default function TicketManagementPage() {
                     resolution: instantResolution,
                     resolutionTime: instantResolution,
                     resolvedBy: willBeResolved ? (t.assignedTo || 'Employee') : null,
+                  }
+                : {}),
+              ...(field === 'assignedToId'
+                ? {
+                    assignedToId: value ? Number(value) : null,
+                    assignedTo: value ? (employees.find((e) => String(e.id) === String(value))?.name || null) : null,
                   }
                 : {}),
             }
@@ -993,18 +1035,24 @@ export default function TicketManagementPage() {
           ? 'Priority'
           : field === 'status'
           ? 'Status'
+          : field === 'assignedToId'
+          ? 'Assignment'
           : capitalize(field);
       const oldFormatted =
         field === 'priority'
           ? capitalize(oldValue)
           : field === 'status'
           ? formatStatus(oldValue)
+          : field === 'assignedToId'
+          ? (ticket.assignedTo || 'Unassigned')
           : capitalize(oldValue);
       const newFormatted =
         field === 'priority'
           ? capitalize(value)
           : field === 'status'
           ? formatStatus(value)
+          : field === 'assignedToId'
+          ? (value ? (employees.find((e) => String(e.id) === String(value))?.name || 'Assigned') : 'Unassigned')
           : capitalize(value);
 
       setMessage(
@@ -1012,7 +1060,20 @@ export default function TicketManagementPage() {
       );
     } catch (err) {
       setTickets((prev) =>
-        prev.map((t) => (t.id === ticket.id ? { ...t, [field]: oldValue } : t))
+        prev.map((t) =>
+          t.id === ticket.id
+            ? {
+                ...t,
+                [field]: oldValue,
+                ...(field === 'assignedToId'
+                  ? {
+                      assignedToId: ticket.assignedToId,
+                      assignedTo: ticket.assignedTo,
+                    }
+                  : {}),
+              }
+            : t
+        )
       );
       setActionError(err.message || `Failed to update ${field}.`);
     }
@@ -1099,12 +1160,6 @@ export default function TicketManagementPage() {
       );
     })
     .sort((a, b) => {
-      const pA = PRIORITY_ORDER[String(a.priority).toLowerCase()] || 4;
-      const pB = PRIORITY_ORDER[String(b.priority).toLowerCase()] || 4;
-      if (pA !== pB) {
-        return pA - pB;
-      }
-
       const timeA = new Date(a.createdAt || 0).getTime();
       const timeB = new Date(b.createdAt || 0).getTime();
       if (!isNaN(timeA) && !isNaN(timeB) && timeB !== timeA) {
@@ -1130,16 +1185,6 @@ export default function TicketManagementPage() {
         </div>
 
         <div className="ticket-header-actions">
-          <button
-            type="button"
-            className="ticket-refresh-button"
-            onClick={() => {
-              fetchTickets();
-              fetchEmployees();
-            }}
-          >
-            Refresh
-          </button>
           {/* Create Ticket Button */}
           <button
             type="button"
@@ -1326,7 +1371,7 @@ export default function TicketManagementPage() {
                     <th>Priority</th>
                     <th>Status</th>
                     <th style={{ width: 140 }}>Resolution time</th>
-                    <th>Assigned To</th>
+                    <th style={{ minWidth: 150 }}>Assigned To</th>
                     <th>Created at / Solved at</th>
                     <th className="ticket-actions-header">Actions</th>
                   </tr>
@@ -1337,6 +1382,30 @@ export default function TicketManagementPage() {
                     const isResolved = ticket.status === 'resolved';
                     const isNew = !isResolved && isTicketNew(ticket.createdAt, ticket.status);
                     const isJustCreated = !isResolved && newlyCreatedTicketId === ticket.id;
+
+                    const currentAssignedId = (() => {
+                      if (
+                        ticket.assignedToId !== null &&
+                        ticket.assignedToId !== undefined &&
+                        ticket.assignedToId !== '' &&
+                        ticket.assignedToId !== 0
+                      ) {
+                        return String(ticket.assignedToId);
+                      }
+                      if (
+                        ticket.assignedTo &&
+                        String(ticket.assignedTo).trim().toLowerCase() !== 'unassigned'
+                      ) {
+                        const matched = employees.find(
+                          (e) =>
+                            String(e.name).trim().toLowerCase() ===
+                            String(ticket.assignedTo).trim().toLowerCase()
+                        );
+                        if (matched) return String(matched.id);
+                        return `custom_${ticket.assignedTo}`;
+                      }
+                      return '';
+                    })();
 
                     return (
                       <tr
@@ -1392,6 +1461,7 @@ export default function TicketManagementPage() {
                                     setContactDialog({
                                       name: ticket.client || ticket.customer || ticket.createdBy || 'Client',
                                       phone: ticket.clientMobile || ticket.customerMobile,
+                                      email: ticket.clientEmail || ticket.customerEmail || ticket.email || '',
                                     })
                                   }
                                 >
@@ -1409,6 +1479,31 @@ export default function TicketManagementPage() {
                                   </svg>
                                   <span>{ticket.clientMobile || ticket.customerMobile}</span>
                                 </button>
+                              )}
+                              {(ticket.clientEmail || ticket.customerEmail || ticket.email) && (
+                                <a
+                                  href={`mailto:${ticket.clientEmail || ticket.customerEmail || ticket.email}`}
+                                  className="ticket-client-email"
+                                  title={`Send email to ${ticket.client || ticket.customer || 'client'} (${ticket.clientEmail || ticket.customerEmail || ticket.email})`}
+                                  aria-label={`Send email to ${ticket.client || ticket.customer || 'client'} at ${ticket.clientEmail || ticket.customerEmail || ticket.email}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <svg
+                                    width="11"
+                                    height="11"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.4"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden="true"
+                                  >
+                                    <rect width="20" height="16" x="2" y="4" rx="2" />
+                                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                                  </svg>
+                                  <span>{ticket.clientEmail || ticket.customerEmail || ticket.email}</span>
+                                </a>
                               )}
                             </div>
                           </div>
@@ -1561,7 +1656,51 @@ export default function TicketManagementPage() {
                         </td>
 
                         {/* 7. Assigned To */}
-                        <td>{getAssignedName(ticket)}</td>
+                        <td>
+                          {isAdmin ? (
+                            <div className="ticket-row-cell-wrap">
+                              <select
+                                className="ticket-row-badge-select ticket-row-assigned-select"
+                                style={{
+                                  color: currentAssignedId ? '#1e293b' : '#94a3b8',
+                                  backgroundColor: '#ffffff',
+                                  borderColor: '#e2e8f0',
+                                  fontWeight: currentAssignedId ? 600 : 400,
+                                }}
+                                value={currentAssignedId}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (!val || val.startsWith('custom_')) {
+                                    handleInlineUpdate(ticket, 'assignedToId', '');
+                                  } else {
+                                    handleInlineUpdate(ticket, 'assignedToId', Number(val));
+                                  }
+                                }}
+                                title="Assign support staff"
+                              >
+                                <option value="" style={{ color: '#94a3b8' }}>
+                                  Unassigned
+                                </option>
+                                {employees.map((emp) => (
+                                  <option
+                                    key={emp.id}
+                                    value={String(emp.id)}
+                                    style={{ color: '#1e293b' }}
+                                  >
+                                    {emp.name}
+                                  </option>
+                                ))}
+                                {currentAssignedId.startsWith('custom_') && (
+                                  <option value={currentAssignedId} style={{ color: '#1e293b' }}>
+                                    {ticket.assignedTo}
+                                  </option>
+                                )}
+                              </select>
+                            </div>
+                          ) : (
+                            <span>{getAssignedName(ticket)}</span>
+                          )}
+                        </td>
 
                         {/* 8. Created at / Solved at */}
                         <td>
@@ -1963,6 +2102,7 @@ export default function TicketManagementPage() {
                         setContactDialog({
                           name: viewingTicket.client || viewingTicket.customer || 'Client',
                           phone: viewingTicket.clientMobile || viewingTicket.customerMobile,
+                          email: viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email || '',
                         })
                       }
                     >
@@ -1980,6 +2120,34 @@ export default function TicketManagementPage() {
                       </svg>
                       <span>{viewingTicket.clientMobile || viewingTicket.customerMobile}</span>
                     </button>
+                  </div>
+                )}
+
+                {(viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email) && (
+                  <div className="ticket-desc-meta-item">
+                    <span className="ticket-desc-meta-label">Email:</span>
+                    <a
+                      href={`mailto:${viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email}`}
+                      className="ticket-client-email"
+                      title={`Send email to ${viewingTicket.client || viewingTicket.customer || 'client'} (${viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email})`}
+                      aria-label={`Send email to ${viewingTicket.client || viewingTicket.customer || 'client'} at ${viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email}`}
+                    >
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <rect width="20" height="16" x="2" y="4" rx="2" />
+                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                      </svg>
+                      <span>{viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email}</span>
+                    </a>
                   </div>
                 )}
               </div>

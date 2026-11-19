@@ -9,7 +9,6 @@ import {
 import TicketManagementPage from './TicketManagementPage.jsx';
 import EmployeeListPage from './EmployeeListPage.jsx';
 import CreateEmployeePage from './CreateEmployeePage.jsx';
-import DesignationPage from './DesignationPage.jsx';
 import ClientManagementPage from './ClientManagementPage.jsx';
 import ExtrasPage from './ExtrasPage.jsx';
 import { getActiveAnnouncements } from '../api/announcementApi.js';
@@ -250,7 +249,6 @@ function getActiveTabFromPath(pathname = '') {
   const p = pathname.toLowerCase();
   if (p.includes('/employees/create')) return 'create-employee';
   if (p.includes('/employees')) return 'employees';
-  if (p.includes('/designation')) return 'designation';
   if (p.includes('/clients')) return 'clients';
   if (p.includes('/tickets')) return 'tickets';
   if (p.includes('/extras')) return 'extras';
@@ -276,7 +274,6 @@ export default function DashboardPage({
     let targetPath = '/dashboard';
     if (targetTab === 'employees') targetPath = '/employees';
     else if (targetTab === 'create-employee') targetPath = '/employees/create';
-    else if (targetTab === 'designation') targetPath = '/designation';
     else if (targetTab === 'clients') targetPath = '/clients';
     else if (targetTab === 'tickets') targetPath = '/tickets';
     else if (targetTab === 'extras') targetPath = '/extras';
@@ -299,7 +296,6 @@ export default function DashboardPage({
       if (
         active === 'employees' ||
         active === 'create-employee' ||
-        active === 'designation' ||
         active === 'extras'
       ) {
         navigate('/dashboard', { replace: true });
@@ -389,6 +385,7 @@ export default function DashboardPage({
   /* ── Ticket state ── */
 
   const [tickets, setTickets] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -478,7 +475,37 @@ export default function DashboardPage({
       }
     }
 
+    async function fetchEmployees() {
+      try {
+        let res = await fetch('http://localhost:4000/api/tickets/employees', {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.employees) && data.employees.length > 0) {
+            if (isMounted) setEmployees(data.employees);
+            return;
+          }
+        }
+        res = await fetch('http://localhost:4000/api/users', {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const empList = Array.isArray(data.users)
+            ? data.users.filter((u) => u.role === 'employee')
+            : Array.isArray(data)
+            ? data.filter((u) => u.role === 'employee')
+            : [];
+          if (isMounted) setEmployees(empList);
+        }
+      } catch (err) {
+        // silent fallback
+      }
+    }
+
     fetchTickets(false);
+    fetchEmployees();
 
     // Fast live auto-refresh every 1500ms so changes reflect across all panels
     const interval = setInterval(() => {
@@ -488,12 +515,14 @@ export default function DashboardPage({
     function onVisibilityChange() {
       if (document.visibilityState === 'visible') {
         fetchTickets(true);
+        fetchEmployees();
       }
     }
     document.addEventListener('visibilitychange', onVisibilityChange);
 
     function handleFastSync() {
       fetchTickets(true);
+      fetchEmployees();
     }
     window.addEventListener('tickets-updated', handleFastSync);
     window.addEventListener('storage', handleFastSync);
@@ -619,44 +648,52 @@ export default function DashboardPage({
       label: 'Open Tickets',
       num: openStatTickets.length,
       accent: '#4f46e5',
-      sub: 'Total unresolved',
+     
     },
     {
       key: 'high',
       label: 'High Priority',
       num: highStatTickets.length,
       accent: '#e11d48',
-      sub: 'Open high priority',
+    
     },
     {
       key: 'medium',
       label: 'Medium Priority',
       num: mediumStatTickets.length,
       accent: '#d97706',
-      sub: 'Open medium priority',
+   
     },
     {
       key: 'low',
       label: 'Low Priority',
       num: lowStatTickets.length,
       accent: '#059669',
-      sub: 'Open low priority',
+     
     },
     {
       key: 'resolved',
       label: 'Resolved Tickets',
       num: resolvedStatTickets.length,
       accent: '#0891b2',
-      sub: 'Closed conversations',
+      
     },
   ];
 
   /* ─────────────────────────────────────────────
-     Inline ticket updates handler (Category, Priority, Status)
+     Inline ticket updates handler (Category, Priority, Status, Assignment)
   ───────────────────────────────────────────── */
 
   async function handleInlineUpdate(ticket, field, value) {
-    if (!ticket || !field || ticket[field] === value) return;
+    if (!ticket || !field) return;
+
+    if (field === 'assignedToId') {
+      const curId = ticket.assignedToId ? String(ticket.assignedToId) : '';
+      const nId = value ? String(value) : '';
+      if (curId === nId) return;
+    } else if (ticket[field] === value) {
+      return;
+    }
 
     if (ticket.status === 'resolved' && field === 'status' && !isAdmin) {
       setNoticeMessage('⚠️ Only administrators can re-open or change the status of a resolved ticket.');
@@ -684,6 +721,12 @@ export default function DashboardPage({
                     resolutionTime: instantResolution,
                     resolvedBy: willBeResolved ? (user?.name || t.assignedTo) : null,
                     resolvedById: willBeResolved ? user?.id : null,
+                  }
+                : {}),
+              ...(field === 'assignedToId'
+                ? {
+                    assignedToId: value ? Number(value) : null,
+                    assignedTo: value ? (employees.find((e) => String(e.id) === String(value))?.name || null) : null,
                   }
                 : {}),
             }
@@ -730,18 +773,24 @@ export default function DashboardPage({
           ? 'Priority'
           : field === 'status'
           ? 'Status'
+          : field === 'assignedToId'
+          ? 'Assignment'
           : capitalize(field);
       const oldFormatted =
         field === 'priority'
           ? capitalize(oldValue)
           : field === 'status'
           ? formatStatus(oldValue)
+          : field === 'assignedToId'
+          ? (ticket.assignedTo || 'Unassigned')
           : capitalize(oldValue);
       const newFormatted =
         field === 'priority'
           ? capitalize(value)
           : field === 'status'
           ? formatStatus(value)
+          : field === 'assignedToId'
+          ? (value ? (employees.find((e) => String(e.id) === String(value))?.name || 'Assigned') : 'Unassigned')
           : capitalize(value);
 
       setNoticeMessage(
@@ -752,7 +801,18 @@ export default function DashboardPage({
     } catch (err) {
       setTickets((previous) =>
         previous.map((t) =>
-          t.id === ticket.id ? { ...t, [field]: oldValue } : t
+          t.id === ticket.id
+            ? {
+                ...t,
+                [field]: oldValue,
+                ...(field === 'assignedToId'
+                  ? {
+                      assignedToId: ticket.assignedToId,
+                      assignedTo: ticket.assignedTo,
+                    }
+                  : {}),
+              }
+            : t
         )
       );
       setError(err.message || `Failed to update ${field}.`);
@@ -797,7 +857,7 @@ export default function DashboardPage({
               <th>Priority</th>
               <th>Status</th>
               <th style={{ width: 140 }}>Resolution time</th>
-              <th>Assigned To</th>
+              <th style={{ minWidth: 150 }}>Assigned To</th>
               <th>Created at / Solved at</th>
               <th style={{ width: 80, textAlign: 'center' }}>Actions</th>
             </tr>
@@ -806,6 +866,30 @@ export default function DashboardPage({
             {ticketList.map((ticket) => {
               const isResolved = ticket.status === 'resolved';
               const isNew = !isResolved && isTicketNew(ticket.createdAt, ticket.status);
+
+              const currentAssignedId = (() => {
+                if (
+                  ticket.assignedToId !== null &&
+                  ticket.assignedToId !== undefined &&
+                  ticket.assignedToId !== '' &&
+                  ticket.assignedToId !== 0
+                ) {
+                  return String(ticket.assignedToId);
+                }
+                if (
+                  ticket.assignedTo &&
+                  String(ticket.assignedTo).trim().toLowerCase() !== 'unassigned'
+                ) {
+                  const matched = employees.find(
+                    (e) =>
+                      String(e.name).trim().toLowerCase() ===
+                      String(ticket.assignedTo).trim().toLowerCase()
+                  );
+                  if (matched) return String(matched.id);
+                  return `custom_${ticket.assignedTo}`;
+                }
+                return '';
+              })();
 
               return (
                 <tr
@@ -859,6 +943,7 @@ export default function DashboardPage({
                               setContactDialog({
                                 name: ticket.client || ticket.customer || ticket.createdBy || 'Client',
                                 phone: ticket.clientMobile || ticket.customerMobile,
+                                email: ticket.clientEmail || ticket.customerEmail || ticket.email || '',
                               })
                             }
                           >
@@ -876,6 +961,31 @@ export default function DashboardPage({
                             </svg>
                             <span>{ticket.clientMobile || ticket.customerMobile}</span>
                           </button>
+                        )}
+                        {(ticket.clientEmail || ticket.customerEmail || ticket.email) && (
+                          <a
+                            href={`mailto:${ticket.clientEmail || ticket.customerEmail || ticket.email}`}
+                            className="ticket-client-email"
+                            title={`Send email to ${ticket.client || ticket.customer || 'client'} (${ticket.clientEmail || ticket.customerEmail || ticket.email})`}
+                            aria-label={`Send email to ${ticket.client || ticket.customer || 'client'} at ${ticket.clientEmail || ticket.customerEmail || ticket.email}`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <svg
+                              width="11"
+                              height="11"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.4"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <rect width="20" height="16" x="2" y="4" rx="2" />
+                              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                            </svg>
+                            <span>{ticket.clientEmail || ticket.customerEmail || ticket.email}</span>
+                          </a>
                         )}
                       </div>
                     </div>
@@ -1026,7 +1136,49 @@ export default function DashboardPage({
                   </td>
 
                   <td>
-                    {ticket.assignedTo || 'Unassigned'}
+                    {isAdmin ? (
+                      <div className="ticket-row-cell-wrap">
+                        <select
+                          className="ticket-row-badge-select ticket-row-assigned-select"
+                          style={{
+                            color: currentAssignedId ? '#1e293b' : '#94a3b8',
+                            backgroundColor: '#ffffff',
+                            borderColor: '#e2e8f0',
+                            fontWeight: currentAssignedId ? 600 : 400,
+                          }}
+                          value={currentAssignedId}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (!val || val.startsWith('custom_')) {
+                              handleInlineUpdate(ticket, 'assignedToId', '');
+                            } else {
+                              handleInlineUpdate(ticket, 'assignedToId', Number(val));
+                            }
+                          }}
+                          title="Assign support staff"
+                        >
+                          <option value="" style={{ color: '#94a3b8' }}>
+                            Unassigned
+                          </option>
+                          {employees.map((emp) => (
+                            <option
+                              key={emp.id}
+                              value={String(emp.id)}
+                              style={{ color: '#1e293b' }}
+                            >
+                              {emp.name}
+                            </option>
+                          ))}
+                          {currentAssignedId.startsWith('custom_') && (
+                            <option value={currentAssignedId} style={{ color: '#1e293b' }}>
+                              {ticket.assignedTo}
+                            </option>
+                          )}
+                        </select>
+                      </div>
+                    ) : (
+                      <span>{ticket.assignedTo || 'Unassigned'}</span>
+                    )}
                   </td>
 
                   <td>
@@ -1339,35 +1491,6 @@ export default function DashboardPage({
             </button>
           )}
 
-          {/* Designation menu */}
-          {isAdmin && (
-            <button
-              className={`db-nav-item ${
-                active === 'designation' ? 'active' : ''
-              }`}
-              onClick={() => {
-                setActive('designation');
-                setMobileMenuOpen(false);
-              }}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <rect x="3" y="4" width="18" height="16" rx="3" />
-                <circle cx="12" cy="10" r="3" />
-                <path d="M7 17a5 5 0 0 1 10 0" />
-              </svg>
-              <span>Designation</span>
-            </button>
-          )}
-
           {/* Client menu */}
           <button
             className={`db-nav-item ${
@@ -1475,8 +1598,6 @@ export default function DashboardPage({
             <CreateEmployeePage
               onBack={() => setActive('employees')}
             />
-          ) : active === 'designation' && isAdmin ? (
-            <DesignationPage isAdmin={isAdmin} />
           ) : active === 'extras' && isAdmin ? (
             <ExtrasPage isAdmin={isAdmin} />
           ) : (
@@ -1486,10 +1607,6 @@ export default function DashboardPage({
               <h1 className="db-page-title">
                 {isEmployee ? 'Employee Dashboard' : 'Dashboard'}
               </h1>
-
-              <p className="db-page-sub">
-                Here's what needs your attention right now.
-              </p>
 
               {/* ── Real-Time Announcements Moving Ticker (Right to Left) ── */}
               {(() => {
@@ -1589,6 +1706,8 @@ export default function DashboardPage({
                       className={`db-stat-card db-stat-card-clickable ${isSelected ? 'active' : ''}`}
                       style={{
                         '--accent': stat.accent,
+                        '--accent-bg': stat.bg,
+                        '--accent-border': stat.border,
                       }}
                       onClick={() => {
                         setSelectedStat((prev) => (prev === stat.key ? null : stat.key));
@@ -1600,8 +1719,22 @@ export default function DashboardPage({
                         }
                       }}
                     >
-                      <div className="db-stat-num">
-                        {stat.num}
+                      <div className="db-stat-card-top">
+                        <div className="db-stat-num">
+                          {stat.num}
+                        </div>
+                        {stat.icon && (
+                          <div
+                            className="db-stat-icon-wrap"
+                            style={{
+                              backgroundColor: stat.bg,
+                              color: stat.accent,
+                              border: `1px solid ${stat.border}`,
+                            }}
+                          >
+                            {stat.icon}
+                          </div>
+                        )}
                       </div>
 
                       <div className="db-stat-label">
@@ -1624,8 +1757,8 @@ export default function DashboardPage({
                   justifyContent: 'space-between',
                   flexWrap: 'wrap',
                   gap: 12,
-                  marginTop: 24,
-                  marginBottom: 16,
+                  marginTop: 4,
+                  marginBottom: 12,
                 }}
               >
                 <div>
@@ -1648,12 +1781,23 @@ export default function DashboardPage({
 
               {/* If a stat card is selected, show that specific list */}
               {selectedStat ? (
-                <div className="db-card" style={{ marginBottom: 28 }}>
+                <div className="db-card" style={{ marginBottom: 16 }}>
                   <div
                     style={{
                       padding: '16px 20px',
-                      borderBottom: '1px solid #f1f5f9',
-                      background: '#fafafa',
+                      borderBottom: '1px solid #e2e8f0',
+                      background: 'linear-gradient(90deg, #f8fafc 0%, #ffffff 100%)',
+                      borderLeft: `4px solid ${
+                        selectedStat === 'open'
+                          ? '#4f46e5'
+                          : selectedStat === 'high'
+                          ? '#e11d48'
+                          : selectedStat === 'medium'
+                          ? '#d97706'
+                          : selectedStat === 'low'
+                          ? '#059669'
+                          : '#0891b2'
+                      }`,
                       borderRadius: '12px 12px 0 0',
                       display: 'flex',
                       alignItems: 'center',
@@ -1677,12 +1821,12 @@ export default function DashboardPage({
                         </span>
                         <span
                           style={{
-                            background: '#f1f5f9',
-                            color: '#334155',
-                            border: '1px solid #e2e8f0',
+                            background: selectedStat === 'high' ? '#fee2e2' : '#e0e7ff',
+                            color: selectedStat === 'high' ? '#b91c1c' : '#3730a3',
+                            border: `1px solid ${selectedStat === 'high' ? '#fca5a5' : '#c7d2fe'}`,
                             fontSize: 12,
                             fontWeight: 700,
-                            padding: '2px 8px',
+                            padding: '2px 9px',
                             borderRadius: 9999,
                           }}
                         >
@@ -1722,7 +1866,7 @@ export default function DashboardPage({
                 /* Default Dashboard view: Two Slabs (Unassigned on top, Open tickets below in descending order) */
                 <>
                   {/* SLAB 1: Unassigned Tickets (On Top) */}
-                  <div className="db-card" style={{ marginBottom: 28 }}>
+                  <div className="db-card" style={{ marginBottom: 16 }}>
                     <div
                       style={{
                         padding: '16px 20px',
@@ -1755,24 +1899,7 @@ export default function DashboardPage({
                             {unassignedOpenTickets.length}{' '}
                             {unassignedOpenTickets.length === 1 ? 'ticket' : 'tickets'}
                           </span>
-                          {unassignedOpenTickets.length > 0 && (
-                            <span
-                              style={{
-                                background: '#f8fafc',
-                                color: '#475569',
-                                border: '1px solid #e2e8f0',
-                                fontSize: 11,
-                                fontWeight: 600,
-                                padding: '2px 6px',
-                                borderRadius: 4,
-                              }}
-                            >
-                            </span>
-                          )}
                         </div>
-                        <span style={{ display: 'block', marginTop: 2, fontSize: 12.5, color: '#64748b' }}>
-                          Tickets awaiting assignment to support staff
-                        </span>
                       </div>
                     </div>
 
@@ -1783,7 +1910,7 @@ export default function DashboardPage({
                   </div>
 
                   {/* SLAB 2: Open Tickets (In Descending Order) */}
-                  <div className="db-card" style={{ marginBottom: 28 }}>
+                  <div className="db-card" style={{ marginBottom: 16 }}>
                     <div
                       style={{
                         padding: '16px 20px',
@@ -1830,9 +1957,6 @@ export default function DashboardPage({
                             ↓ Descending
                           </span>
                         </div>
-                        <span style={{ display: 'block', marginTop: 2, fontSize: 12.5, color: '#64748b' }}>
-                          Active assigned tickets ordered by latest creation date (newest first)
-                        </span>
                       </div>
                     </div>
 
@@ -1982,6 +2106,7 @@ export default function DashboardPage({
                         setContactDialog({
                           name: viewingTicket.client || viewingTicket.customer || 'Client',
                           phone: viewingTicket.clientMobile || viewingTicket.customerMobile,
+                          email: viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email || '',
                         })
                       }
                     >
@@ -1999,6 +2124,34 @@ export default function DashboardPage({
                       </svg>
                       <span>{viewingTicket.clientMobile || viewingTicket.customerMobile}</span>
                     </button>
+                  </div>
+                )}
+
+                {(viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email) && (
+                  <div className="ticket-desc-meta-item">
+                    <span className="ticket-desc-meta-label">Email:</span>
+                    <a
+                      href={`mailto:${viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email}`}
+                      className="ticket-client-email"
+                      title={`Send email to ${viewingTicket.client || viewingTicket.customer || 'client'} (${viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email})`}
+                      aria-label={`Send email to ${viewingTicket.client || viewingTicket.customer || 'client'} at ${viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email}`}
+                    >
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <rect width="20" height="16" x="2" y="4" rx="2" />
+                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                      </svg>
+                      <span>{viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email}</span>
+                    </a>
                   </div>
                 )}
               </div>

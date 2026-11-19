@@ -1,7 +1,8 @@
-export default function ContactCustomerDialog({ contact, onClose }) {
+export default function ContactCustomerDialog({ contact, onClose, title }) {
   if (!contact) return null;
 
   const rawPhone = String(contact.phone || '').trim();
+  const rawEmail = String(contact.email || '').trim();
   const digits = rawPhone.replace(/\D/g, '');
   const displayPhone =
     digits.length === 10
@@ -12,6 +13,7 @@ export default function ContactCustomerDialog({ contact, onClose }) {
   const waNumber = digits.length === 10 ? `91${digits}` : digits;
   const waUrl = `https://wa.me/${waNumber}`;
   const telUrl = `tel:${digits}`;
+  const mailtoUrl = `mailto:${rawEmail}`;
 
   function getInitials(name = '') {
     return (
@@ -24,6 +26,13 @@ export default function ContactCustomerDialog({ contact, onClose }) {
         .toUpperCase() || 'C'
     );
   }
+
+  const dialogHeading =
+    title ||
+    contact.title ||
+    (contact.isEmployee || contact.role === 'employee'
+      ? 'Contact Employee'
+      : 'Contact Client');
 
   return (
     <div
@@ -40,7 +49,7 @@ export default function ContactCustomerDialog({ contact, onClose }) {
       >
         <div className="contact-dialog-header">
           <div className="contact-dialog-header-info">
-            <h2 id="contact-dialog-title">Contact Client</h2>
+            <h2 id="contact-dialog-title">{dialogHeading}</h2>
             <p>Choose your preferred communication method</p>
           </div>
           <button
@@ -59,9 +68,41 @@ export default function ContactCustomerDialog({ contact, onClose }) {
           </div>
           <div className="contact-dialog-details">
             <span className="contact-dialog-name">
-              {contact.name || 'Client'}
+              {contact.name || (contact.isEmployee ? 'Employee' : 'Client')}
             </span>
+            {contact.designation && (
+              <span
+                style={{
+                  fontSize: 12,
+                  color: '#4f46e5',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  marginTop: 1,
+                  marginBottom: 2,
+                }}
+              >
+                <span>💼</span>
+                {contact.designation}
+              </span>
+            )}
             <span className="contact-dialog-number">{displayPhone}</span>
+            {rawEmail && (
+              <span
+                style={{
+                  fontSize: 12,
+                  color: '#64748b',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  marginTop: 2,
+                }}
+              >
+                <span>✉️</span>
+                {rawEmail}
+              </span>
+            )}
           </div>
         </div>
 
@@ -149,6 +190,50 @@ export default function ContactCustomerDialog({ contact, onClose }) {
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </a>
+
+          {/* Option 3: Send Email */}
+          {rawEmail && (
+            <a
+              href={mailtoUrl}
+              className="contact-dialog-btn email"
+              onClick={onClose}
+            >
+              <div className="contact-dialog-btn-icon email">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect width="20" height="16" x="2" y="4" rx="2" />
+                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                </svg>
+              </div>
+              <div className="contact-dialog-btn-text">
+                <span className="contact-dialog-btn-title">Send Email</span>
+                <span className="contact-dialog-btn-desc">{rawEmail}</span>
+              </div>
+              <svg
+                className="contact-dialog-btn-arrow"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </a>
+          )}
         </div>
 
         <div className="contact-dialog-footer">

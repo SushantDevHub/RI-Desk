@@ -84,14 +84,14 @@ router.post('/', requireAdmin, (req, res) => {
   try {
     const { title, category, audience, priority, content, status } = req.body;
 
-    const trimmedTitle = String(title || '').trim();
     const trimmedContent = String(content || '').trim();
+    const trimmedTitle = String(title || trimmedContent).trim();
 
-    if (!trimmedTitle) {
-      return res.status(400).json({ error: 'Announcement title is required.' });
-    }
     if (!trimmedContent) {
       return res.status(400).json({ error: 'Announcement content is required.' });
+    }
+    if (!trimmedTitle) {
+      return res.status(400).json({ error: 'Announcement title is required.' });
     }
 
     const newAnnouncement = {

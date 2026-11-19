@@ -354,6 +354,21 @@
   color: #cbd5e1;
 }
 
+.client-ticket-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
 .client-contacts-block {
   display: flex;
   flex-direction: column;
@@ -1487,6 +1502,71 @@
   font-size: 10px;
 }
 
+/* Associated Tickets in View Modal */
+.client-tickets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.client-ticket-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.client-ticket-card:hover {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+}
+
+.client-ticket-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.client-ticket-id {
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: #4f46e5;
+  background: #eef2ff;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.client-ticket-subject {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.client-ticket-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.client-ticket-cat {
+  color: #475569;
+}
+
+.client-ticket-date {
+  color: #94a3b8;
+}
+
 .client-view-footer {
   padding: 14px 24px;
   border-top: 1px solid #e2e8f0;
@@ -1623,9 +1703,8 @@
     justify-content: stretch;
   }
 
-  .client-refresh-btn,
+  
   .client-create-btn,
-  .ticket-refresh-button,
   .ticket-create-button {
     flex: 1;
     text-align: center;
