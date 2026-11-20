@@ -860,25 +860,48 @@
 .ticket-row-actions {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 6px;
   white-space: nowrap;
+  vertical-align: middle;
+}
+
+.ticket-action-col,
+.ticket-actions-col {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.ticket-action-col-single {
+  justify-content: center;
 }
 
 .ticket-icon-button {
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #e2e8f0;
-  border-radius: 9px;
+  border-radius: 6px;
   background: #fff;
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s, transform 0.2s;
+  transition: all 0.15s ease-in-out;
+  padding: 0;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border: 1px solid transparent;
 }
 
 .ticket-icon-button:hover {
   transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+}
+
+.ticket-icon-button:active {
+  transform: translateY(0);
 }
 
 .ticket-edit-icon {
@@ -1969,6 +1992,32 @@
   background: #e0e7ff;
   border-color: #a5b4fc;
   color: #2a22a0;
+}
+
+.ticket-transfer-icon {
+  background: #fdf4ff;
+  border: 1px solid #f0abfc;
+  color: #9333ea;
+}
+
+.ticket-transfer-icon:hover {
+  background: #fae8ff;
+  border-color: #e879f9;
+  color: #7e22ce;
+}
+
+.ticket-ask-admin-icon,
+.ticket-ask-employee-icon {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #059669;
+}
+
+.ticket-ask-admin-icon:hover,
+.ticket-ask-employee-icon:hover {
+  background: #d1fae5;
+  border-color: #6ee7b7;
+  color: #047857;
 }
 
 .ticket-log-l-symbol {

@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { getToken } from '../api/authApi.js';
 import ContactClientDialog from '../components/ContactClientDialog.jsx';
 import TicketLogsDialog from '../components/TicketLogsDialog.jsx';
+import TransferTicketDialog from '../components/TransferTicketDialog.jsx';
+import AskAdminDialog from '../components/AskAdminDialog.jsx';
+import AskEmployeeDialog from '../components/AskEmployeeDialog.jsx';
 import './TicketManagementPage.css';
 
 const API = 'http://localhost:4000/api';
@@ -211,7 +214,6 @@ export function validateTicket(ticket) {
   const email = (ticket.clientEmail || ticket.customerEmail || ticket.email || '').trim();
 
   if (
-    !ticket.subject.trim() ||
     !clientName ||
     !mobile ||
     !ticket.description.trim()
@@ -245,7 +247,7 @@ export function buildPayload(ticket) {
   const email = (ticket.clientEmail || ticket.customerEmail || ticket.email || '').trim();
 
   return {
-    subject: ticket.subject.trim(),
+    subject: (ticket.subject || '').trim(),
     userType: ticket.userType,
     client: clientName,
     customer: clientName,
@@ -279,6 +281,17 @@ export function TicketIcon({ type }) {
     'aria-hidden': true,
   };
 
+  if (type === 'transfer') {
+    return (
+      <svg {...common} width={15} height={15}>
+        <path d="M17 1l4 4-4 4" />
+        <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+        <path d="M7 23l-4-4 4-4" />
+        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+      </svg>
+    );
+  }
+
   if (type === 'edit') {
     return (
       <svg {...common}>
@@ -302,6 +315,16 @@ export function TicketIcon({ type }) {
 
   if (type === 'log' || type === 'history') {
     return <span className="ticket-log-l-symbol">L</span>;
+  }
+
+  if (type === 'ask-admin' || type === 'help' || type === 'info' || type === 'i') {
+    return (
+      <svg {...common} width={14} height={14}>
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="16" x2="12" y2="12" />
+        <line x1="12" y1="8" x2="12.01" y2="8" strokeWidth={2.5} />
+      </svg>
+    );
   }
 
   return (
@@ -335,17 +358,6 @@ export function TicketFormFields({ values, onChange, employees, idPrefix, isAdmi
 
   return (
     <div className="ticket-form-grid">
-      <div className="ticket-form-field">
-        <label htmlFor={id('subject')}>Ticket Subject *</label>
-        <input
-          id={id('subject')}
-          value={values.subject}
-          onChange={(e) => onChange('subject', e.target.value)}
-          placeholder="e.g. Recharge failed"
-          required
-        />
-      </div>
-
       <div className="ticket-form-field">
         <label htmlFor={id('client')}>Client Name *</label>
         <input
@@ -544,6 +556,9 @@ export default function TicketManagementPage() {
   const [ticketToDelete, setTicketToDelete] = useState(null);
   const [viewingTicket, setViewingTicket] = useState(null);
   const [viewingLogsTicket, setViewingLogsTicket] = useState(null);
+  const [transferringTicket, setTransferringTicket] = useState(null);
+  const [askAdminTicket, setAskAdminTicket] = useState(null);
+  const [askEmployeeTicket, setAskEmployeeTicket] = useState(null);
   const [newlyCreatedTicketId, setNewlyCreatedTicketId] = useState(null);
   const [contactDialog, setContactDialog] = useState(null);
 
@@ -1143,7 +1158,6 @@ export default function TicketManagementPage() {
         !searchText ||
         [
           ticket.id,
-          ticket.subject,
           ticket.createdBy,
           assignedName,
         ].some((value) =>
@@ -1279,7 +1293,7 @@ export default function TicketManagementPage() {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#1e293b' }}>
-              Choose Support Staff:
+              Choose All Employees:
             </span>
             <select
               id="employee-staff-filter"
@@ -1289,7 +1303,7 @@ export default function TicketManagementPage() {
               aria-label="Choose support staff from the dropdown"
               style={{ minWidth: 220 }}
             >
-              <option value="all">All Support Staff</option>
+              <option value="all">All Employees</option>
               <option value="unassigned">Unassigned Tickets</option>
               {employees.map((emp) => (
                 <option key={emp.id} value={String(emp.id)}>
@@ -1737,35 +1751,78 @@ export default function TicketManagementPage() {
                         {/* 9. Actions */}
                         <td className="ticket-actions-cell">
                           <div className="ticket-row-actions">
-                            <button
-                              type="button"
-                              className="ticket-icon-button ticket-log-icon"
-                              title="View Ticket Logs (Priority, Status, Assignment history)"
-                              aria-label={`View logs for ticket ${ticket.id}`}
-                              onClick={() => setViewingLogsTicket(ticket)}
-                            >
-                              <TicketIcon type="log" />
-                            </button>
+                            {/* Column 1: L & I */}
+                            <div className="ticket-action-col">
+                              <button
+                                type="button"
+                                className="ticket-icon-button ticket-log-icon"
+                                title="View Transfer History"
+                                aria-label={`View transfer history for ticket ${ticket.id}`}
+                                onClick={() => setViewingLogsTicket(ticket)}
+                              >
+                                <TicketIcon type="log" />
+                              </button>
 
-                            <button
-                              type="button"
-                              className="ticket-icon-button ticket-edit-icon"
-                              title="Edit ticket"
-                              aria-label={`Edit ticket ${ticket.id}`}
-                              onClick={() => openEditTicket(ticket)}
-                            >
-                              <TicketIcon type="edit" />
-                            </button>
+                              {!isAdmin ? (
+                                <button
+                                  type="button"
+                                  className="ticket-icon-button ticket-ask-admin-icon"
+                                  title="Ask Admin for Help"
+                                  aria-label={`Ask admin for help on ticket ${ticket.id}`}
+                                  onClick={() => setAskAdminTicket(ticket)}
+                                >
+                                  <TicketIcon type="ask-admin" />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="ticket-icon-button ticket-ask-employee-icon"
+                                  title="Ask Employee / Query"
+                                  aria-label={`Ask employee on ticket ${ticket.id}`}
+                                  onClick={() => setAskEmployeeTicket(ticket)}
+                                >
+                                  <TicketIcon type="ask-admin" />
+                                </button>
+                              )}
+                            </div>
 
-                            <button
-                              type="button"
-                              className="ticket-icon-button ticket-delete-icon"
-                              title="Delete ticket"
-                              aria-label={`Delete ticket ${ticket.id}`}
-                              onClick={() => openDeleteTicket(ticket)}
-                            >
-                              <TicketIcon type="delete" />
-                            </button>
+                            {/* Column 2: Edit & Delete */}
+                            <div className="ticket-action-col">
+                              <button
+                                type="button"
+                                className="ticket-icon-button ticket-edit-icon"
+                                title="Edit ticket"
+                                aria-label={`Edit ticket ${ticket.id}`}
+                                onClick={() => openEditTicket(ticket)}
+                              >
+                                <TicketIcon type="edit" />
+                              </button>
+
+                              <button
+                                type="button"
+                                className="ticket-icon-button ticket-delete-icon"
+                                title="Delete ticket"
+                                aria-label={`Delete ticket ${ticket.id}`}
+                                onClick={() => openDeleteTicket(ticket)}
+                              >
+                                <TicketIcon type="delete" />
+                              </button>
+                            </div>
+
+                            {/* Column 3: Transfer button */}
+                            {!isAdmin && (
+                              <div className="ticket-action-col ticket-action-col-single">
+                                <button
+                                  type="button"
+                                  className="ticket-icon-button ticket-transfer-icon"
+                                  title="Transfer To"
+                                  aria-label={`Transfer ticket ${ticket.id} to another employee`}
+                                  onClick={() => setTransferringTicket(ticket)}
+                                >
+                                  <TicketIcon type="transfer" />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1935,9 +1992,7 @@ export default function TicketManagementPage() {
 
             <p>
               Are you sure you want to delete ticket{' '}
-              <strong>#{ticketToDelete.id}</strong>
-              {' — '}
-              <strong>{ticketToDelete.subject || 'Untitled ticket'}</strong>?{' '}
+              <strong>#{ticketToDelete.id}</strong>?{' '}
               This action cannot be undone.
             </p>
 
@@ -1988,7 +2043,6 @@ export default function TicketManagementPage() {
                 <h2 id="view-desc-title">Ticket Details</h2>
                 <p>
                   Ticket #{viewingTicket.id}
-                  {viewingTicket.subject ? ` — ${viewingTicket.subject}` : ''}
                 </p>
               </div>
 
@@ -2194,6 +2248,37 @@ export default function TicketManagementPage() {
         <TicketLogsDialog
           ticket={viewingLogsTicket}
           onClose={() => setViewingLogsTicket(null)}
+        />
+      )}
+
+      {/* ═══════════════════════════════════════
+          TRANSFER TICKET POP-UP DIALOG (EMPLOYEE)
+      ═══════════════════════════════════════ */}
+      {transferringTicket && (
+        <TransferTicketDialog
+          ticket={transferringTicket}
+          onClose={() => setTransferringTicket(null)}
+        />
+      )}
+
+      {/* ═══════════════════════════════════════
+          ASK ADMIN FOR HELP POP-UP DIALOG (EMPLOYEE)
+      ═══════════════════════════════════════ */}
+      {askAdminTicket && (
+        <AskAdminDialog
+          ticket={askAdminTicket}
+          onClose={() => setAskAdminTicket(null)}
+        />
+      )}
+
+      {/* ═══════════════════════════════════════
+          ASK EMPLOYEE POP-UP DIALOG (ADMIN)
+      ═══════════════════════════════════════ */}
+      {askEmployeeTicket && (
+        <AskEmployeeDialog
+          ticket={askEmployeeTicket}
+          employees={employees}
+          onClose={() => setAskEmployeeTicket(null)}
         />
       )}
 

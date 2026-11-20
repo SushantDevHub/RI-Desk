@@ -32,14 +32,32 @@ function formatStatus(status = '') {
   return capitalize(status);
 }
 
+// Clean and normalize displayed values: strip "Assigned (...)", "Not Assigned", etc.
+function formatLogValue(val) {
+  if (val === null || val === undefined || val === '' || val === 'None' || val === '—') {
+    return '—';
+  }
+  const str = String(val).trim();
+  const assignedMatch = str.match(/^Assigned\s*\((.+)\)$/i);
+  if (assignedMatch) return assignedMatch[1].trim();
+  if (/^Not Assigned/i.test(str) || str.toLowerCase() === 'unassigned') return 'Unassigned';
+  return str;
+}
+
+// Clean and normalize field names for human readability
+function formatFieldName(fieldName = '') {
+  const f = String(fieldName || '').toLowerCase();
+  if (f === 'assignment' || f.includes('assign')) return 'Assignee';
+  if (f.includes('work left') || f.includes('transfer note')) return 'Handover Notes';
+  return capitalize(fieldName);
+}
+
 function synthesizeTicketLogs(ticket) {
   if (!ticket) return [];
 
   const isAssigned = Boolean(ticket.assignedTo || ticket.assignedToId);
   const employeeName = ticket.assignedTo || null;
-  const actualAssignmentText = isAssigned
-    ? `Assigned (${employeeName})`
-    : 'Not Assigned (Unassigned)';
+  const actualAssignmentText = employeeName || 'Unassigned';
   const actualPriority = capitalize(ticket.priority || 'medium');
   const actualStatus = formatStatus(ticket.status || 'open');
   const actualDescription = (ticket.description || '').trim();
@@ -73,6 +91,12 @@ function synthesizeTicketLogs(ticket) {
       },
       changes: [
         {
+          field: 'Assignee',
+          oldValue: 'None',
+          newValue: actualAssignmentText,
+          isAssigned,
+        },
+        {
           field: 'Priority',
           oldValue: 'None',
           newValue: actualPriority,
@@ -83,50 +107,76 @@ function synthesizeTicketLogs(ticket) {
           newValue: actualStatus,
         },
         {
-          field: 'Assignment',
-          oldValue: 'None',
-          newValue: actualAssignmentText,
-          isAssigned,
-        },
-        {
           field: 'Description',
           oldValue: 'None',
           newValue: actualDescription || 'No description provided',
         },
       ],
-      message: `Ticket created with Priority: "${actualPriority}", Status: "${actualStatus}", Assignment: "${actualAssignmentText}"`,
+      message: `Ticket created with Assignee: "${actualAssignmentText}", Priority: "${actualPriority}", Status: "${actualStatus}"`,
     };
 
     logs = [initialLog];
   }
 
-  // Determine what the latest state recorded in logs is
+  // If ticket has transferNotes and no transfer log found, append synthesized transfer log
+  const hasTransferLog = logs.some(
+    (l) =>
+      l.action === 'Ticket Transferred' ||
+      l.transferDetails ||
+      String(l.action || '').toLowerCase().includes('transfer')
+  );
+
+  if (!hasTransferLog && ticket.transferNotes) {
+    logs.push({
+      id: `synth_transfer_${ticket.id}`,
+      timestamp: ticket.lastTransferredAt || ticket.updatedAt || new Date().toISOString(),
+      performedBy: ticket.lastTransferredBy || 'Employee',
+      performedByRole: 'employee',
+      action: 'Ticket Transferred',
+      assignment: {
+        old: 'Previous Assignee',
+        new: employeeName || 'Target Assignee',
+        oldAssigned: true,
+        newAssigned: isAssigned,
+      },
+      transferDetails: {
+        from: 'Previous Assignee',
+        to: employeeName || 'Target Assignee',
+        workLeft: ticket.transferNotes,
+        transferredBy: ticket.lastTransferredBy || 'Employee',
+        transferredByRole: 'employee',
+      },
+      changes: [
+        {
+          field: 'Assignee',
+          oldValue: 'Previous Assignee',
+          newValue: actualAssignmentText,
+          newAssigned: isAssigned,
+        },
+      ],
+      message: `Ticket transferred. Work left: "${ticket.transferNotes}"`,
+    });
+  }
+
+  // Track latest state to reconcile any missing changes without duplicates
   const lastLoggedState = {
     priority: null,
     status: null,
     assignment: null,
-    isAssigned: null,
     description: null,
     category: null,
     subject: null,
   };
 
   logs.forEach((log) => {
-    if (log.priority && log.priority.new !== undefined && log.priority.new !== null) {
+    if (log.priority?.new) {
       lastLoggedState.priority = capitalize(log.priority.new);
     }
-    if (log.status && log.status.new !== undefined && log.status.new !== null) {
+    if (log.status?.new) {
       lastLoggedState.status = formatStatus(log.status.new);
     }
-    if (log.assignment) {
-      if (log.assignment.newAssigned !== undefined) {
-        lastLoggedState.isAssigned = Boolean(log.assignment.newAssigned);
-      }
-      if (log.assignment.new !== undefined && log.assignment.new !== null) {
-        lastLoggedState.assignment = log.assignment.newAssigned
-          ? `Assigned (${log.assignment.new})`
-          : 'Not Assigned (Unassigned)';
-      }
+    if (log.assignment?.new) {
+      lastLoggedState.assignment = formatLogValue(log.assignment.new);
     }
     if (Array.isArray(log.changes)) {
       log.changes.forEach((c) => {
@@ -134,10 +184,8 @@ function synthesizeTicketLogs(ticket) {
         const f = String(c.field).toLowerCase();
         if (f === 'priority') lastLoggedState.priority = capitalize(c.newValue);
         if (f === 'status') lastLoggedState.status = formatStatus(c.newValue);
-        if (f === 'assignment') {
-          lastLoggedState.assignment = c.newValue;
-          lastLoggedState.isAssigned =
-            c.newAssigned ?? c.isAssigned ?? (c.newValue && !c.newValue.includes('Not Assigned'));
+        if (f === 'assignment' || f.includes('assign')) {
+          lastLoggedState.assignment = formatLogValue(c.newValue);
         }
         if (f === 'description') lastLoggedState.description = c.newValue;
         if (f === 'category') lastLoggedState.category = capitalize(c.newValue);
@@ -146,10 +194,12 @@ function synthesizeTicketLogs(ticket) {
     }
   });
 
-  // Reconcile any divergence between the last logged state and the current ticket state
   const missingChanges = [];
 
-  if (lastLoggedState.priority && lastLoggedState.priority !== actualPriority) {
+  if (
+    lastLoggedState.priority &&
+    formatLogValue(lastLoggedState.priority) !== formatLogValue(actualPriority)
+  ) {
     missingChanges.push({
       field: 'Priority',
       oldValue: lastLoggedState.priority,
@@ -157,7 +207,10 @@ function synthesizeTicketLogs(ticket) {
     });
   }
 
-  if (lastLoggedState.status && lastLoggedState.status !== actualStatus) {
+  if (
+    lastLoggedState.status &&
+    formatLogValue(lastLoggedState.status) !== formatLogValue(actualStatus)
+  ) {
     missingChanges.push({
       field: 'Status',
       oldValue: lastLoggedState.status,
@@ -165,12 +218,14 @@ function synthesizeTicketLogs(ticket) {
     });
   }
 
-  if (lastLoggedState.assignment && lastLoggedState.assignment !== actualAssignmentText) {
+  if (
+    lastLoggedState.assignment &&
+    formatLogValue(lastLoggedState.assignment) !== formatLogValue(actualAssignmentText)
+  ) {
     missingChanges.push({
-      field: 'Assignment',
+      field: 'Assignee',
       oldValue: lastLoggedState.assignment,
       newValue: actualAssignmentText,
-      oldAssigned: Boolean(lastLoggedState.isAssigned),
       newAssigned: isAssigned,
     });
   }
@@ -195,13 +250,7 @@ function synthesizeTicketLogs(ticket) {
     });
   }
 
-  if (lastLoggedState.subject && actualSubject && lastLoggedState.subject !== actualSubject) {
-    missingChanges.push({
-      field: 'Subject',
-      oldValue: lastLoggedState.subject,
-      newValue: actualSubject,
-    });
-  }
+
 
   if (missingChanges.length > 0) {
     logs.push({
@@ -209,36 +258,90 @@ function synthesizeTicketLogs(ticket) {
       timestamp: ticket.updatedAt || new Date().toISOString(),
       performedBy: ticket.resolvedBy || 'Admin User',
       performedByRole: ticket.resolvedBy ? 'admin' : 'employee',
-      action: missingChanges
-        .map((c) => `${c.field === 'Assignment' ? 'Assignment' : c.field} Changed`)
-        .join(', '),
-      priority: {
-        old: lastLoggedState.priority || actualPriority,
-        new: actualPriority,
-      },
-      status: {
-        old: lastLoggedState.status || actualStatus,
-        new: actualStatus,
-      },
-      assignment: {
-        old: lastLoggedState.assignment || 'Not Assigned (Unassigned)',
-        new: actualAssignmentText,
-        oldAssigned: Boolean(lastLoggedState.isAssigned),
-        newAssigned: isAssigned,
-      },
+      action: 'Ticket Updated',
       changes: missingChanges,
       message: missingChanges
-        .map(
-          (c) =>
-            `${c.field === 'Assignment' ? 'Assigned Status' : c.field} changed from "${
-              c.oldValue
-            }" to "${c.newValue}"`
-        )
+        .map((c) => `${c.field} changed from "${c.oldValue}" to "${c.newValue}"`)
         .join(' • '),
     });
   }
 
   return logs;
+}
+
+// Clean and deduplicate logs for display: removes repetitive entries and no-ops
+function cleanAndDeduplicateLogs(rawLogs = []) {
+  const result = [];
+  const seenSignatures = new Set();
+
+  for (const log of rawLogs) {
+    if (!log) continue;
+    const action = log.action || 'Ticket Updated';
+    const isTransfer =
+      action === 'Ticket Transferred' ||
+      Boolean(log.transferDetails) ||
+      String(action).toLowerCase().includes('transfer');
+    const isCreation = action === 'Ticket Created';
+
+    if (isTransfer) {
+      result.push({
+        ...log,
+        action: 'Ticket Transferred',
+        isTransfer: true,
+      });
+      continue;
+    }
+
+    if (isCreation) {
+      const cleanChanges = (Array.isArray(log.changes) ? log.changes : [])
+        .map((c) => ({
+          ...c,
+          field: formatFieldName(c.field),
+          oldValue: formatLogValue(c.oldValue),
+          newValue: formatLogValue(c.newValue),
+        }))
+        .filter((c) => c.newValue !== '—');
+
+      result.push({
+        ...log,
+        isCreation: true,
+        changes: cleanChanges,
+      });
+      continue;
+    }
+
+    // Regular updates: filter out no-op changes (where old value == new value)
+    const rawChanges = Array.isArray(log.changes) ? log.changes : [];
+    const cleanChanges = rawChanges
+      .map((c) => ({
+        ...c,
+        field: formatFieldName(c.field),
+        oldValue: formatLogValue(c.oldValue),
+        newValue: formatLogValue(c.newValue),
+      }))
+      .filter((c) => c.oldValue.toLowerCase() !== c.newValue.toLowerCase());
+
+    // Skip update entries that have zero meaningful changes
+    if (cleanChanges.length === 0) {
+      continue;
+    }
+
+    // Deduplicate identical consecutive change entries
+    const sig = `${log.timestamp}_${cleanChanges
+      .map((c) => `${c.field}:${c.oldValue}->${c.newValue}`)
+      .join('|')}`;
+    if (seenSignatures.has(sig)) {
+      continue;
+    }
+    seenSignatures.add(sig);
+
+    result.push({
+      ...log,
+      changes: cleanChanges,
+    });
+  }
+
+  return result;
 }
 
 export default function TicketLogsDialog({ ticket, onClose }) {
@@ -255,7 +358,7 @@ export default function TicketLogsDialog({ ticket, onClose }) {
     setLogs(synthesizeTicketLogs(ticket));
   }, [ticket]);
 
-  // Fetch freshest logs from server with fast live-sync & background polling
+  // Fetch freshest logs from server with fast live-sync & polling
   useEffect(() => {
     let isMounted = true;
 
@@ -269,8 +372,14 @@ export default function TicketLogsDialog({ ticket, onClose }) {
             Authorization: `Bearer ${getToken()}`,
           },
         });
-        if (!res.ok) throw new Error('Failed to load logs');
-        const data = await res.json();
+        if (!res.ok) throw new Error(`Failed to load logs (${res.status})`);
+        const text = await res.text();
+        let data = {};
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch {
+          data = {};
+        }
         if (isMounted) {
           const freshTicket = data.ticket || ticket;
           setCurrentTicket(freshTicket);
@@ -283,7 +392,6 @@ export default function TicketLogsDialog({ ticket, onClose }) {
           }
         }
       } catch (err) {
-        // Fall back to existing or synthesized ticket logs
         if (isMounted) {
           setLogs((prev) => (prev.length > 0 ? prev : synthesizeTicketLogs(ticket)));
         }
@@ -294,15 +402,12 @@ export default function TicketLogsDialog({ ticket, onClose }) {
       }
     }
 
-    // Initial fetch
     fetchLogs(false);
 
-    // Fast polling every 1200ms while dialog is open
     const interval = setInterval(() => {
       fetchLogs(true);
-    }, 1200);
+    }, 1500);
 
-    // Instant event-driven sync when any ticket is updated in the app or another tab
     function handleFastSync(event) {
       if (event?.detail?.id && String(event.detail.id) !== String(ticket.id)) {
         return;
@@ -325,14 +430,19 @@ export default function TicketLogsDialog({ ticket, onClose }) {
   const currentPriority = String(currentTicket.priority || 'medium').toLowerCase();
   const currentStatus = String(currentTicket.status || 'open').toLowerCase();
   const isCurrentlyAssigned = Boolean(currentTicket.assignedTo || currentTicket.assignedToId);
-  const currentAssignee = currentTicket.assignedTo || 'Unassigned';
+  const currentAssignee = formatLogValue(currentTicket.assignedTo) || 'Unassigned';
 
-  // Display logs in reverse-chronological order (newest first)
-  const sortedLogs = [...logs].sort((a, b) => {
+  // Display logs in reverse-chronological order (newest first), cleaned & deduplicated
+  const rawSortedLogs = [...logs].sort((a, b) => {
     const timeA = new Date(a.timestamp || 0).getTime();
     const timeB = new Date(b.timestamp || 0).getTime();
     return timeB - timeA;
   });
+
+  const displayedLogs = cleanAndDeduplicateLogs(rawSortedLogs);
+
+  // Count transfer events
+  const transferCount = displayedLogs.filter((l) => l.isTransfer).length;
 
   return (
     <div
@@ -358,8 +468,10 @@ export default function TicketLogsDialog({ ticket, onClose }) {
                 Ticket Logs — <span className="ticket-log-id">{currentTicket.id}</span>
               </h2>
               <p className="ticket-log-sub">
-                {currentTicket.subject ? `"${currentTicket.subject}"` : 'Ticket change history'}
-                {(currentTicket.client || currentTicket.customer) ? ` • Client: ${currentTicket.client || currentTicket.customer}` : ''}
+                {currentTicket.category ? capitalize(currentTicket.category) : 'Ticket history'}
+                {(currentTicket.client || currentTicket.customer)
+                  ? ` • Client: ${currentTicket.client || currentTicket.customer}`
+                  : ''}
               </p>
             </div>
           </div>
@@ -395,33 +507,40 @@ export default function TicketLogsDialog({ ticket, onClose }) {
             </span>
           </div>
 
-          {/* Assigned or Not */}
+          {/* Current Assignee */}
           <div className="ticket-log-state-card">
-            <span className="ticket-log-state-label">Assigned or Not</span>
+            <span className="ticket-log-state-label">Current Assignee</span>
             <span
               className={`ticket-log-state-val ${
-                isCurrentlyAssigned ? 'assigned-val' : 'unassigned-val'
+                isCurrentlyAssigned && currentAssignee !== 'Unassigned'
+                  ? 'assigned-val'
+                  : 'unassigned-val'
               }`}
             >
-              {isCurrentlyAssigned ? (
+              {isCurrentlyAssigned && currentAssignee !== 'Unassigned' ? (
                 <>
                   <span className="ticket-log-dot dot-assigned" />
-                  Assigned ({currentAssignee})
+                  {currentAssignee}
                 </>
               ) : (
                 <>
                   <span className="ticket-log-dot dot-unassigned" />
-                  Not Assigned
+                  Unassigned
                 </>
               )}
             </span>
           </div>
 
-          {/* Log count */}
+          {/* Total History Events */}
           <div className="ticket-log-state-card">
-            <span className="ticket-log-state-label">Total Events</span>
+            <span className="ticket-log-state-label">History Events</span>
             <span className="ticket-log-state-val neutral-val">
-              {logs.length} {logs.length === 1 ? 'event' : 'events'}
+              {displayedLogs.length} {displayedLogs.length === 1 ? 'event' : 'events'}
+              {transferCount > 0 && (
+                <span className="transfer-count-pill">
+                  {transferCount} {transferCount === 1 ? 'Transfer' : 'Transfers'}
+                </span>
+              )}
             </span>
           </div>
         </div>
@@ -464,22 +583,27 @@ export default function TicketLogsDialog({ ticket, onClose }) {
 
         {/* Log Entries Timeline */}
         <div className="ticket-log-body">
-          {loading && logs.length === 0 ? (
+          {loading && displayedLogs.length === 0 ? (
             <div className="ticket-log-empty">Loading ticket logs...</div>
-          ) : sortedLogs.length === 0 ? (
+          ) : displayedLogs.length === 0 ? (
             <div className="ticket-log-empty">
               No log records found for this ticket yet.
             </div>
           ) : (
             <div className="ticket-log-timeline">
-              {sortedLogs.map((log, index) => {
+              {displayedLogs.map((log, index) => {
                 const changes = Array.isArray(log.changes) ? log.changes : [];
+                const isTransfer = Boolean(log.isTransfer);
+
                 return (
                   <div key={log.id || `log-${index}`} className="ticket-log-item">
                     {/* Timeline Node marker */}
                     <div className="ticket-log-marker">
-                      <div className="ticket-log-circle" />
-                      {index !== sortedLogs.length - 1 && (
+                      <div
+                        className="ticket-log-circle"
+                        style={isTransfer ? { borderColor: '#7c3aed' } : {}}
+                      />
+                      {index !== displayedLogs.length - 1 && (
                         <div className="ticket-log-line" />
                       )}
                     </div>
@@ -488,8 +612,12 @@ export default function TicketLogsDialog({ ticket, onClose }) {
                     <div className="ticket-log-content">
                       <div className="ticket-log-item-header">
                         <div className="ticket-log-action-wrap">
-                          <span className="ticket-log-action-badge">
-                            {log.action || 'Ticket Updated'}
+                          <span
+                            className={`ticket-log-action-badge ${
+                              isTransfer ? 'badge-transferred' : ''
+                            }`}
+                          >
+                            {isTransfer ? 'Ticket Transferred' : (log.action || 'Ticket Updated')}
                           </span>
                           <span className="ticket-log-author">
                             by <strong>{log.performedBy || 'System'}</strong>
@@ -505,34 +633,72 @@ export default function TicketLogsDialog({ ticket, onClose }) {
                         </span>
                       </div>
 
-                      {/* Changes Table showing Old Value and New Value */}
-                      {changes.length > 0 ? (
+                      {/* Clean Transfer Handover Box (No duplicate table underneath) */}
+                      {isTransfer ? (
+                        <div className="ticket-log-transfer-callout">
+                          <div className="transfer-callout-header">
+                            <span className="transfer-callout-tag">Transfer to</span>
+                            <div className="transfer-callout-route">
+                              <span>
+                                {formatLogValue(
+                                  log.transferDetails?.from ||
+                                    log.assignment?.old ||
+                                    'Previous Assignee'
+                                )}
+                              </span>
+                              <svg
+                                width="13"
+                                height="13"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <polyline points="9 18 15 12 9 6" />
+                              </svg>
+                              <span>
+                                {formatLogValue(
+                                  log.transferDetails?.to ||
+                                    log.assignment?.new ||
+                                    currentTicket.assignedTo ||
+                                    'Target Assignee'
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                          {(log.transferDetails?.workLeft || currentTicket.transferNotes) && (
+                            <p className="transfer-callout-desc">
+                              <strong>Work :</strong>{' '}
+                              {log.transferDetails?.workLeft || currentTicket.transferNotes}
+                            </p>
+                          )}
+                        </div>
+                      ) : changes.length > 0 ? (
+                        /* Clean Field Changes Table with Old -> New Values */
                         <div className="ticket-log-changes-table-wrap">
                           <table className="ticket-log-changes-table">
                             <thead>
                               <tr>
                                 <th>Field</th>
-                                <th>Old Value</th>
+                                <th>Previous Value</th>
                                 <th style={{ width: 30, textAlign: 'center' }}></th>
-                                <th>New Value</th>
+                                <th>Updated Value</th>
                               </tr>
                             </thead>
                             <tbody>
                               {changes.map((change, cIdx) => {
                                 const isPriority =
                                   String(change.field).toLowerCase() === 'priority';
-                                const isStatus =
-                                  String(change.field).toLowerCase() === 'status';
-                                const isAssignment =
-                                  String(change.field).toLowerCase() === 'assignment';
-
+                                const isAssignee =
+                                  String(change.field).toLowerCase() === 'assignee';
                                 const isHighOld =
                                   isPriority &&
                                   String(change.oldValue).toLowerCase().includes('high');
                                 const isHighNew =
                                   isPriority &&
                                   String(change.newValue).toLowerCase().includes('high');
-
                                 const isDesc =
                                   String(change.field).toLowerCase() === 'description';
 
@@ -540,19 +706,17 @@ export default function TicketLogsDialog({ ticket, onClose }) {
                                   <tr key={`change-${cIdx}`}>
                                     {/* 1. Field */}
                                     <td className="ticket-log-cell-field">
-                                      {change.field === 'Assignment'
-                                        ? 'Assigned / Assignment'
-                                        : change.field}
+                                      {change.field}
                                     </td>
 
-                                    {/* 2. Old Value */}
+                                    {/* 2. Previous Value */}
                                     <td className="ticket-log-cell-val">
                                       <span
                                         className={`ticket-log-val-badge old-val ${
                                           isHighOld ? 'priority-high-text' : ''
                                         } ${isDesc ? 'desc-val-badge' : ''}`}
                                       >
-                                        {change.oldValue || '—'}
+                                        {change.oldValue}
                                       </span>
                                     </td>
 
@@ -573,20 +737,20 @@ export default function TicketLogsDialog({ ticket, onClose }) {
                                       </svg>
                                     </td>
 
-                                    {/* 3. New Value */}
+                                    {/* 3. Updated Value */}
                                     <td className="ticket-log-cell-val">
                                       <span
                                         className={`ticket-log-val-badge new-val ${
                                           isHighNew
                                             ? 'priority-high-text'
-                                            : isAssignment && change.newAssigned
+                                            : isAssignee && change.newValue !== 'Unassigned'
                                             ? 'is-assigned-badge'
-                                            : isAssignment && !change.newAssigned
+                                            : isAssignee && change.newValue === 'Unassigned'
                                             ? 'is-unassigned-badge'
                                             : ''
                                         } ${isDesc ? 'desc-val-badge' : ''}`}
                                       >
-                                        {change.newValue || '—'}
+                                        {change.newValue}
                                       </span>
                                     </td>
                                   </tr>
@@ -595,11 +759,7 @@ export default function TicketLogsDialog({ ticket, onClose }) {
                             </tbody>
                           </table>
                         </div>
-                      ) : (
-                        <div className="ticket-log-no-changes">
-                          <span>Updated without field modifications</span>
-                        </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 );

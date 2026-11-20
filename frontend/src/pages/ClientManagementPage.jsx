@@ -51,6 +51,54 @@ const EMPTY_FORM = {
   status: 'active',
 };
 
+const CLIENT_STAT_CONFIG = {
+  total: {
+    key: 'total',
+    title: 'Total Registered Clients List',
+    description: 'Listing all registered company profiles and client accounts',
+    color: '#4f46e5',
+    pillBg: '#e0e7ff',
+    pillColor: '#3730a3',
+    pillBorder: '#c7d2fe',
+  },
+  active: {
+    key: 'active',
+    title: 'Active Clients List',
+    description: 'Listing all active client accounts currently receiving services',
+    color: '#059669',
+    pillBg: '#d1fae5',
+    pillColor: '#065f46',
+    pillBorder: '#a7f3d0',
+  },
+  revenue: {
+    key: 'revenue',
+    title: 'Monthly Rental Revenue List',
+    description: 'Listing paying clients sorted by highest monthly rental revenue',
+    color: '#6366f1',
+    pillBg: '#eef2ff',
+    pillColor: '#3730a3',
+    pillBorder: '#c7d2fe',
+  },
+  services: {
+    key: 'services',
+    title: 'Subscribed Services Clients List',
+    description: 'Listing clients currently enrolled in active service packages',
+    color: '#2563eb',
+    pillBg: '#dbeafe',
+    pillColor: '#1e40af',
+    pillBorder: '#bfdbfe',
+  },
+  features: {
+    key: 'features',
+    title: 'Active Features Clients List',
+    description: 'Listing clients with active enabled software features',
+    color: '#0d9488',
+    pillBg: '#ccfbf1',
+    pillColor: '#115e59',
+    pillBorder: '#99f6e4',
+  },
+};
+
 function formatCurrency(amount) {
   const num = Number(amount) || 0;
   return new Intl.NumberFormat('en-IN', {
@@ -431,6 +479,12 @@ export default function ClientManagementPage({ isAdmin = true }) {
       ) {
         return false;
       }
+      if (
+        cardFilter === 'features' &&
+        (!Array.isArray(client.features) || client.features.length === 0)
+      ) {
+        return false;
+      }
 
       if (statusFilter !== 'all' && client.status !== statusFilter) return false;
 
@@ -517,8 +571,8 @@ export default function ClientManagementPage({ isAdmin = true }) {
           role="button"
           tabIndex={0}
           aria-pressed={cardFilter === 'total'}
-          aria-label={`Total Clients: ${clients.length}. Click to view all clients.`}
-          title={`Click to view all ${clients.length} clients`}
+          aria-label={`Total Clients: ${clients.length}. Click to filter list.`}
+          title={`Click to view all ${clients.length} clients as a list`}
           className={`client-stat-card ${cardFilter === 'total' ? 'active' : ''}`}
           style={{
             '--card-accent': '#4f46e5',
@@ -526,20 +580,12 @@ export default function ClientManagementPage({ isAdmin = true }) {
             '--card-border': '#c7d2fe',
           }}
           onClick={() => {
-            setCardFilter(null);
-            setStatusFilter('all');
-            setServiceFilter('all');
-            setFeatureFilter('all');
-            showNotice('Showing all clients.');
+            setCardFilter((prev) => (prev === 'total' ? null : 'total'));
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              setCardFilter(null);
-              setStatusFilter('all');
-              setServiceFilter('all');
-              setFeatureFilter('all');
-              showNotice('Showing all clients.');
+              setCardFilter((prev) => (prev === 'total' ? null : 'total'));
             }
           }}
         >
@@ -660,33 +706,6 @@ export default function ClientManagementPage({ isAdmin = true }) {
         </div>
       </div>
 
-      {/* ── Active Card Filter Banner ── */}
-      {cardFilter && (
-        <div className="client-active-filter-banner" role="status">
-          <span>
-            Showing:{' '}
-            <strong>
-              {cardFilter === 'total' && 'All Registered Clients'}
-              {cardFilter === 'active' && `Active Clients (${filteredClients.length})`}
-              {cardFilter === 'revenue' && `Paying Clients Sorted by Highest Rental (${filteredClients.length})`}
-              {cardFilter === 'services' && `Clients with Subscribed Services (${filteredClients.length})`}
-              {cardFilter === 'features' && `Clients with Active Features (${filteredClients.length})`}
-            </strong>
-          </span>
-          <button
-            type="button"
-            className="client-clear-card-filter-btn"
-            onClick={() => {
-              setCardFilter(null);
-              setStatusFilter('all');
-            }}
-            aria-label="Clear active card filter"
-          >
-            ✕ Reset Filter
-          </button>
-        </div>
-      )}
-
       {/* ── Filter & Search Toolbar ── */}
       <div className="client-toolbar">
         <div className="client-search-wrap">
@@ -786,27 +805,90 @@ export default function ClientManagementPage({ isAdmin = true }) {
           <div className="client-spinner" />
           <p>Loading clients...</p>
         </div>
-      ) : filteredClients.length === 0 ? (
-        <div className="client-empty-state">
-          <div className="client-empty-icon">🏢</div>
-          <h3>No clients found</h3>
-          <p>
-            {search || statusFilter !== 'all' || serviceFilter !== 'all' || featureFilter !== 'all'
-              ? 'No clients match your filter criteria. Try adjusting your search query.'
-              : 'Get started by creating your first client profile with company details, services, and features.'}
-          </p>
-          <button
-            type="button"
-            className="ticket-create-button client-create-btn"
-            style={{ marginTop: 12 }}
-            onClick={openCreateDialog}
-          >
-            + Create Client
-          </button>
-        </div>
       ) : (
         <div className="client-table-card">
-          <div className="client-table-scroll">
+          {/* Dedicated Filtered List Header (Same as Dashboard selectedStat view) */}
+          {cardFilter && CLIENT_STAT_CONFIG[cardFilter] && (
+            <div
+              className="client-stat-filter-header"
+              style={{
+                borderLeft: `4px solid ${CLIENT_STAT_CONFIG[cardFilter].color}`,
+              }}
+            >
+              <div className="client-stat-filter-header-left">
+                <div className="client-stat-filter-title-row">
+                  <span className="client-stat-filter-title">
+                    {CLIENT_STAT_CONFIG[cardFilter].title}
+                  </span>
+                  <span
+                    className="client-stat-filter-pill"
+                    style={{
+                      background: CLIENT_STAT_CONFIG[cardFilter].pillBg,
+                      color: CLIENT_STAT_CONFIG[cardFilter].pillColor,
+                      border: `1px solid ${CLIENT_STAT_CONFIG[cardFilter].pillBorder}`,
+                    }}
+                  >
+                    {filteredClients.length} {filteredClients.length === 1 ? 'client' : 'clients'}
+                  </span>
+                </div>
+                <span className="client-stat-filter-sub">
+                  {CLIENT_STAT_CONFIG[cardFilter].description}
+                </span>
+              </div>
+
+              <div>
+                <button
+                  type="button"
+                  className="client-stat-filter-reset-btn"
+                  onClick={() => {
+                    setCardFilter(null);
+                    setStatusFilter('all');
+                  }}
+                  title="Clear stat filter and show all clients"
+                >
+                  ✕ Clear Selection
+                </button>
+              </div>
+            </div>
+          )}
+
+          {filteredClients.length === 0 ? (
+            <div className="client-empty-state" style={{ padding: '36px 20px' }}>
+              <div className="client-empty-icon">🏢</div>
+              <h3>No clients found</h3>
+              <p>
+                {search || statusFilter !== 'all' || serviceFilter !== 'all' || featureFilter !== 'all' || cardFilter
+                  ? 'No clients match the active filter criteria. Try adjusting or clearing filters.'
+                  : 'Get started by creating your first client profile with company details, services, and features.'}
+              </p>
+              {cardFilter || search || statusFilter !== 'all' || serviceFilter !== 'all' || featureFilter !== 'all' ? (
+                <button
+                  type="button"
+                  className="client-stat-filter-reset-btn"
+                  style={{ marginTop: 12, padding: '6px 14px' }}
+                  onClick={() => {
+                    setCardFilter(null);
+                    setStatusFilter('all');
+                    setServiceFilter('all');
+                    setFeatureFilter('all');
+                    setSearch('');
+                  }}
+                >
+                  ✕ Reset All Filters
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="ticket-create-button client-create-btn"
+                  style={{ marginTop: 12 }}
+                  onClick={openCreateDialog}
+                >
+                  + Create Client
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="client-table-scroll">
             <table className="client-table">
               <thead>
                 <tr>
@@ -1084,8 +1166,9 @@ export default function ClientManagementPage({ isAdmin = true }) {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    )}
 
       {/* ────────────────────────────────────────────────────────
           CREATE / EDIT CLIENT MODAL DIALOG
@@ -1634,7 +1717,6 @@ export default function ClientManagementPage({ isAdmin = true }) {
                             {tkt.priority ? tkt.priority.charAt(0).toUpperCase() + tkt.priority.slice(1) : 'Medium'}
                           </span>
                         </div>
-                        <div className="client-ticket-subject">{tkt.subject}</div>
                         <div className="client-ticket-meta">
                           <span className="client-ticket-cat">Category: <strong>{tkt.category}</strong></span>
                           {tkt.createdAt && (

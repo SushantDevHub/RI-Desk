@@ -13,6 +13,7 @@ import {
 
 import { syncClientsWithTickets } from '../utils/clientStore.js';
 import { getAllUsers } from '../utils/userStore.js';
+import { addNotification } from '../utils/notificationStore.js';
 
 const router = express.Router();
 
@@ -99,6 +100,7 @@ function createLogEntry({
   priority = null,
   status = null,
   assignment = null,
+  transferDetails = null,
   message = null,
 }) {
   const generatedMessage = message || buildLogMessage(changes, action);
@@ -112,6 +114,7 @@ function createLogEntry({
     priority,
     status,
     assignment,
+    transferDetails,
     changes,
   };
 }
@@ -408,6 +411,35 @@ router.get('/employees', authenticate, (req, res) => {
 });
 
 // --------------------------------------------------
+// GET /api/tickets/admin-contact
+// Fetch admin contact details for employee help/query
+// --------------------------------------------------
+
+router.get('/admin-contact', authenticate, (req, res) => {
+  try {
+    const allUsers = getAllUsers();
+    const admin = allUsers.find((u) => u.role === 'admin') || {
+      id: 1,
+      name: 'Admin User',
+      email: 'admin@ridesk.com',
+      mobileNumber: '9876543210',
+    };
+
+    return res.json({
+      admin: {
+        id: admin.id,
+        name: admin.name || 'Admin User',
+        email: admin.email || 'admin@ridesk.com',
+        mobileNumber: admin.mobileNumber || '9876543210',
+      },
+    });
+  } catch (error) {
+    console.error('Get admin contact error:', error);
+    return res.status(500).json({ error: 'Failed to load admin contact.' });
+  }
+});
+
+// --------------------------------------------------
 // POST /api/tickets
 // Create a ticket
 // --------------------------------------------------
@@ -432,14 +464,9 @@ router.post('/', authenticate, (req, res) => {
     } = req.body;
 
     // Validate required fields
-    if (
-      typeof subject !== 'string' ||
-      !subject.trim() ||
-      typeof description !== 'string' ||
-      !description.trim()
-    ) {
+    if (typeof description !== 'string' || !description.trim()) {
       return res.status(400).json({
-        error: 'Subject and description are required.',
+        error: 'Description is required.',
       });
     }
 
@@ -557,7 +584,7 @@ router.post('/', authenticate, (req, res) => {
 
     const ticket = {
       id: `TKT-${nextNumber}`,
-      subject: subject.trim(),
+      subject: typeof subject === 'string' ? subject.trim() : '',
       userType,
       client: finalClient,
       customer: finalClient,
@@ -711,6 +738,157 @@ router.patch(
   }
 );
 
+// --------------------------------------------------
+// POST /api/tickets/:id/transfer
+// Transfer a ticket to another employee with work left description
+// Accessible by BOTH Admin and Employees!
+// --------------------------------------------------
+
+router.post('/:id/transfer', authenticate, (req, res) => {
+  try {
+    const { transferToId, workLeftDescription } = req.body;
+
+    if (!transferToId) {
+      return res.status(400).json({ error: 'Please select an employee to transfer to.' });
+    }
+
+    const trimmedNotes = String(workLeftDescription || '').trim();
+    if (!trimmedNotes) {
+      return res.status(400).json({ error: 'Please describe the work done or work left on this ticket.' });
+    }
+
+    if (trimmedNotes.length > 250) {
+      return res.status(400).json({ error: 'Work left description cannot exceed 250 characters.' });
+    }
+
+    const allUsers = getAllUsers();
+    const targetEmployee = allUsers.find(
+      (user) =>
+        String(user.id) === String(transferToId) &&
+        user.role === 'employee'
+    );
+
+    if (!targetEmployee) {
+      return res.status(404).json({ error: 'Target employee not found.' });
+    }
+
+    if (targetEmployee.status === 'inactive') {
+      return res.status(400).json({ error: 'Cannot transfer ticket to an inactive employee.' });
+    }
+
+    const existing = getAllTickets().find(
+      (t) => String(t.id) === String(req.params.id)
+    );
+
+    if (!existing) {
+      return res.status(404).json({ error: 'Ticket not found.' });
+    }
+
+    const oldEmployeeName = existing.assignedTo || null;
+    const oldIsAssigned = Boolean(existing.assignedTo || existing.assignedToId);
+    const newEmployeeName = targetEmployee.name;
+
+    if (existing.assignedToId && String(existing.assignedToId) === String(targetEmployee.id)) {
+      return res.status(400).json({ error: `Ticket is already assigned to ${newEmployeeName}.` });
+    }
+
+    if (String(req.user.id) === String(targetEmployee.id)) {
+      return res.status(400).json({
+        error: 'You cannot transfer a ticket to yourself. Please select another employee.',
+      });
+    }
+
+    const performerName = req.user.name || (req.user.role === 'admin' ? 'Admin User' : 'Employee');
+    const performerRole = req.user.role || 'employee';
+
+    const transferLog = createLogEntry({
+      performedBy: performerName,
+      performedByRole: performerRole,
+      action: 'Ticket Transferred',
+      priority: {
+        old: existing.priority || 'medium',
+        new: existing.priority || 'medium',
+      },
+      status: {
+        old: existing.status || 'open',
+        new: existing.status || 'open',
+      },
+      assignment: {
+        old: oldEmployeeName,
+        new: newEmployeeName,
+        oldAssigned: oldIsAssigned,
+        newAssigned: true,
+      },
+      transferDetails: {
+        from: oldEmployeeName || 'Unassigned',
+        to: newEmployeeName,
+        workLeft: trimmedNotes,
+        transferredBy: performerName,
+        transferredByRole: performerRole,
+      },
+      changes: [
+        {
+          field: 'Assignment',
+          oldValue: oldIsAssigned
+            ? `Assigned (${oldEmployeeName})`
+            : 'Not Assigned (Unassigned)',
+          newValue: `Assigned (${newEmployeeName})`,
+          oldAssigned: oldIsAssigned,
+          newAssigned: true,
+        },
+        {
+          field: 'Work Left / Transfer Note',
+          oldValue: existing.transferNotes || '—',
+          newValue: trimmedNotes,
+        },
+      ],
+      message: `Ticket transferred from "${oldEmployeeName || 'Unassigned'}" to "${newEmployeeName}" by ${performerName}. Work Left: "${trimmedNotes}"`,
+    });
+
+    const currentLogs = getOrSynthesizeLogs(existing);
+
+    const updated = updateTicket(req.params.id, {
+      assignedTo: newEmployeeName,
+      assignedToId: targetEmployee.id,
+      transferNotes: trimmedNotes,
+      lastTransferredAt: new Date().toISOString(),
+      lastTransferredBy: performerName,
+      logs: [...currentLogs, transferLog],
+      updatedAt: new Date().toISOString(),
+    });
+
+    if (!updated) {
+      return res.status(404).json({ error: 'Ticket not found.' });
+    }
+
+    let createdNotification = null;
+    try {
+      createdNotification = addNotification({
+        recipientId: targetEmployee.id,
+        senderId: req.user.id,
+        senderName: performerName,
+        ticketId: existing.id,
+        ticketNumber: existing.ticketNumber || existing.id,
+        ticketSubject: existing.category || 'Ticket',
+        workLeft: trimmedNotes,
+        type: 'ticket_transferred',
+      });
+    } catch (notifErr) {
+      console.error('Failed to create transfer notification:', notifErr);
+    }
+
+    return res.json({
+      message: `Ticket successfully transferred to ${newEmployeeName}.`,
+      ticket: updated,
+      log: transferLog,
+      notification: createdNotification,
+    });
+  } catch (error) {
+    console.error('Transfer ticket error:', error);
+    return res.status(500).json({ error: 'Failed to transfer ticket.' });
+  }
+});
+
 function calculateResolutionTime(createdAt, resolvedAt) {
   if (!createdAt) return '< 1 min';
   const start = new Date(createdAt).getTime();
@@ -834,11 +1012,6 @@ router.patch('/:id', authenticate, (req, res) => {
 
     if (subject !== undefined) {
       const trimmedSubject = String(subject || '').trim();
-      if (!trimmedSubject) {
-        return res.status(400).json({
-          error: 'Subject cannot be empty.',
-        });
-      }
       const oldSubject = (existing.subject || '').trim();
       if (oldSubject !== trimmedSubject) {
         changes.push({
@@ -996,11 +1169,8 @@ router.put('/:id', authenticate, (req, res) => {
       category, priority, description, assignedToId, status,
     } = req.body;
 
-    if (
-      typeof subject !== 'string' || !subject.trim() ||
-      typeof description !== 'string' || !description.trim()
-    ) {
-      return res.status(400).json({ error: 'Subject and description are required.' });
+    if (typeof description !== 'string' || !description.trim()) {
+      return res.status(400).json({ error: 'Description is required.' });
     }
     if (!['low', 'medium', 'high'].includes(priority)) {
       return res.status(400).json({ error: 'Invalid priority.' });
@@ -1094,11 +1264,12 @@ router.put('/:id', authenticate, (req, res) => {
         newValue: capitalize(cleanedCategory),
       });
     }
-    if (existing.subject !== subject.trim()) {
+    const finalSubject = typeof subject === 'string' ? subject.trim() : (existing.subject || '');
+    if ((existing.subject || '') !== finalSubject && finalSubject) {
       changes.push({
         field: 'Subject',
         oldValue: existing.subject || '',
-        newValue: subject.trim(),
+        newValue: finalSubject,
       });
     }
     const oldDescription = (existing.description || '').trim();
@@ -1189,7 +1360,7 @@ router.put('/:id', authenticate, (req, res) => {
     }
 
     const updated = updateTicket(req.params.id, {
-      subject: subject.trim(),
+      subject: typeof subject === 'string' ? subject.trim() : (existing.subject || ''),
       userType,
       client: newClient,
       customer: newClient,
@@ -1227,6 +1398,31 @@ router.put('/:id', authenticate, (req, res) => {
   } catch (error) {
     console.error('Update ticket error:', error);
     return res.status(500).json({ error: 'Failed to update ticket.' });
+  }
+});
+
+// --------------------------------------------------
+// GET /api/tickets/:id
+// Get single ticket by ID
+// --------------------------------------------------
+
+router.get('/:id', authenticate, (req, res) => {
+  try {
+    const ticket = getAllTickets().find(
+      (t) => String(t.id) === String(req.params.id)
+    );
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found.' });
+    }
+
+    const logs = getOrSynthesizeLogs(ticket);
+    return res.json({
+      ticket: { ...ticket, logs },
+    });
+  } catch (error) {
+    console.error('Get single ticket error:', error);
+    return res.status(500).json({ error: 'Failed to fetch ticket.' });
   }
 });
 

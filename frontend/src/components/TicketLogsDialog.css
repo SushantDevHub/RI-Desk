@@ -591,8 +591,315 @@
   background: #194fa4;
 }
 
+/* =========================================
+   TIMELINE TRANSFER CALLOUT BOX
+========================================= */
+
+.ticket-log-transfer-callout {
+  margin-top: 8px;
+  background: #faf5ff;
+  border: 1px solid #e9d5ff;
+  border-left: 3px solid #7c3aed;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.transfer-callout-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.transfer-callout-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: #7c3aed;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.transfer-callout-route {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #4338ca;
+}
+
+.transfer-callout-desc {
+  margin: 0;
+  font-size: 12.5px;
+  color: #334155;
+  line-height: 1.5;
+  background: #ffffff;
+  border: 1px solid #f3e8ff;
+  border-radius: 6px;
+  padding: 8px 11px;
+  word-break: break-word;
+}
+
+.transfer-count-pill {
+  font-size: 11px;
+  color: #7c3aed;
+  font-weight: 600;
+  background: #ede9fe;
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-left: 6px;
+}
+
+/* =========================================
+   TRANSFER TICKET SECTION
+========================================= */
+
+.ticket-log-transfer-card {
+  margin: 12px 22px 0;
+  background: #ffffff;
+  border: 1px solid #e0e7ff;
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 4px rgba(79, 70, 229, 0.05);
+}
+
+.ticket-log-transfer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.ticket-log-transfer-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ticket-log-transfer-icon-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: #eef2ff;
+  color: #4f46e5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ticket-log-transfer-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e1b4b;
+}
+
+.ticket-log-transfer-subtitle {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.ticket-log-current-assignee-pill {
+  font-size: 11.5px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  padding: 3px 9px;
+  border-radius: 6px;
+  color: #334155;
+}
+
+.ticket-log-current-assignee-pill strong {
+  color: #4f46e5;
+}
+
+.ticket-log-transfer-alert {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+
+.ticket-log-transfer-alert.success {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.ticket-log-transfer-alert.error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.ticket-log-transfer-row {
+  display: grid;
+  grid-template-columns: 200px 1fr auto;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.ticket-log-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ticket-log-field-group label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.ticket-log-field-group .req {
+  color: #ef4444;
+}
+
+.ticket-log-select {
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12.5px;
+  background-color: #ffffff;
+  color: #1e293b;
+  outline: none;
+  transition: all 0.15s ease;
+  height: 38px;
+}
+
+.ticket-log-select:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+.ticket-log-textarea {
+  padding: 7px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #1e293b;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 38px;
+  max-height: 100px;
+  outline: none;
+  transition: all 0.15s ease;
+  line-height: 1.4;
+}
+
+.ticket-log-textarea:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+.ticket-log-transfer-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #4f46e5;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 0 16px;
+  height: 38px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.ticket-log-transfer-btn:hover:not(:disabled) {
+  background: #4338ca;
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+}
+
+.ticket-log-transfer-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.ticket-log-spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: logSpin 0.7s linear infinite;
+  display: inline-block;
+}
+
+@keyframes logSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Timeline Transfer Callout Box */
+.ticket-log-transfer-callout {
+  margin-top: 10px;
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  border-left: 3px solid #7c3aed;
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.transfer-callout-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.transfer-callout-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6d28d9;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.transfer-callout-route {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.transfer-callout-desc {
+  margin: 0;
+  font-size: 12px;
+  color: #334155;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ticket-log-action-badge.badge-transferred {
+  background: #f3e8ff;
+  color: #7e22ce;
+  border-color: #d8b4fe;
+}
+
 /* Responsive */
 @media (max-width: 640px) {
+  .ticket-log-transfer-row {
+    grid-template-columns: 1fr;
+  }
+  .ticket-log-transfer-btn {
+    width: 100%;
+  }
   .ticket-log-state-grid {
     grid-template-columns: repeat(2, 1fr);
   }

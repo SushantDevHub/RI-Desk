@@ -196,6 +196,70 @@
   margin-bottom: 14px;
 }
 
+/* ── Client Stat Filter Header (Same as Dashboard selectedStat view) ── */
+.client-stat-filter-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: linear-gradient(90deg, #f8fafc 0%, #ffffff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.client-stat-filter-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.client-stat-filter-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.client-stat-filter-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.client-stat-filter-pill {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 9999px;
+  line-height: 1.4;
+}
+
+.client-stat-filter-sub {
+  font-size: 12.5px;
+  color: #64748b;
+}
+
+.client-stat-filter-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.client-stat-filter-reset-btn:hover {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #93c5fd;
+}
+
 .client-clear-card-filter-btn {
   background: #ffffff;
   color: #4f46e5;
@@ -376,7 +440,7 @@
   font-family: 'IBM Plex Mono', monospace;
   font-size: 11.5px;
   font-weight: 600;
-  color: #64748b;
+  color: #0f172a;
   white-space: nowrap;
 }
 

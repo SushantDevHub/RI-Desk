@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import {
@@ -19,12 +19,24 @@ import ExtrasPage from './ExtrasPage.jsx';
 import { getActiveAnnouncements } from '../api/announcementApi.js';
 import ContactClientDialog from '../components/ContactClientDialog.jsx';
 import TicketLogsDialog from '../components/TicketLogsDialog.jsx';
+import TransferTicketDialog from '../components/TransferTicketDialog.jsx';
+import AskAdminDialog from '../components/AskAdminDialog.jsx';
+import AskEmployeeDialog from '../components/AskEmployeeDialog.jsx';
 import './TicketManagementPage.css';
 import './DashboardPage.css';
 
 /* ─────────────────────────────────────────────
    Helpers
 ───────────────────────────────────────────── */
+
+async function safeReadJson(res) {
+  const text = await res.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return { error: text && !text.includes('<!DOCTYPE') ? text : `Request failed (${res.status})` };
+  }
+}
 
 function initials(name = '') {
   return name
@@ -33,6 +45,24 @@ function initials(name = '') {
     .slice(0, 2)
     .join('')
     .toUpperCase();
+}
+
+function formatNotifTime(isoString) {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return '';
+  const now = new Date();
+  const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (diffSec < 45) return 'Just now';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+  if (diffSec < 172800) return 'Yesterday';
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function EyeIcon({ visible }) {
@@ -69,6 +99,29 @@ function EyeIcon({ visible }) {
     >
       <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
       <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  );
+}
+
+function TransferNotificationLogo({ size = 21, className = 'db-notif-icon' }) {
+  return (
+    <svg
+      className={className}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.95"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="2.2" r="1.1" />
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+      <path d="M8.5 8.5h6l-1.8-1.8" strokeWidth="1.8" />
+      <path d="M15.5 11.8h-6l1.8 1.8" strokeWidth="1.8" />
     </svg>
   );
 }
@@ -269,6 +322,9 @@ export default function DashboardPage({
   user,
   onLogout,
 }) {
+  const isAdmin = user?.role === 'admin';
+  const isEmployee = user?.role === 'employee';
+
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -400,6 +456,9 @@ export default function DashboardPage({
   const [liveAnnouncements, setLiveAnnouncements] = useState([]);
   const [dismissedAnnouncements, setDismissedAnnouncements] = useState([]);
   const [viewingLogsTicket, setViewingLogsTicket] = useState(null);
+  const [transferringTicket, setTransferringTicket] = useState(null);
+  const [askAdminTicket, setAskAdminTicket] = useState(null);
+  const [askEmployeeTicket, setAskEmployeeTicket] = useState(null);
   const [selectedStat, setSelectedStat] = useState(null);
 
   const [editingTicket, setEditingTicket] = useState(null);
@@ -409,6 +468,154 @@ export default function DashboardPage({
   const [ticketToDelete, setTicketToDelete] = useState(null);
   const [deletingTicket, setDeletingTicket] = useState(false);
   const [deleteActionError, setDeleteActionError] = useState('');
+
+  /* ── Notifications state (topbar notification logo with count) ── */
+  const [notifications, setNotifications] = useState([]);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [notifMenuOpen, setNotifMenuOpen] = useState(false);
+  const notifDropdownRef = useRef(null);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const token = getToken();
+      if (!token) return;
+      const res = await fetch('http://localhost:4000/api/notifications', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!res.ok) return;
+      const data = await safeReadJson(res);
+      if (data && Array.isArray(data.notifications)) {
+        setNotifications(data.notifications);
+        setUnreadNotifCount(
+          typeof data.unreadCount === 'number' ? data.unreadCount : 0
+        );
+      }
+    } catch (err) {
+      console.error('Fetch notifications error:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user && !isAdmin) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 8000);
+
+      const handleNotifUpdate = () => {
+        fetchNotifications();
+      };
+      const handleStorage = (e) => {
+        if (e.key === 'ri_desk_notif_sync') {
+          fetchNotifications();
+        }
+      };
+
+      window.addEventListener('notifications-updated', handleNotifUpdate);
+      window.addEventListener('tickets-updated', handleNotifUpdate);
+      window.addEventListener('storage', handleStorage);
+
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('notifications-updated', handleNotifUpdate);
+        window.removeEventListener('tickets-updated', handleNotifUpdate);
+        window.removeEventListener('storage', handleStorage);
+      };
+    }
+  }, [user, isAdmin, fetchNotifications]);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        notifDropdownRef.current &&
+        !notifDropdownRef.current.contains(event.target)
+      ) {
+        setNotifMenuOpen(false);
+      }
+    }
+    if (notifMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [notifMenuOpen]);
+
+  async function handleMarkNotifRead(notifId, e) {
+    if (e) {
+      e.stopPropagation();
+    }
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notifId ? { ...n, read: true } : n))
+    );
+    setUnreadNotifCount((prev) => Math.max(0, prev - 1));
+
+    try {
+      const token = getToken();
+      if (!token) return;
+      await fetch(`http://localhost:4000/api/notifications/${notifId}/read`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    } catch (err) {
+      console.error('Mark notification read error:', err);
+    }
+  }
+
+  async function handleMarkAllNotifsRead() {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setUnreadNotifCount(0);
+
+    try {
+      const token = getToken();
+      if (!token) return;
+      await fetch('http://localhost:4000/api/notifications/mark-all-read', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    } catch (err) {
+      console.error('Mark all read error:', err);
+    }
+  }
+
+  async function handleNotificationClick(notif) {
+    if (!notif.read) {
+      handleMarkNotifRead(notif.id);
+    }
+    setNotifMenuOpen(false);
+
+    let targetTicket = tickets.find(
+      (t) => String(t.id) === String(notif.ticketId)
+    );
+
+    try {
+      const token = getToken();
+      if (token) {
+        const res = await fetch(
+          `http://localhost:4000/api/tickets/${notif.ticketId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        if (res.ok) {
+          const data = await safeReadJson(res);
+          if (data && data.ticket) {
+            targetTicket = data.ticket;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Fetch ticket details error:', err);
+    }
+
+    if (targetTicket) {
+      setViewingLogsTicket(targetTicket);
+    }
+  }
 
   /* ── Load real-time active announcements ── */
   useEffect(() => {
@@ -430,11 +637,6 @@ export default function DashboardPage({
       clearInterval(interval);
     };
   }, []);
-
-  /* ── Role ── */
-
-  const isAdmin = user?.role === 'admin';
-  const isEmployee = user?.role === 'employee';
 
   /* ── Auto-dismiss notice ── */
 
@@ -768,7 +970,7 @@ export default function DashboardPage({
         }
       );
 
-      const data = await res.json();
+      const data = await safeReadJson(res);
       if (!res.ok) {
         throw new Error(data.error || `Failed to update ${field}.`);
       }
@@ -928,7 +1130,7 @@ export default function DashboardPage({
         }
       );
 
-      const data = await response.json();
+      const data = await safeReadJson(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to update ticket.');
       }
@@ -985,7 +1187,7 @@ export default function DashboardPage({
         }
       );
 
-      const data = await response.json();
+      const data = await safeReadJson(response);
       if (!response.ok) {
         throw new Error(data.error || 'Failed to delete ticket.');
       }
@@ -1400,35 +1602,78 @@ export default function DashboardPage({
 
                   <td className="ticket-actions-cell" style={{ textAlign: 'center' }}>
                     <div className="ticket-row-actions" style={{ justifyContent: 'center' }}>
-                      <button
-                        type="button"
-                        className="ticket-icon-button ticket-log-icon"
-                        title="View Log Details (Priority, Status, Assignment history)"
-                        aria-label={`View log details for ticket ${ticket.id}`}
-                        onClick={() => setViewingLogsTicket(ticket)}
-                      >
-                        <TicketIcon type="log" />
-                      </button>
+                      {/* Column 1: L & I */}
+                      <div className="ticket-action-col">
+                        <button
+                          type="button"
+                          className="ticket-icon-button ticket-log-icon"
+                          title="View Transfer History"
+                          aria-label={`View transfer history for ticket ${ticket.id}`}
+                          onClick={() => setViewingLogsTicket(ticket)}
+                        >
+                          <TicketIcon type="log" />
+                        </button>
 
-                      <button
-                        type="button"
-                        className="ticket-icon-button ticket-edit-icon"
-                        title="Edit ticket"
-                        aria-label={`Edit ticket ${ticket.id}`}
-                        onClick={() => openEditTicket(ticket)}
-                      >
-                        <TicketIcon type="edit" />
-                      </button>
+                        {!isAdmin ? (
+                          <button
+                            type="button"
+                            className="ticket-icon-button ticket-ask-admin-icon"
+                            title="Ask Admin for Help"
+                            aria-label={`Ask admin for help on ticket ${ticket.id}`}
+                            onClick={() => setAskAdminTicket(ticket)}
+                          >
+                            <TicketIcon type="ask-admin" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="ticket-icon-button ticket-ask-employee-icon"
+                            title="Ask Employee / Query"
+                            aria-label={`Ask employee on ticket ${ticket.id}`}
+                            onClick={() => setAskEmployeeTicket(ticket)}
+                          >
+                            <TicketIcon type="ask-admin" />
+                          </button>
+                        )}
+                      </div>
 
-                      <button
-                        type="button"
-                        className="ticket-icon-button ticket-delete-icon"
-                        title="Delete ticket"
-                        aria-label={`Delete ticket ${ticket.id}`}
-                        onClick={() => openDeleteTicket(ticket)}
-                      >
-                        <TicketIcon type="delete" />
-                      </button>
+                      {/* Column 2: Edit & Delete */}
+                      <div className="ticket-action-col">
+                        <button
+                          type="button"
+                          className="ticket-icon-button ticket-edit-icon"
+                          title="Edit ticket"
+                          aria-label={`Edit ticket ${ticket.id}`}
+                          onClick={() => openEditTicket(ticket)}
+                        >
+                          <TicketIcon type="edit" />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="ticket-icon-button ticket-delete-icon"
+                          title="Delete ticket"
+                          aria-label={`Delete ticket ${ticket.id}`}
+                          onClick={() => openDeleteTicket(ticket)}
+                        >
+                          <TicketIcon type="delete" />
+                        </button>
+                      </div>
+
+                      {/* Column 3: Transfer button */}
+                      {!isAdmin && (
+                        <div className="ticket-action-col ticket-action-col-single">
+                          <button
+                            type="button"
+                            className="ticket-icon-button ticket-transfer-icon"
+                            title="Transfer To"
+                            aria-label={`Transfer ticket ${ticket.id} to another employee`}
+                            onClick={() => setTransferringTicket(ticket)}
+                          >
+                            <TicketIcon type="transfer" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -1503,6 +1748,118 @@ export default function DashboardPage({
   </div>
 </div>
         <div className="db-topbar-right">
+
+          {/* ── Notification Bell Logo with Count (Employee Panel Only) ── */}
+          {!isAdmin && (
+            <div className="db-notif-container" ref={notifDropdownRef}>
+              <button
+                type="button"
+                className={`db-notif-btn ${notifMenuOpen ? 'active' : ''} ${unreadNotifCount > 0 ? 'has-unread' : ''}`}
+                onClick={() => setNotifMenuOpen((prev) => !prev)}
+                aria-label="Transfer Notifications"
+                aria-expanded={notifMenuOpen}
+                title={
+                  unreadNotifCount > 0
+                    ? `${unreadNotifCount} unread transfer notification${unreadNotifCount > 1 ? 's' : ''}`
+                    : 'Transfer Notifications'
+                }
+              >
+                <TransferNotificationLogo size={21} />
+                {unreadNotifCount > 0 && (
+                  <span className="db-notif-badge">
+                    {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
+                  </span>
+                )}
+              </button>
+
+              {notifMenuOpen && (
+                <div className="db-notif-dropdown" role="menu">
+                  <div className="db-notif-header">
+                    <div className="db-notif-header-title">
+                      <TransferNotificationLogo size={17} className="db-notif-header-icon" />
+                      <span>Transfer Notifications</span>
+                      {unreadNotifCount > 0 && (
+                        <span className="db-notif-pill">{unreadNotifCount} new</span>
+                      )}
+                    </div>
+                    {unreadNotifCount > 0 && (
+                      <button
+                        type="button"
+                        className="db-notif-mark-all"
+                        onClick={handleMarkAllNotifsRead}
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="db-notif-list">
+                    {notifications.length === 0 ? (
+                      <div className="db-notif-empty">
+                        <TransferNotificationLogo size={36} className="db-notif-empty-icon" />
+                        <div className="db-notif-empty-title">No notifications yet</div>
+                        <div className="db-notif-empty-desc">
+                          When tickets are transferred to you, they'll appear here.
+                        </div>
+                      </div>
+                    ) : (
+                      notifications.map((notif) => (
+                        <div
+                          key={notif.id}
+                          className={`db-notif-item ${!notif.read ? 'unread' : ''}`}
+                          onClick={() => handleNotificationClick(notif)}
+                          role="menuitem"
+                          tabIndex={0}
+                        >
+                          <div className="db-notif-item-icon">
+                            <TransferNotificationLogo size={16} />
+                          </div>
+                          <div className="db-notif-item-body">
+                            <div className="db-notif-item-title">
+                              <strong>{notif.senderName}</strong> transferred ticket{' '}
+                              <span className="db-notif-ticket-id">
+                                #{notif.ticketNumber || notif.ticketId}
+                              </span>{' '}
+                              to you
+                            </div>
+                            {notif.workLeft && (
+                              <div className="db-notif-item-notes">
+                                <span className="db-notif-notes-label">Work Left:</span>{' '}
+                                <span className="db-notif-notes-text">
+                                  {notif.workLeft}
+                                </span>
+                              </div>
+                            )}
+                            <div className="db-notif-item-footer">
+                              <span className="db-notif-item-time">
+                                {formatNotifTime(notif.createdAt)}
+                              </span>
+                              <span className="db-notif-view-hint">
+                                View ticket log →
+                              </span>
+                            </div>
+                          </div>
+                          {!notif.read && (
+                            <div className="db-notif-unread-indicator">
+                              <span className="db-notif-dot" title="Unread" />
+                              <button
+                                type="button"
+                                className="db-notif-read-btn"
+                                title="Mark as read"
+                                onClick={(e) => handleMarkNotifRead(notif.id, e)}
+                              >
+                                ✓
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="db-user-dropdown-container" ref={userDropdownRef}>
             <button
@@ -1595,18 +1952,52 @@ export default function DashboardPage({
                       <polyline points="9 18 15 12 9 6" />
                     </svg>
                   </button>
+
+                  <button
+                    type="button"
+                    className="db-dropdown-item db-dropdown-item-logout"
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      setShowLogoutDialog(true);
+                    }}
+                  >
+                    <div className="db-dropdown-item-left">
+                      <svg
+                        width="15"
+                        height="15"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <polyline points="16 17 21 12 16 7" />
+                        <line x1="21" y1="12" x2="9" y2="12" />
+                      </svg>
+                      <span>Log Out</span>
+                    </div>
+                    <svg
+                      className="db-dropdown-item-arrow"
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             )}
           </div>
-
-          <button
-            type="button"
-            className="db-logout-btn"
-            onClick={() => setShowLogoutDialog(true)}
-          >
-            Log out
-          </button>
 
         </div>
 
@@ -1929,14 +2320,7 @@ export default function DashboardPage({
                   marginBottom: 12,
                 }}
               >
-                <div>
-                  <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                    {selectedStat ? 'Filtered Tickets' : 'Tickets Overview'}
-                  </h2>
-                  <span style={{ fontSize: 13, color: '#64748b', display: 'block', marginTop: 2 }}>
-                    
-                  </span>
-                </div>
+               
 
                 <button
                   type="button"
@@ -2155,6 +2539,40 @@ export default function DashboardPage({
       )}
 
       {/* ═══════════════════════════════════════
+          TRANSFER TICKET POP-UP DIALOG (EMPLOYEE)
+      ═══════════════════════════════════════ */}
+      {transferringTicket && (
+        <TransferTicketDialog
+          ticket={transferringTicket}
+          currentUser={user}
+          onClose={() => setTransferringTicket(null)}
+        />
+      )}
+
+      {/* ═══════════════════════════════════════
+          ASK ADMIN FOR HELP POP-UP DIALOG (EMPLOYEE)
+      ═══════════════════════════════════════ */}
+      {askAdminTicket && (
+        <AskAdminDialog
+          ticket={askAdminTicket}
+          currentUser={user}
+          onClose={() => setAskAdminTicket(null)}
+        />
+      )}
+
+      {/* ═══════════════════════════════════════
+          ASK EMPLOYEE POP-UP DIALOG (ADMIN)
+      ═══════════════════════════════════════ */}
+      {askEmployeeTicket && (
+        <AskEmployeeDialog
+          ticket={askEmployeeTicket}
+          employees={employees}
+          currentUser={user}
+          onClose={() => setAskEmployeeTicket(null)}
+        />
+      )}
+
+      {/* ═══════════════════════════════════════
           EDIT TICKET POP-UP DIALOG
       ═══════════════════════════════════════ */}
       {editingTicket && (
@@ -2239,8 +2657,7 @@ export default function DashboardPage({
 
             <p>
               Are you sure you want to delete ticket{' '}
-              <strong>#{ticketToDelete.id}</strong>
-              {ticketToDelete.subject ? ` — "${ticketToDelete.subject}"` : ''}?{' '}
+              <strong>#{ticketToDelete.id}</strong>?{' '}
               This action cannot be undone.
             </p>
 

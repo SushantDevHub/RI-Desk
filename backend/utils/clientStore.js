@@ -86,7 +86,7 @@ export function syncClientsWithTickets() {
 
     group.tickets.push({
       id: ticket.id,
-      subject: ticket.subject || 'No Subject',
+      subject: ticket.subject || '',
       category: cat ? cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase() : 'General',
       priority: ticket.priority || 'medium',
       status: ticket.status || 'open',

@@ -1,0 +1,468 @@
+/* ─────────────────────────────────────────────
+   ASK EMPLOYEE QUERY DIALOG (ADMIN PANEL)
+───────────────────────────────────────────── */
+
+.ask-emp-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(4px);
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: askEmpFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes askEmpFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ask-emp-dialog {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 530px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.22), 0 4px 12px rgba(15, 23, 42, 0.08);
+  border: 1px solid #e2e8f0;
+  animation: askEmpScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes askEmpScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.ask-emp-dialog-header {
+  padding: 18px 20px 14px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ask-emp-header-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ask-emp-header-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #059669;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ask-emp-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.ask-emp-subtitle {
+  font-size: 12px;
+  color: #64748b;
+  margin: 3px 0 0 0;
+  line-height: 1.35;
+}
+
+.ask-emp-dialog-close {
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.ask-emp-dialog-close:hover {
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+.ask-emp-body {
+  padding: 18px 20px 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Form field */
+.ask-emp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ask-emp-field-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ask-emp-field-label .req {
+  color: #dc2626;
+}
+
+.ask-emp-field-label .opt {
+  color: #94a3b8;
+  font-weight: 400;
+  font-size: 11.5px;
+}
+
+.ask-emp-select {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #0f172a;
+  background: #ffffff;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.ask-emp-select:focus {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
+}
+
+/* Pre-loaded Recipient Card */
+.ask-emp-recipient-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.ask-emp-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #059669;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ask-emp-recipient-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ask-emp-recipient-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ask-emp-role-badge {
+  font-size: 10px;
+  font-weight: 700;
+  background: #dcfce7;
+  color: #166534;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.ask-emp-assigned-badge {
+  font-size: 10px;
+  font-weight: 700;
+  background: #fef3c7;
+  color: #92400e;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.ask-emp-recipient-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.ask-emp-profile-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  border: 1px solid transparent;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.ask-emp-profile-btn svg {
+  flex-shrink: 0;
+}
+
+.ask-emp-profile-btn.btn-wa-pill {
+  background: #ffffff;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.ask-emp-profile-btn.btn-wa-pill:hover {
+  background: #16a34a;
+  color: #ffffff;
+  border-color: #16a34a;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(22, 163, 74, 0.28);
+}
+
+.ask-emp-profile-btn.btn-email-pill {
+  background: #ffffff;
+  color: #0369a1;
+  border: 1px solid #7dd3fc;
+}
+
+.ask-emp-profile-btn.btn-email-pill:hover {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #0284c7;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.28);
+}
+
+.ask-emp-pill-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.ask-emp-pill-badge.wa {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.ask-emp-profile-btn.btn-wa-pill:hover .ask-emp-pill-badge.wa {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.ask-emp-pill-badge.email {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.ask-emp-profile-btn.btn-email-pill:hover .ask-emp-pill-badge.email {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+/* Summary Card */
+.ask-emp-summary-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #059669;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ask-emp-summary-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ask-emp-ticket-id {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #059669;
+}
+
+.ask-emp-badge {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  letter-spacing: 0.02em;
+}
+
+.ask-emp-badge.status {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.ask-emp-badge.category {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.ask-emp-badge.priority-high {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.ask-emp-badge.priority-medium {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.ask-emp-badge.priority-low {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+/* Client Box */
+.ask-emp-client-box {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 10px;
+  background: #ffffff;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
+  font-size: 12px;
+}
+
+.ask-emp-client-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #334155;
+}
+
+.ask-emp-lbl {
+  color: #64748b;
+  font-size: 11.5px;
+  min-width: 95px;
+}
+
+.ask-emp-desc-box {
+  font-size: 12px;
+  color: #334155;
+  background: #ffffff;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
+  padding: 7px 10px;
+  line-height: 1.4;
+}
+
+.ask-emp-desc-lbl {
+  font-weight: 600;
+  color: #64748b;
+  margin-right: 6px;
+}
+
+.ask-emp-work-left-box {
+  background: #fffbeb;
+  border: 1px solid #fef3c7;
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-size: 12px;
+  color: #92400e;
+  line-height: 1.4;
+}
+
+.ask-emp-notes-lbl {
+  font-weight: 700;
+  margin-right: 6px;
+}
+
+/* Textarea */
+.ask-emp-textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #0f172a;
+  background: #ffffff;
+  resize: vertical;
+  min-height: 72px;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.ask-emp-textarea:focus {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
+}
+
+
+/* Footer */
+.ask-emp-footer {
+  padding: 12px 20px 16px 20px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ask-emp-close-btn {
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  background: #4338ca;
+  color: #ffffff;
+  border: 1px solid #cbd5e1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ask-emp-close-btn:hover {
+  background: #382dad;
+  color: #ffffff;
+}

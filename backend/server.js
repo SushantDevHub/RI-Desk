@@ -7,6 +7,7 @@ import usersRoutes from './routes/users.js';
 import designationsRoutes from './routes/designations.js';
 import clientsRoutes from './routes/clients.js';
 import announcementsRoutes from './routes/announcements.js';
+import notificationsRoutes from './routes/notifications.js';
 
  
 const app = express();
@@ -20,6 +21,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/designations', designationsRoutes);
 app.use('/api/clients', clientsRoutes);
 app.use('/api/announcements', announcementsRoutes);
+app.use('/api/notifications', notificationsRoutes);
 
 app.listen(PORT, () => {
   console.log(`Auth API (JWT) listening on http://localhost:${PORT}`);
