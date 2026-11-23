@@ -200,7 +200,17 @@ export function syncClientsWithTickets() {
 }
 
 export function getAllClients() {
-  return syncClientsWithTickets();
+  const clients = syncClientsWithTickets();
+  return clients.slice().sort((a, b) => {
+    const timeA = new Date(a.createdAt || 0).getTime();
+    const timeB = new Date(b.createdAt || 0).getTime();
+    if (!isNaN(timeA) && !isNaN(timeB) && timeB !== timeA) {
+      return timeB - timeA;
+    }
+    return String(b.id || '').localeCompare(String(a.id || ''), undefined, {
+      numeric: true,
+    });
+  });
 }
 
 export function saveAllClients(items) {

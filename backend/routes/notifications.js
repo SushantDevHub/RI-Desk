@@ -6,6 +6,9 @@ import {
   markNotificationRead,
   markAllNotificationsRead,
   deleteNotification,
+  sendMobileNotification,
+  getMobileNotificationsHistory,
+  deleteMobileNotification,
 } from '../utils/notificationStore.js';
 
 const router = express.Router();
@@ -30,8 +33,9 @@ function authenticate(req, res, next) {
 router.get('/', authenticate, (req, res) => {
   try {
     const userId = req.user.id;
-    const notifications = getNotificationsForUser(userId);
-    const unreadCount = getUnreadCountForUser(userId);
+    const userRole = req.user.role || 'employee';
+    const notifications = getNotificationsForUser(userId, userRole);
+    const unreadCount = getUnreadCountForUser(userId, userRole);
 
     return res.json({
       notifications,
@@ -43,10 +47,98 @@ router.get('/', authenticate, (req, res) => {
   }
 });
 
+// POST /api/notifications/send-mobile - Dispatch mobile push notification
+router.post('/send-mobile', authenticate, (req, res) => {
+  try {
+    const {
+      target = 'All Users',
+      targetId = null,
+      targetName = null,
+      title = '',
+      message = '',
+      priority = 'Normal',
+      ticketId = null,
+      ticketNumber = null,
+    } = req.body;
+
+    if (!message || !String(message).trim()) {
+      return res.status(400).json({ error: 'Notification message is required.' });
+    }
+
+    const senderId = req.user.id;
+    const senderName = req.user.name || 'Admin User';
+    const senderRole = req.user.role || 'admin';
+
+    const result = sendMobileNotification({
+      target,
+      targetId,
+      targetName,
+      title,
+      message,
+      priority,
+      senderId,
+      senderName,
+      senderRole,
+      ticketId,
+      ticketNumber,
+    });
+
+    const history = getMobileNotificationsHistory();
+
+    return res.json({
+      success: true,
+      message: `Mobile push notification dispatched successfully to ${target}!`,
+      notification: result.broadcast,
+      inAppNotification: result.inAppNotification,
+      history,
+    });
+  } catch (error) {
+    console.error('Send mobile notification error:', error);
+    return res.status(500).json({
+      error: error.message || 'Failed to dispatch mobile notification.',
+    });
+  }
+});
+
+// GET /api/notifications/mobile-history - Fetch mobile notifications dispatch history
+router.get('/mobile-history', authenticate, (req, res) => {
+  try {
+    const history = getMobileNotificationsHistory();
+    return res.json({
+      success: true,
+      history,
+    });
+  } catch (error) {
+    console.error('Fetch mobile history error:', error);
+    return res.status(500).json({ error: 'Failed to load dispatch history.' });
+  }
+});
+
+// DELETE /api/notifications/mobile-history/:id - Delete an entry from dispatch history
+router.delete('/mobile-history/:id', authenticate, (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = deleteMobileNotification(id);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Notification entry not found.' });
+    }
+    const history = getMobileNotificationsHistory();
+    return res.json({
+      success: true,
+      message: 'Notification removed from dispatch history.',
+      history,
+    });
+  } catch (error) {
+    console.error('Delete mobile history error:', error);
+    return res.status(500).json({ error: 'Failed to delete history item.' });
+  }
+});
+
 // PATCH /api/notifications/:id/read - Mark single notification as read
 router.patch('/:id/read', authenticate, (req, res) => {
   try {
     const userId = req.user.id;
+    const userRole = req.user.role || 'employee';
     const notificationId = req.params.id;
 
     const updated = markNotificationRead(notificationId, userId);
@@ -54,7 +146,7 @@ router.patch('/:id/read', authenticate, (req, res) => {
       return res.status(404).json({ error: 'Notification not found.' });
     }
 
-    const unreadCount = getUnreadCountForUser(userId);
+    const unreadCount = getUnreadCountForUser(userId, userRole);
     return res.json({
       success: true,
       notification: updated,
@@ -70,7 +162,8 @@ router.patch('/:id/read', authenticate, (req, res) => {
 router.post('/mark-all-read', authenticate, (req, res) => {
   try {
     const userId = req.user.id;
-    const count = markAllNotificationsRead(userId);
+    const userRole = req.user.role || 'employee';
+    const count = markAllNotificationsRead(userId, userRole);
 
     return res.json({
       success: true,
@@ -87,6 +180,7 @@ router.post('/mark-all-read', authenticate, (req, res) => {
 router.delete('/:id', authenticate, (req, res) => {
   try {
     const userId = req.user.id;
+    const userRole = req.user.role || 'employee';
     const notificationId = req.params.id;
 
     const deleted = deleteNotification(notificationId, userId);
@@ -94,7 +188,7 @@ router.delete('/:id', authenticate, (req, res) => {
       return res.status(404).json({ error: 'Notification not found.' });
     }
 
-    const unreadCount = getUnreadCountForUser(userId);
+    const unreadCount = getUnreadCountForUser(userId, userRole);
     return res.json({
       success: true,
       unreadCount,

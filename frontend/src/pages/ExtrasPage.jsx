@@ -1,10 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { getToken } from '../api/authApi.js';
 import {
   getAllAnnouncementsAdmin,
   createAnnouncement,
   toggleAnnouncementStatus,
   deleteAnnouncement,
 } from '../api/announcementApi.js';
+import {
+  sendMobileNotification,
+  getMobileNotificationsHistory,
+  deleteMobileNotificationHistory,
+} from '../api/notificationApi.js';
 import './ExtrasPage.css';
 import './DashboardPage.css';
 
@@ -276,53 +282,212 @@ export default function ExtrasPage({
     }
   };
 
-  // Notification State (starts empty, zero dummy data)
+  // Notification State & Directory (Connected to backend)
   const [notifTarget, setNotifTarget] = useState('All Users');
+  const [selectedClientId, setSelectedClientId] = useState('');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [notifTitle, setNotifTitle] = useState('');
   const [notifBody, setNotifBody] = useState('');
   const [notifPriority, setNotifPriority] = useState('Normal');
   const [notifLogs, setNotifLogs] = useState([]);
+  const [loadingNotifs, setLoadingNotifs] = useState(false);
+  const [sendingNotif, setSendingNotif] = useState(false);
+  const [clientsList, setClientsList] = useState([]);
+  const [employeesList, setEmployeesList] = useState([]);
+  const [devicePermission, setDevicePermission] = useState(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
+  );
 
-  // SMS State (starts empty, zero dummy data)
-  const [smsPhone, setSmsPhone] = useState('');
-  const [smsTemplate, setSmsTemplate] = useState('General Alert');
-  const [smsMessage, setSmsMessage] = useState('');
-  const [smsLogs, setSmsLogs] = useState([]);
+  // Fetch mobile notifications dispatch history
+  const loadNotificationsHistory = useCallback(async () => {
+    try {
+      setLoadingNotifs(true);
+      const data = await getMobileNotificationsHistory();
+      setNotifLogs(data);
+    } catch (err) {
+      console.error('Failed to load mobile notifications history:', err);
+    } finally {
+      setLoadingNotifs(false);
+    }
+  }, []);
 
-  // WhatsApp State (starts empty, zero dummy data)
-  const [waPhone, setWaPhone] = useState('');
-  const [waTemplate, setWaTemplate] = useState('Ticket Update');
-  const [waMessage, setWaMessage] = useState('');
-  const [waLogs, setWaLogs] = useState([]);
+  // Fetch directory (clients and employees) for flexible targeting
+  useEffect(() => {
+    async function loadDirectory() {
+      try {
+        const token = getToken();
+        if (!token) return;
 
-  // Email State (starts empty, zero dummy data)
-  const [emailTo, setEmailTo] = useState('');
-  const [emailSubject, setEmailSubject] = useState('');
-  const [emailBody, setEmailBody] = useState('');
-  const [emailLogs, setEmailLogs] = useState([]);
+        // Fetch clients
+        const clientRes = await fetch('http://localhost:4000/api/clients', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (clientRes.ok) {
+          const cData = await clientRes.json();
+          if (Array.isArray(cData.clients)) {
+            setClientsList(cData.clients);
+          }
+        }
 
-  const handleSendNotification = (e) => {
+        // Fetch employees
+        const empRes = await fetch('http://localhost:4000/api/tickets/employees', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (empRes.ok) {
+          const eData = await empRes.json();
+          if (Array.isArray(eData.employees)) {
+            setEmployeesList(eData.employees);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load clients/employees directory:', err);
+      }
+    }
+
+    loadDirectory();
+    loadNotificationsHistory();
+  }, [loadNotificationsHistory]);
+
+  const requestDevicePermission = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      try {
+        const perm = await Notification.requestPermission();
+        setDevicePermission(perm);
+        if (perm === 'granted') {
+          showSuccess('Device notifications enabled successfully!');
+        }
+      } catch (err) {
+        console.error('Notification permission error:', err);
+      }
+    }
+  };
+
+  const handleSendNotification = async (e) => {
     if (e) e.preventDefault();
     const trimmed = notifBody.trim();
-    if (!trimmed) return;
-    const entry = {
-      id: Date.now(),
-      title: notifTitle.trim() || (trimmed.length > 50 ? trimmed.slice(0, 50) + '...' : trimmed),
-      message: trimmed,
-      target: notifTarget,
-      time: 'Just now',
-      status: 'Delivered',
-    };
-    setNotifLogs([entry, ...notifLogs]);
-    setNotifTitle('');
-    setNotifBody('');
-    showSuccess(`Mobile push notification dispatched to ${notifTarget}!`);
+    if (!trimmed) {
+      setErrorMessage('Notification message is required.');
+      return;
+    }
+
+    let target = notifTarget;
+    let targetId = null;
+    let targetName = null;
+
+    if (notifTarget === 'Clients') {
+      if (selectedClientId) {
+        const c = clientsList.find((item) => String(item.id) === String(selectedClientId));
+        targetId = selectedClientId;
+        targetName = c
+          ? `${c.name || c.companyName || 'Client'} (${c.mobileNumber || ''})`
+          : `Client #${selectedClientId}`;
+      } else {
+        targetName = `All Clients (${clientsList.length})`;
+      }
+    } else if (notifTarget === 'Employees') {
+      if (selectedEmployeeId) {
+        const emp = employeesList.find((item) => String(item.id) === String(selectedEmployeeId));
+        targetId = selectedEmployeeId;
+        targetName = emp
+          ? `${emp.name} (${emp.designation || 'Employee'})`
+          : `Employee #${selectedEmployeeId}`;
+      } else {
+        targetName = `All Employees (${employeesList.length})`;
+      }
+    } else {
+      target = 'All Users';
+      targetName = `All Users (${employeesList.length} Employees & ${clientsList.length} Clients)`;
+    }
+
+    setSendingNotif(true);
+    setErrorMessage('');
+
+    try {
+      const res = await sendMobileNotification({
+        target,
+        targetId,
+        targetName,
+        title: notifTitle.trim(),
+        message: trimmed,
+        priority: notifPriority,
+      });
+
+      if (res && res.history) {
+        setNotifLogs(res.history);
+      } else if (res && res.notification) {
+        setNotifLogs((prev) => [res.notification, ...prev]);
+      }
+
+      setNotifTitle('');
+      setNotifBody('');
+      showSuccess(res.message || `Mobile push notification dispatched to ${targetName || target}!`);
+
+      // Trigger cross-window and in-app badge update
+      window.dispatchEvent(new CustomEvent('notifications-updated'));
+      localStorage.setItem('ri_desk_notif_sync', Date.now().toString());
+
+      // Trigger native device push notification if permission granted
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification(notifTitle.trim() || 'RI-Desk Mobile Notification', {
+            body: trimmed,
+            icon: '/favicon.ico',
+          });
+        } catch (err) {
+          console.warn('Native notification error:', err);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to dispatch notification:', err);
+      setErrorMessage(err.message || 'Failed to dispatch mobile notification.');
+    } finally {
+      setSendingNotif(false);
+    }
   };
 
   const handleResetNotification = () => {
     setNotifTarget('All Users');
+    setSelectedClientId('');
+    setSelectedEmployeeId('');
     setNotifTitle('');
     setNotifBody('');
+    setNotifPriority('Normal');
+  };
+
+  const handleDeleteNotificationLog = async (id, e) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm('Delete this entry from mobile dispatch history?')) return;
+    try {
+      const res = await deleteMobileNotificationHistory(id);
+      if (res && res.history) {
+        setNotifLogs(res.history);
+      } else {
+        setNotifLogs((prev) => prev.filter((item) => String(item.id) !== String(id)));
+      }
+      showSuccess('Notification entry deleted from history.');
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to delete notification history item.');
+    }
+  };
+
+  const handleResendNotification = (log) => {
+    if (!log) return;
+    setNotifTarget(log.target || 'All Users');
+    if (log.target === 'Clients' && log.targetId) {
+      setSelectedClientId(String(log.targetId));
+    } else {
+      setSelectedClientId('');
+    }
+    if (log.target === 'Employees' && log.targetId) {
+      setSelectedEmployeeId(String(log.targetId));
+    } else {
+      setSelectedEmployeeId('');
+    }
+    setNotifTitle(log.title || '');
+    setNotifBody(log.message || '');
+    setNotifPriority(log.priority || 'Normal');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showSuccess(`Loaded notification details from history. Ready to resend.`);
   };
 
   const handleSendSMS = (e) => {
@@ -641,10 +806,28 @@ export default function ExtrasPage({
           <div className="extras-screenshot-container">
             <h1 className="extras-screenshot-title">Send Mobile Notification</h1>
 
+            {/* Optional Device Notification Permission Banner */}
+            {devicePermission !== 'granted' && typeof window !== 'undefined' && 'Notification' in window && (
+              <div className="extras-device-push-banner">
+                <div className="extras-device-push-text">
+                  <span>🔔</span>
+                  <span>Enable device alerts to receive instant push banners on this device</span>
+                </div>
+                <button
+                  type="button"
+                  className="extras-device-push-btn"
+                  onClick={requestDevicePermission}
+                >
+                  Enable Alerts
+                </button>
+              </div>
+            )}
+
             <form onSubmit={handleSendNotification}>
               <div className="extras-screenshot-card">
                 <h2 className="extras-screenshot-subtitle">Notification's Details</h2>
 
+                {/* Usertype / Target Group */}
                 <div className="extras-screenshot-field">
                   <label className="extras-screenshot-label">
                     Usertype <span className="extras-req-star">*</span>
@@ -652,22 +835,117 @@ export default function ExtrasPage({
                   <select
                     className="extras-screenshot-select"
                     value={notifTarget}
-                    onChange={(e) => setNotifTarget(e.target.value)}
+                    onChange={(e) => {
+                      setNotifTarget(e.target.value);
+                      setSelectedClientId('');
+                      setSelectedEmployeeId('');
+                    }}
                     required
                   >
-                    <option value="All Users">All Users</option>
+                    <option value="All Users">All Users (Clients & Employees)</option>
                     <option value="Clients">Clients</option>
                     <option value="Employees">Employees</option>
                   </select>
                 </div>
 
+                {/* Specific Client Selector when Clients is chosen */}
+                {notifTarget === 'Clients' && (
+                  <div className="extras-screenshot-field">
+                    <label className="extras-screenshot-label">
+                      Select Client Target
+                    </label>
+                    <select
+                      className="extras-screenshot-select"
+                      value={selectedClientId}
+                      onChange={(e) => setSelectedClientId(e.target.value)}
+                    >
+                      <option value="">All Clients ({clientsList.length})</option>
+                      {clientsList.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name || c.companyName || 'Client'} {c.mobileNumber ? `• ${c.mobileNumber}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Specific Employee Selector when Employees is chosen */}
+                {notifTarget === 'Employees' && (
+                  <div className="extras-screenshot-field">
+                    <label className="extras-screenshot-label">
+                      Select Employee Target
+                    </label>
+                    <select
+                      className="extras-screenshot-select"
+                      value={selectedEmployeeId}
+                      onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                    >
+                      <option value="">All Employees ({employeesList.length})</option>
+                      {employeesList.map((emp) => (
+                        <option key={emp.id} value={emp.id}>
+                          {emp.name} {emp.designation ? `(${emp.designation})` : ''} {emp.mobileNumber ? `• ${emp.mobileNumber}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Audience Summary Hint */}
+                <div className="extras-notif-audience-hint">
+                  <span>📱</span>
+                  <span>
+                    {notifTarget === 'All Users'
+                      ? `Pushing to all active devices: ${clientsList.length} Clients & ${employeesList.length} Employees`
+                      : notifTarget === 'Clients'
+                      ? selectedClientId
+                        ? `Targeting specific client mobile: ${
+                            clientsList.find((c) => String(c.id) === String(selectedClientId))?.name || 'Selected Client'
+                          }`
+                        : `Targeting all ${clientsList.length} registered clients`
+                      : selectedEmployeeId
+                      ? `Targeting specific employee mobile: ${
+                          employeesList.find((e) => String(e.id) === String(selectedEmployeeId))?.name || 'Selected Employee'
+                        }`
+                      : `Targeting all ${employeesList.length} active employees`}
+                  </span>
+                </div>
+
+                {/* Notification Title (Optional) */}
+                <div className="extras-screenshot-field">
+                  <label className="extras-screenshot-label">
+                    Title <span style={{ fontWeight: 400, color: '#64748b', fontSize: 12 }}>(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="extras-screenshot-select"
+                    placeholder="e.g. System Notice, Ticket Resolution, Service Update"
+                    value={notifTitle}
+                    onChange={(e) => setNotifTitle(e.target.value)}
+                  />
+                </div>
+
+                {/* Priority Selection */}
+                <div className="extras-screenshot-field">
+                  <label className="extras-screenshot-label">Priority</label>
+                  <select
+                    className="extras-screenshot-select"
+                    value={notifPriority}
+                    onChange={(e) => setNotifPriority(e.target.value)}
+                  >
+                    <option value="Normal">Normal</option>
+                    <option value="High">High</option>
+                    <option value="Urgent">Urgent</option>
+                  </select>
+                </div>
+
+                {/* Notification Message */}
                 <div className="extras-screenshot-field">
                   <label className="extras-screenshot-label">
                     Message <span className="extras-req-star">*</span>
                   </label>
                   <textarea
                     className="extras-screenshot-textarea"
-                    placeholder="Type notification message"
+                    placeholder="Type notification message to broadcast to mobile devices"
                     rows={2}
                     value={notifBody}
                     onChange={(e) => setNotifBody(e.target.value)}
@@ -677,23 +955,35 @@ export default function ExtrasPage({
               </div>
 
               <div className="extras-screenshot-actions">
-                <button type="submit" className="extras-screenshot-submit">
-                  Submit
+                <button
+                  type="submit"
+                  className="extras-screenshot-submit"
+                  disabled={sendingNotif}
+                >
+                  {sendingNotif ? 'Dispatching...' : 'Submit'}
                 </button>
                 <button
                   type="button"
                   className="extras-screenshot-reset"
                   onClick={handleResetNotification}
+                  disabled={sendingNotif}
                 >
                   Reset
                 </button>
               </div>
             </form>
 
+            {/* Persisted Dispatch History */}
             <div className="extras-list-card" style={{ marginTop: '8px' }}>
-              <h3 className="extras-card-heading">
-                Dispatch History ({notifLogs.length})
-              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <h3 className="extras-card-heading" style={{ margin: 0 }}>
+                  Dispatch History ({notifLogs.length})
+                </h3>
+                {loadingNotifs && (
+                  <span style={{ fontSize: 12, color: '#64748b' }}>Refreshing...</span>
+                )}
+              </div>
+
               {notifLogs.length === 0 ? (
                 <div className="extras-empty-state">
                   <p className="extras-empty-sub">No mobile notifications sent yet.</p>
@@ -704,13 +994,66 @@ export default function ExtrasPage({
                     <div key={log.id} className="extras-feed-item">
                       <div className="extras-feed-item-top">
                         <h4 className="extras-feed-item-title">
-                          {log.message || log.title}
+                          {log.title && log.title !== log.message ? (
+                            <>
+                              <strong>{log.title}:</strong> {log.message}
+                            </>
+                          ) : (
+                            log.message || log.title
+                          )}
                         </h4>
-                        <span className="extras-feed-item-badge">{log.status}</span>
+                        <span className="extras-feed-item-badge">
+                          ✓ {log.status || 'Delivered'}
+                        </span>
                       </div>
-                      <div className="extras-feed-item-meta">
-                        <span>Target: {log.target}</span>
-                        <span>{log.time}</span>
+
+                      <div className="extras-feed-item-subinfo">
+                        <span
+                          className={`extras-target-chip ${
+                            String(log.target).toLowerCase().includes('client')
+                              ? 'clients'
+                              : String(log.target).toLowerCase().includes('employee')
+                              ? 'employees'
+                              : ''
+                          }`}
+                        >
+                          Target: {log.targetName || log.target}
+                        </span>
+
+                        {log.priority && log.priority !== 'Normal' && (
+                          <span className={`extras-priority-chip ${log.priority.toLowerCase()}`}>
+                            {log.priority}
+                          </span>
+                        )}
+
+                        {log.recipientsSummary && (
+                          <span>({log.recipientsSummary})</span>
+                        )}
+                      </div>
+
+                      <div className="extras-feed-item-meta" style={{ marginTop: 6 }}>
+                        <span>
+                          By {log.senderName || 'Admin'} • {formatTime(log.createdAt) || log.time}
+                        </span>
+                      </div>
+
+                      <div className="extras-feed-actions">
+                        <button
+                          type="button"
+                          className="extras-action-btn"
+                          onClick={() => handleResendNotification(log)}
+                          title="Load into form to resend"
+                        >
+                          Resend
+                        </button>
+                        <button
+                          type="button"
+                          className="extras-action-btn delete"
+                          onClick={(e) => handleDeleteNotificationLog(log.id, e)}
+                          title="Delete from history"
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
                   ))}

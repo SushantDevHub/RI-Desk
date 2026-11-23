@@ -136,6 +136,17 @@ async function readResponse(res) {
   return data;
 }
 
+function sortClientsDescending(a, b) {
+  const timeA = new Date(a.createdAt || 0).getTime();
+  const timeB = new Date(b.createdAt || 0).getTime();
+  if (!isNaN(timeA) && !isNaN(timeB) && timeB !== timeA) {
+    return timeB - timeA;
+  }
+  return String(b.id || '').localeCompare(String(a.id || ''), undefined, {
+    numeric: true,
+  });
+}
+
 export default function ClientManagementPage({ isAdmin = true }) {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -178,7 +189,8 @@ export default function ClientManagementPage({ isAdmin = true }) {
         },
       });
       const data = await readResponse(res);
-      setClients(Array.isArray(data.clients) ? data.clients : []);
+      const list = Array.isArray(data.clients) ? data.clients : [];
+      setClients(list.slice().sort(sortClientsDescending));
     } catch (err) {
       setError(err.message || 'Failed to load clients.');
     } finally {
@@ -530,6 +542,8 @@ export default function ClientManagementPage({ isAdmin = true }) {
       result = [...result].sort(
         (a, b) => (Number(b.monthlyRental) || 0) - (Number(a.monthlyRental) || 0)
       );
+    } else {
+      result = [...result].sort(sortClientsDescending);
     }
 
     return result;

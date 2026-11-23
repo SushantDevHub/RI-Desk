@@ -473,6 +473,7 @@ export default function DashboardPage({
   const [notifications, setNotifications] = useState([]);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [notifMenuOpen, setNotifMenuOpen] = useState(false);
+  const [activeMobileNotifModal, setActiveMobileNotifModal] = useState(null);
   const notifDropdownRef = useRef(null);
 
   const fetchNotifications = useCallback(async () => {
@@ -498,7 +499,7 @@ export default function DashboardPage({
   }, []);
 
   useEffect(() => {
-    if (user && !isAdmin) {
+    if (user) {
       fetchNotifications();
       const interval = setInterval(fetchNotifications, 8000);
 
@@ -522,7 +523,7 @@ export default function DashboardPage({
         window.removeEventListener('storage', handleStorage);
       };
     }
-  }, [user, isAdmin, fetchNotifications]);
+  }, [user, fetchNotifications]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -587,6 +588,11 @@ export default function DashboardPage({
       handleMarkNotifRead(notif.id);
     }
     setNotifMenuOpen(false);
+
+    if (notif.type === 'mobile_notification') {
+      setActiveMobileNotifModal(notif);
+      return;
+    }
 
     let targetTicket = tickets.find(
       (t) => String(t.id) === String(notif.ticketId)
@@ -1749,19 +1755,19 @@ export default function DashboardPage({
 </div>
         <div className="db-topbar-right">
 
-          {/* ── Notification Bell Logo with Count (Employee Panel Only) ── */}
-          {!isAdmin && (
+          {/* ── Notification Bell Logo with Count (Employees & Admin) ── */}
+          {user && (
             <div className="db-notif-container" ref={notifDropdownRef}>
               <button
                 type="button"
                 className={`db-notif-btn ${notifMenuOpen ? 'active' : ''} ${unreadNotifCount > 0 ? 'has-unread' : ''}`}
                 onClick={() => setNotifMenuOpen((prev) => !prev)}
-                aria-label="Transfer Notifications"
+                aria-label="Notifications"
                 aria-expanded={notifMenuOpen}
                 title={
                   unreadNotifCount > 0
-                    ? `${unreadNotifCount} unread transfer notification${unreadNotifCount > 1 ? 's' : ''}`
-                    : 'Transfer Notifications'
+                    ? `${unreadNotifCount} unread notification${unreadNotifCount > 1 ? 's' : ''}`
+                    : 'Notifications'
                 }
               >
                 <TransferNotificationLogo size={21} />
@@ -1777,7 +1783,7 @@ export default function DashboardPage({
                   <div className="db-notif-header">
                     <div className="db-notif-header-title">
                       <TransferNotificationLogo size={17} className="db-notif-header-icon" />
-                      <span>Transfer Notifications</span>
+                      <span>Notifications</span>
                       {unreadNotifCount > 0 && (
                         <span className="db-notif-pill">{unreadNotifCount} new</span>
                       )}
@@ -1799,61 +1805,97 @@ export default function DashboardPage({
                         <TransferNotificationLogo size={36} className="db-notif-empty-icon" />
                         <div className="db-notif-empty-title">No notifications yet</div>
                         <div className="db-notif-empty-desc">
-                          When tickets are transferred to you, they'll appear here.
+                          Ticket transfers and mobile broadcast notifications will appear here.
                         </div>
                       </div>
                     ) : (
-                      notifications.map((notif) => (
-                        <div
-                          key={notif.id}
-                          className={`db-notif-item ${!notif.read ? 'unread' : ''}`}
-                          onClick={() => handleNotificationClick(notif)}
-                          role="menuitem"
-                          tabIndex={0}
-                        >
-                          <div className="db-notif-item-icon">
-                            <TransferNotificationLogo size={16} />
-                          </div>
-                          <div className="db-notif-item-body">
-                            <div className="db-notif-item-title">
-                              <strong>{notif.senderName}</strong> transferred ticket{' '}
-                              <span className="db-notif-ticket-id">
-                                #{notif.ticketNumber || notif.ticketId}
-                              </span>{' '}
-                              to you
+                      notifications.map((notif) => {
+                        const isMobile = notif.type === 'mobile_notification';
+                        return (
+                          <div
+                            key={notif.id}
+                            className={`db-notif-item ${!notif.read ? 'unread' : ''}`}
+                            onClick={() => handleNotificationClick(notif)}
+                            role="menuitem"
+                            tabIndex={0}
+                          >
+                            <div className="db-notif-item-icon">
+                              {isMobile ? (
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                                  <line x1="12" y1="18" x2="12.01" y2="18" />
+                                </svg>
+                              ) : (
+                                <TransferNotificationLogo size={16} />
+                              )}
                             </div>
-                            {notif.workLeft && (
-                              <div className="db-notif-item-notes">
-                                <span className="db-notif-notes-label">Work Left:</span>{' '}
-                                <span className="db-notif-notes-text">
-                                  {notif.workLeft}
-                                </span>
+                            <div className="db-notif-item-body">
+                              {isMobile ? (
+                                <>
+                                  <div className="db-notif-item-title">
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginRight: 5 }}>
+                                      <span style={{ fontSize: 10, background: '#ede9fe', color: '#6d28d9', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>
+                                        {notif.target || 'ALERT'}
+                                      </span>
+                                    </span>
+                                    <strong>{notif.title || 'Mobile Notification'}</strong>
+                                  </div>
+                                  <div style={{ fontSize: 12, color: '#475569', marginTop: 3, lineHeight: 1.35 }}>
+                                    {notif.message}
+                                  </div>
+                                  <div className="db-notif-item-footer">
+                                    <span className="db-notif-item-time">
+                                      By {notif.senderName || 'Admin'} • {formatNotifTime(notif.createdAt)}
+                                    </span>
+                                    <span className="db-notif-view-hint">
+                                      View details →
+                                    </span>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="db-notif-item-title">
+                                    <strong>{notif.senderName}</strong> transferred ticket{' '}
+                                    <span className="db-notif-ticket-id">
+                                      #{notif.ticketNumber || notif.ticketId}
+                                    </span>{' '}
+                                    to you
+                                  </div>
+                                  {notif.workLeft && (
+                                    <div className="db-notif-item-notes">
+                                      <span className="db-notif-notes-label">Work Left:</span>{' '}
+                                      <span className="db-notif-notes-text">
+                                        {notif.workLeft}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="db-notif-item-footer">
+                                    <span className="db-notif-item-time">
+                                      {formatNotifTime(notif.createdAt)}
+                                    </span>
+                                    <span className="db-notif-view-hint">
+                                      View ticket log →
+                                    </span>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                            {!notif.read && (
+                              <div className="db-notif-unread-indicator">
+                                <span className="db-notif-dot" title="Unread" />
+                                <button
+                                  type="button"
+                                  className="db-notif-read-btn"
+                                  title="Mark as read"
+                                  onClick={(e) => handleMarkNotifRead(notif.id, e)}
+                                >
+                                  ✓
+                                </button>
                               </div>
                             )}
-                            <div className="db-notif-item-footer">
-                              <span className="db-notif-item-time">
-                                {formatNotifTime(notif.createdAt)}
-                              </span>
-                              <span className="db-notif-view-hint">
-                                View ticket log →
-                              </span>
-                            </div>
                           </div>
-                          {!notif.read && (
-                            <div className="db-notif-unread-indicator">
-                              <span className="db-notif-dot" title="Unread" />
-                              <button
-                                type="button"
-                                className="db-notif-read-btn"
-                                title="Mark as read"
-                                onClick={(e) => handleMarkNotifRead(notif.id, e)}
-                              >
-                                ✓
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -2527,6 +2569,110 @@ export default function DashboardPage({
       </div>
 
 
+
+      {/* ═══════════════════════════════════════
+          MOBILE NOTIFICATION DETAIL MODAL
+      ═══════════════════════════════════════ */}
+      {activeMobileNotifModal && (
+        <div
+          className="ticket-dialog-overlay"
+          onClick={() => setActiveMobileNotifModal(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="ticket-dialog"
+            style={{ maxWidth: '480px', padding: '20px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="ticket-dialog-header" style={{ marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '8px',
+                  background: '#ede9fe',
+                  color: '#7c3aed',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                    <line x1="12" y1="18" x2="12.01" y2="18" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#1e293b' }}>
+                    {activeMobileNotifModal.title || 'Mobile Notification'}
+                  </h2>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                    <span style={{ fontSize: '10.5px', background: '#ede9fe', color: '#6d28d9', padding: '1px 6px', borderRadius: '4px', fontWeight: 700 }}>
+                      Target: {activeMobileNotifModal.targetName || activeMobileNotifModal.target || 'All Users'}
+                    </span>
+                    <span style={{ fontSize: '11.5px', color: '#64748b' }}>
+                      By {activeMobileNotifModal.senderName || 'Admin'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="ticket-dialog-close"
+                onClick={() => setActiveMobileNotifModal(null)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              padding: '14px',
+              fontSize: '13.5px',
+              color: '#334155',
+              lineHeight: 1.5,
+              whiteSpace: 'pre-wrap',
+              marginBottom: '16px',
+            }}>
+              {activeMobileNotifModal.message}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
+              <span style={{ fontSize: '11.5px', color: '#94a3b8' }}>
+                {formatNotifTime(activeMobileNotifModal.createdAt)}
+              </span>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {activeMobileNotifModal.ticketId && (
+                  <button
+                    type="button"
+                    className="ticket-form-btn submit"
+                    style={{ padding: '6px 14px', fontSize: '12px' }}
+                    onClick={() => {
+                      const t = tickets.find((item) => String(item.id) === String(activeMobileNotifModal.ticketId));
+                      setActiveMobileNotifModal(null);
+                      if (t) setViewingLogsTicket(t);
+                    }}
+                  >
+                    View Ticket #{activeMobileNotifModal.ticketNumber || activeMobileNotifModal.ticketId}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="ticket-form-btn cancel"
+                  style={{ padding: '6px 14px', fontSize: '12px' }}
+                  onClick={() => setActiveMobileNotifModal(null)}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══════════════════════════════════════
           TICKET LOGS POP-UP DIALOG

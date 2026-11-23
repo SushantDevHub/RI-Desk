@@ -274,6 +274,20 @@
   box-shadow: 0 2px 6px rgba(2, 132, 199, 0.28);
 }
 
+.ask-emp-profile-btn.btn-push-pill {
+  background: #ffffff;
+  color: #7c3aed;
+  border: 1px solid #c4b5fd;
+}
+
+.ask-emp-profile-btn.btn-push-pill:hover {
+  background: #7c3aed;
+  color: #ffffff;
+  border-color: #7c3aed;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.28);
+}
+
 .ask-emp-pill-badge {
   font-size: 10px;
   font-weight: 700;
@@ -300,6 +314,16 @@
 }
 
 .ask-emp-profile-btn.btn-email-pill:hover .ask-emp-pill-badge.email {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.ask-emp-pill-badge.push {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
+.ask-emp-profile-btn.btn-push-pill:hover .ask-emp-pill-badge.push {
   background: rgba(255, 255, 255, 0.25);
   color: #ffffff;
 }

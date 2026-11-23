@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getToken } from '../api/authApi.js';
+import { sendMobileNotification } from '../api/notificationApi.js';
 import './AskEmployeeDialog.css';
 
 const API = 'http://localhost:4000/api';
@@ -36,6 +37,8 @@ export default function AskEmployeeDialog({
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [adminQuery, setAdminQuery] = useState('');
   const [loadingEmployees, setLoadingEmployees] = useState(false);
+  const [sendingPush, setSendingPush] = useState(false);
+  const [pushSentSuccess, setPushSentSuccess] = useState(false);
 
   // Fetch employees if initial list is empty
   useEffect(() => {
@@ -252,6 +255,42 @@ export default function AskEmployeeDialog({
     window.location.href = mailtoUrl;
   }
 
+  // Handle Mobile Push Notification action
+  async function handleSendMobileNotification() {
+    if (!selectedEmployee) {
+      alert('Please select an employee.');
+      return;
+    }
+    setSendingPush(true);
+    setPushSentSuccess(false);
+    try {
+      const notifMessage = adminQuery.trim()
+        ? `[Ticket #${ticket.id}] ${adminQuery.trim()}`
+        : `[Ticket #${ticket.id}] Please review this ticket for client ${clientName} and take required action.`;
+
+      await sendMobileNotification({
+        target: 'Employees',
+        targetId: selectedEmployee.id,
+        targetName: selectedEmployee.name,
+        title: `Instruction on Ticket #${ticket.id}`,
+        message: notifMessage,
+        priority: ticket.priority === 'high' ? 'High' : 'Normal',
+        ticketId: ticket.id,
+        ticketNumber: ticket.ticketNumber || ticket.id,
+      });
+
+      setPushSentSuccess(true);
+      window.dispatchEvent(new CustomEvent('notifications-updated'));
+      localStorage.setItem('ri_desk_notif_sync', Date.now().toString());
+      setTimeout(() => setPushSentSuccess(false), 4500);
+    } catch (err) {
+      console.error('Failed to send mobile push:', err);
+      alert(err.message || 'Failed to dispatch mobile notification to employee.');
+    } finally {
+      setSendingPush(false);
+    }
+  }
+
   return (
     <div className="ask-emp-dialog-overlay" onClick={onClose}>
       <section
@@ -361,6 +400,21 @@ export default function AskEmployeeDialog({
                     </svg>
                     <span>{selectedEmployee.email || 'No email provided'}</span>
                     <span className="ask-emp-pill-badge email">Email</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="ask-emp-profile-btn btn-push-pill"
+                    onClick={handleSendMobileNotification}
+                    disabled={sendingPush}
+                    title={`Send instant mobile push notification to ${employeeName}`}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                      <line x1="12" y1="18" x2="12.01" y2="18" />
+                    </svg>
+                    <span>{sendingPush ? 'Sending...' : pushSentSuccess ? 'Sent ✓' : 'Mobile Push'}</span>
+                    <span className="ask-emp-pill-badge push">Instant</span>
                   </button>
                 </div>
               </div>
