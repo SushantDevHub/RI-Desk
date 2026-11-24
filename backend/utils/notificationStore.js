@@ -76,6 +76,11 @@ function isUserRecipient(n, userId, userRole = 'employee') {
   const normUserId = String(userId);
   const normRole = String(userRole || '').toLowerCase();
 
+  // Admin can supervise all ticket transfers and notifications in RI-Desk
+  if (normRole === 'admin') {
+    return true;
+  }
+
   // If directly targeted by recipientId
   if (n.recipientId && String(n.recipientId) === normUserId) {
     return true;
@@ -83,6 +88,11 @@ function isUserRecipient(n, userId, userRole = 'employee') {
 
   // If specific targetId is set
   if (n.targetId && String(n.targetId) === normUserId) {
+    return true;
+  }
+
+  // If sender of the notification (they can view their transfer confirmation)
+  if (n.senderId && String(n.senderId) === normUserId) {
     return true;
   }
 
@@ -104,11 +114,6 @@ function isUserRecipient(n, userId, userRole = 'employee') {
     if ((target === 'clients' || target === 'client') && (normRole === 'client' || normRole === 'admin')) {
       return true;
     }
-
-    // Admin can supervise all mobile notifications
-    if (normRole === 'admin') {
-      return true;
-    }
   }
 
   return false;
@@ -118,21 +123,38 @@ function isUserRecipient(n, userId, userRole = 'employee') {
  * Check if a notification is read by the specific user.
  */
 function isNotificationReadByUser(n, userId) {
-  if (n.read) return true;
   if (Array.isArray(n.readBy) && n.readBy.map(String).includes(String(userId))) {
+    return true;
+  }
+  // If legacy read is true and no readBy array is present
+  if (n.read && (!n.readBy || n.readBy.length === 0)) {
     return true;
   }
   return false;
 }
 
 export function getNotificationsForUser(userId, userRole = 'employee') {
+  const allUsers = getAllUsers();
   const all = getAllNotifications();
   return all
     .filter((n) => isUserRecipient(n, userId, userRole))
-    .map((n) => ({
-      ...n,
-      read: isNotificationReadByUser(n, userId),
-    }))
+    .map((n) => {
+      let resolvedRecipientName = n.recipientName;
+      if (!resolvedRecipientName && n.recipientId) {
+        resolvedRecipientName = allUsers.find((u) => String(u.id) === String(n.recipientId))?.name || '';
+      }
+      let resolvedSenderName = n.senderName;
+      if (!resolvedSenderName && n.senderId) {
+        resolvedSenderName = allUsers.find((u) => String(u.id) === String(n.senderId))?.name || 'A team member';
+      }
+
+      return {
+        ...n,
+        recipientName: resolvedRecipientName,
+        senderName: resolvedSenderName,
+        read: isNotificationReadByUser(n, userId),
+      };
+    })
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
@@ -143,6 +165,7 @@ export function getUnreadCountForUser(userId, userRole = 'employee') {
 
 export function addNotification({
   recipientId,
+  recipientName,
   senderId,
   senderName,
   ticketId,
@@ -156,19 +179,31 @@ export function addNotification({
     return null;
   }
 
+  const allUsers = getAllUsers();
+  const resolvedRecipientName =
+    recipientName ||
+    allUsers.find((u) => String(u.id) === String(recipientId))?.name ||
+    '';
+
+  const resolvedSenderName =
+    senderName ||
+    allUsers.find((u) => String(u.id) === String(senderId))?.name ||
+    'A team member';
+
   const all = getAllNotifications();
   const newNotif = {
     id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     type,
     recipientId,
+    recipientName: resolvedRecipientName,
     senderId,
-    senderName: senderName || 'A team member',
+    senderName: resolvedSenderName,
     ticketId,
     ticketNumber: ticketNumber || ticketId,
     ticketSubject: ticketSubject || 'Ticket',
     workLeft: workLeft || '',
     read: false,
-    readBy: [],
+    readBy: senderId ? [String(senderId)] : [],
     createdAt: new Date().toISOString(),
   };
 

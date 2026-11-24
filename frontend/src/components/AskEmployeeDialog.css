@@ -160,172 +160,54 @@
   box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
 }
 
-/* Pre-loaded Recipient Card */
-.ask-emp-recipient-card {
+/* Action Buttons (WhatsApp & Email) just below description box */
+.ask-emp-action-buttons {
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  border-radius: 10px;
-  padding: 10px 14px;
+  gap: 10px;
+  margin-top: 2px;
 }
 
-.ask-emp-avatar {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: #059669;
-  color: #ffffff;
-  font-size: 13px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.ask-emp-recipient-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.ask-emp-recipient-name {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13.5px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.ask-emp-role-badge {
-  font-size: 10px;
-  font-weight: 700;
-  background: #dcfce7;
-  color: #166534;
-  padding: 1px 6px;
-  border-radius: 4px;
-}
-
-.ask-emp-assigned-badge {
-  font-size: 10px;
-  font-weight: 700;
-  background: #fef3c7;
-  color: #92400e;
-  padding: 1px 6px;
-  border-radius: 4px;
-}
-
-.ask-emp-recipient-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.ask-emp-profile-btn {
+.ask-emp-action-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
+  gap: 7px;
+  padding: 7px 15px;
   border-radius: 7px;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease-in-out;
   border: 1px solid transparent;
   line-height: 1.2;
-  white-space: nowrap;
+  transition: all 0.15s ease-in-out;
 }
 
-.ask-emp-profile-btn svg {
+.ask-emp-action-btn svg {
   flex-shrink: 0;
 }
 
-.ask-emp-profile-btn.btn-wa-pill {
-  background: #ffffff;
-  color: #15803d;
-  border: 1px solid #86efac;
-}
-
-.ask-emp-profile-btn.btn-wa-pill:hover {
+.ask-emp-action-btn.btn-wa {
   background: #16a34a;
   color: #ffffff;
-  border-color: #16a34a;
+  border-color: #15803d;
+}
+
+.ask-emp-action-btn.btn-wa:hover {
+  background: #15803d;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.28);
   transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(22, 163, 74, 0.28);
 }
 
-.ask-emp-profile-btn.btn-email-pill {
-  background: #ffffff;
-  color: #0369a1;
-  border: 1px solid #7dd3fc;
-}
-
-.ask-emp-profile-btn.btn-email-pill:hover {
+.ask-emp-action-btn.btn-email {
   background: #0284c7;
   color: #ffffff;
-  border-color: #0284c7;
+  border-color: #0369a1;
+}
+
+.ask-emp-action-btn.btn-email:hover {
+  background: #0369a1;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.28);
   transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.28);
-}
-
-.ask-emp-profile-btn.btn-push-pill {
-  background: #ffffff;
-  color: #7c3aed;
-  border: 1px solid #c4b5fd;
-}
-
-.ask-emp-profile-btn.btn-push-pill:hover {
-  background: #7c3aed;
-  color: #ffffff;
-  border-color: #7c3aed;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.28);
-}
-
-.ask-emp-pill-badge {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  flex-shrink: 0;
-}
-
-.ask-emp-pill-badge.wa {
-  background: #dcfce7;
-  color: #15803d;
-}
-
-.ask-emp-profile-btn.btn-wa-pill:hover .ask-emp-pill-badge.wa {
-  background: rgba(255, 255, 255, 0.25);
-  color: #ffffff;
-}
-
-.ask-emp-pill-badge.email {
-  background: #e0f2fe;
-  color: #0369a1;
-}
-
-.ask-emp-profile-btn.btn-email-pill:hover .ask-emp-pill-badge.email {
-  background: rgba(255, 255, 255, 0.25);
-  color: #ffffff;
-}
-
-.ask-emp-pill-badge.push {
-  background: #ede9fe;
-  color: #7c3aed;
-}
-
-.ask-emp-profile-btn.btn-push-pill:hover .ask-emp-pill-badge.push {
-  background: rgba(255, 255, 255, 0.25);
-  color: #ffffff;
 }
 
 /* Summary Card */

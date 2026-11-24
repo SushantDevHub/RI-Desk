@@ -103,7 +103,7 @@ function EyeIcon({ visible }) {
   );
 }
 
-function TransferNotificationLogo({ size = 21, className = 'db-notif-icon' }) {
+function TransferNotificationLogo({ size = 20, className = 'db-notif-icon' }) {
   return (
     <svg
       className={className}
@@ -112,16 +112,13 @@ function TransferNotificationLogo({ size = 21, className = 'db-notif-icon' }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.95"
+      strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      <circle cx="12" cy="2.2" r="1.1" />
       <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-      <path d="M8.5 8.5h6l-1.8-1.8" strokeWidth="1.8" />
-      <path d="M15.5 11.8h-6l1.8 1.8" strokeWidth="1.8" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
     </svg>
   );
 }
@@ -501,7 +498,7 @@ export default function DashboardPage({
   useEffect(() => {
     if (user) {
       fetchNotifications();
-      const interval = setInterval(fetchNotifications, 8000);
+      const interval = setInterval(fetchNotifications, 4000);
 
       const handleNotifUpdate = () => {
         fetchNotifications();
@@ -1782,11 +1779,7 @@ export default function DashboardPage({
                 <div className="db-notif-dropdown" role="menu">
                   <div className="db-notif-header">
                     <div className="db-notif-header-title">
-                      <TransferNotificationLogo size={17} className="db-notif-header-icon" />
                       <span>Notifications</span>
-                      {unreadNotifCount > 0 && (
-                        <span className="db-notif-pill">{unreadNotifCount} new</span>
-                      )}
                     </div>
                     {unreadNotifCount > 0 && (
                       <button
@@ -1802,10 +1795,9 @@ export default function DashboardPage({
                   <div className="db-notif-list">
                     {notifications.length === 0 ? (
                       <div className="db-notif-empty">
-                        <TransferNotificationLogo size={36} className="db-notif-empty-icon" />
-                        <div className="db-notif-empty-title">No notifications yet</div>
+                        <div className="db-notif-empty-title">No notifications</div>
                         <div className="db-notif-empty-desc">
-                          Ticket transfers and mobile broadcast notifications will appear here.
+                          Ticket transfers will appear here.
                         </div>
                       </div>
                     ) : (
@@ -1819,79 +1811,61 @@ export default function DashboardPage({
                             role="menuitem"
                             tabIndex={0}
                           >
-                            <div className="db-notif-item-icon">
-                              {isMobile ? (
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-                                  <line x1="12" y1="18" x2="12.01" y2="18" />
-                                </svg>
-                              ) : (
-                                <TransferNotificationLogo size={16} />
-                              )}
-                            </div>
                             <div className="db-notif-item-body">
                               {isMobile ? (
                                 <>
                                   <div className="db-notif-item-title">
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginRight: 5 }}>
-                                      <span style={{ fontSize: 10, background: '#ede9fe', color: '#6d28d9', padding: '1px 5px', borderRadius: 3, fontWeight: 700 }}>
-                                        {notif.target || 'ALERT'}
-                                      </span>
-                                    </span>
-                                    <strong>{notif.title || 'Mobile Notification'}</strong>
+                                    <strong>{notif.title || 'Notification'}</strong>
                                   </div>
-                                  <div style={{ fontSize: 12, color: '#475569', marginTop: 3, lineHeight: 1.35 }}>
+                                  <div className="db-notif-item-desc">
                                     {notif.message}
                                   </div>
-                                  <div className="db-notif-item-footer">
-                                    <span className="db-notif-item-time">
-                                      By {notif.senderName || 'Admin'} • {formatNotifTime(notif.createdAt)}
-                                    </span>
-                                    <span className="db-notif-view-hint">
-                                      View details →
-                                    </span>
+                                  <div className="db-notif-item-meta">
+                                    {notif.senderName || 'Admin'} • {formatNotifTime(notif.createdAt)}
                                   </div>
                                 </>
                               ) : (
                                 <>
                                   <div className="db-notif-item-title">
-                                    <strong>{notif.senderName}</strong> transferred ticket{' '}
-                                    <span className="db-notif-ticket-id">
-                                      #{notif.ticketNumber || notif.ticketId}
-                                    </span>{' '}
-                                    to you
+                                    {String(notif.senderId) === String(user?.id) ? (
+                                      <>
+                                        <strong>You</strong> transferred ticket{' '}
+                                        <span className="db-notif-ticket-id">
+                                          #{notif.ticketNumber || notif.ticketId}
+                                        </span>{' '}
+                                        to <strong>{notif.recipientName || 'assigned employee'}</strong>
+                                      </>
+                                    ) : String(notif.recipientId) === String(user?.id) ? (
+                                      <>
+                                        <strong>{notif.senderName}</strong> transferred ticket{' '}
+                                        <span className="db-notif-ticket-id">
+                                          #{notif.ticketNumber || notif.ticketId}
+                                        </span>{' '}
+                                        to you
+                                      </>
+                                    ) : (
+                                      <>
+                                        <strong>{notif.senderName}</strong> transferred ticket{' '}
+                                        <span className="db-notif-ticket-id">
+                                          #{notif.ticketNumber || notif.ticketId}
+                                        </span>{' '}
+                                        to <strong>{notif.recipientName || 'assigned employee'}</strong>
+                                      </>
+                                    )}
                                   </div>
                                   {notif.workLeft && (
-                                    <div className="db-notif-item-notes">
-                                      <span className="db-notif-notes-label">Work Left:</span>{' '}
-                                      <span className="db-notif-notes-text">
-                                        {notif.workLeft}
-                                      </span>
+                                    <div className="db-notif-item-desc">
+                                      Note: {notif.workLeft}
                                     </div>
                                   )}
-                                  <div className="db-notif-item-footer">
-                                    <span className="db-notif-item-time">
-                                      {formatNotifTime(notif.createdAt)}
-                                    </span>
-                                    <span className="db-notif-view-hint">
-                                      View ticket log →
-                                    </span>
+                                  <div className="db-notif-item-meta">
+                                    {formatNotifTime(notif.createdAt)}
                                   </div>
                                 </>
                               )}
                             </div>
                             {!notif.read && (
-                              <div className="db-notif-unread-indicator">
-                                <span className="db-notif-dot" title="Unread" />
-                                <button
-                                  type="button"
-                                  className="db-notif-read-btn"
-                                  title="Mark as read"
-                                  onClick={(e) => handleMarkNotifRead(notif.id, e)}
-                                >
-                                  ✓
-                                </button>
-                              </div>
+                              <span className="db-notif-dot" title="Unread" />
                             )}
                           </div>
                         );

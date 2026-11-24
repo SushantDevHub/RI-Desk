@@ -555,9 +555,6 @@ export default function ClientManagementPage({ isAdmin = true }) {
       <div className="client-page-header">
         <div>
           <h1 className="db-page-title">Manage Clients</h1>
-          <p className="db-page-sub">
-            Manage company profiles, monthly rentals, subscribed services, and active features.
-          </p>
         </div>
 
         <div className="client-header-actions ticket-header-actions">

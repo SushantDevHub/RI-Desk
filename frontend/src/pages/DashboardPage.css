@@ -93,7 +93,7 @@
 }
 
 /* ─────────────────────────────────────────────
-   TOPBAR NOTIFICATIONS (LOGO & BADGE COUNT)
+   TOPBAR NOTIFICATIONS (CLEAN & SIMPLE)
 ───────────────────────────────────────────── */
 .db-notif-container {
   position: relative;
@@ -105,130 +105,58 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid transparent;
   color: #475569;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   padding: 0;
   outline: none;
+  transition: all 0.15s ease;
 }
 
 .db-notif-btn:hover {
-  background: #e2e8f0;
-  color: #1e293b;
-  border-color: #cbd5e1;
-  transform: translateY(-1px);
+  background: #f1f5f9;
+  color: #0f172a;
 }
 
 .db-notif-btn.active {
   background: #eff6ff;
   color: #2563eb;
-  border-color: #93c5fd;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.14);
-}
-
-.db-notif-btn.has-unread {
-  color: #1d4ed8;
-  background: #eff6ff;
-  border-color: #bfdbfe;
-}
-
-.db-notif-btn.has-unread .db-notif-icon {
-  animation: dbChimeSway 3.2s ease-in-out infinite;
-  transform-origin: 50% 2px;
-}
-
-@keyframes dbChimeSway {
-  0%, 100% {
-    transform: rotate(0deg);
-  }
-  6% {
-    transform: rotate(13deg);
-  }
-  12% {
-    transform: rotate(-11deg);
-  }
-  18% {
-    transform: rotate(8deg);
-  }
-  24% {
-    transform: rotate(-5deg);
-  }
-  30% {
-    transform: rotate(2deg);
-  }
-  36% {
-    transform: rotate(0deg);
-  }
-}
-
-.db-notif-header-icon {
-  color: #2563eb;
-  flex-shrink: 0;
-}
-
-.db-notif-empty-icon {
-  color: #94a3b8;
-  margin-bottom: 4px;
-  opacity: 0.7;
-}
-
-.db-notif-icon {
-  flex-shrink: 0;
-  transition: transform 0.2s ease;
-}
-
-.db-notif-btn:hover .db-notif-icon {
-  transform: scale(1.05);
 }
 
 .db-notif-badge {
   position: absolute;
-  top: -3px;
-  right: -3px;
-  min-width: 19px;
-  height: 19px;
-  padding: 0 5px;
-  border-radius: 10px;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
   background: #ef4444;
   color: #ffffff;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid #ffffff;
-  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.38);
-  animation: dbNotifPulse 2s infinite ease-in-out;
   line-height: 1;
-}
-
-@keyframes dbNotifPulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.08);
-  }
 }
 
 /* Notification dropdown menu */
 .db-notif-dropdown {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   right: 0;
-  width: 360px;
+  width: 320px;
   max-width: calc(100vw - 24px);
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14), 0 4px 12px rgba(15, 23, 42, 0.06);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   z-index: 1200;
-  animation: dbDropdownIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -238,92 +166,63 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 10px 14px;
   border-bottom: 1px solid #f1f5f9;
-  background: #f8fafc;
+  background: #ffffff;
 }
 
 .db-notif-header-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   color: #0f172a;
-}
-
-.db-notif-pill {
-  font-size: 11px;
-  font-weight: 700;
-  background: #eff6ff;
-  color: #2563eb;
-  padding: 2px 7px;
-  border-radius: 10px;
-  border: 1px solid #bfdbfe;
 }
 
 .db-notif-mark-all {
   background: none;
   border: none;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
   color: #2563eb;
   cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 6px;
-  transition: all 0.15s ease;
+  padding: 0;
 }
 
 .db-notif-mark-all:hover {
-  background: #eff6ff;
-  color: #1d4ed8;
   text-decoration: underline;
 }
 
 .db-notif-list {
-  max-height: 380px;
+  max-height: 340px;
   overflow-y: auto;
-  overscroll-behavior: contain;
 }
 
 .db-notif-empty {
-  padding: 34px 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  padding: 28px 16px;
   text-align: center;
   color: #94a3b8;
-  gap: 8px;
-}
-
-.db-notif-empty svg {
-  color: #cbd5e1;
-  margin-bottom: 4px;
 }
 
 .db-notif-empty-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #475569;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  margin-bottom: 2px;
 }
 
 .db-notif-empty-desc {
   font-size: 12px;
   color: #94a3b8;
-  max-width: 240px;
-  line-height: 1.4;
 }
 
 .db-notif-item {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 12px 16px;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
   border-bottom: 1px solid #f1f5f9;
   cursor: pointer;
-  transition: background 0.15s ease;
-  position: relative;
-  text-decoration: none;
+  background: #ffffff;
+  transition: background 0.12s ease;
 }
 
 .db-notif-item:last-child {
@@ -342,155 +241,45 @@
   background: #e5f0fe;
 }
 
-.db-notif-item-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  color: #2563eb;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.db-notif-item.unread .db-notif-item-icon {
-  background: #dbeafe;
-  color: #1d4ed8;
-  border-color: #93c5fd;
-}
-
 .db-notif-item-body {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .db-notif-item-title {
-  font-size: 13px;
-  line-height: 1.35;
+  font-size: 12.5px;
+  line-height: 1.4;
   color: #1e293b;
 }
 
 .db-notif-ticket-id {
-  font-weight: 700;
+  font-weight: 600;
   color: #2563eb;
 }
 
-.db-notif-item-subject {
-  font-size: 12px;
-  color: #475569;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.db-notif-subject-label {
-  font-weight: 600;
-  color: #64748b;
-  margin-right: 3px;
-}
-
-.db-notif-item-notes {
+.db-notif-item-desc {
   font-size: 11.5px;
+  color: #64748b;
   line-height: 1.35;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-left: 3px solid #3b82f6;
-  padding: 5px 8px;
-  border-radius: 4px;
-  color: #334155;
-  margin-top: 2px;
   word-break: break-word;
 }
 
-.db-notif-item.unread .db-notif-item-notes {
-  background: #ffffff;
-  border-color: #cbd5e1;
-  border-left-color: #2563eb;
-}
-
-.db-notif-notes-label {
-  font-weight: 600;
-  color: #1e40af;
-}
-
-.db-notif-notes-text {
-  color: #334155;
-}
-
-.db-notif-item-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: 3px;
-}
-
-.db-notif-item-time {
+.db-notif-item-meta {
   font-size: 11px;
   color: #94a3b8;
-}
-
-.db-notif-view-hint {
-  font-size: 11px;
-  font-weight: 600;
-  color: #2563eb;
-  opacity: 0.85;
-}
-
-.db-notif-item:hover .db-notif-view-hint {
-  opacity: 1;
-  text-decoration: underline;
-}
-
-.db-notif-unread-indicator {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  flex-shrink: 0;
-  padding-top: 4px;
+  margin-top: 1px;
 }
 
 .db-notif-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #2563eb;
-}
-
-.db-notif-read-btn {
-  opacity: 0;
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  color: #475569;
-  font-size: 12px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
-  padding: 0;
-}
-
-.db-notif-item:hover .db-notif-read-btn {
-  opacity: 1;
-}
-
-.db-notif-read-btn:hover {
-  background: #2563eb;
-  border-color: #2563eb;
-  color: #ffffff;
+  flex-shrink: 0;
+  margin-top: 5px;
 }
 .db-user-dropdown-container {
   position: relative;

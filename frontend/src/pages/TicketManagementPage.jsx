@@ -1191,11 +1191,6 @@ export default function TicketManagementPage() {
       <div className="ticket-page-header">
         <div>
           <h1 className="db-page-title">Manage Tickets</h1>
-          <p className="db-page-sub">
-            {isAdmin
-              ? 'View tickets, manage details and assign them to employees.'
-              : 'Create tickets, view and track support requests.'}
-          </p>
         </div>
 
         <div className="ticket-header-actions">

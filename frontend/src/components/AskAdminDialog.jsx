@@ -4,26 +4,6 @@ import './AskAdminDialog.css';
 
 const API = 'http://localhost:4000/api';
 
-function formatPhone(digits = '') {
-  const clean = String(digits).replace(/\D/g, '');
-  if (clean.length === 10) {
-    return `+91 ${clean.slice(0, 5)} ${clean.slice(5)}`;
-  }
-  return clean || '—';
-}
-
-function getInitials(name = '') {
-  return (
-    name
-      .split(' ')
-      .filter(Boolean)
-      .map((w) => w[0])
-      .slice(0, 2)
-      .join('')
-      .toUpperCase() || 'AD'
-  );
-}
-
 export default function AskAdminDialog({ ticket, currentUser, onClose }) {
   if (!ticket) return null;
 
@@ -232,45 +212,6 @@ export default function AskAdminDialog({ ticket, currentUser, onClose }) {
 
         {/* Dialog Body */}
         <div className="ask-admin-body">
-          {/* Pre-Loaded Admin Profile Card */}
-          <div className="ask-admin-recipient-card">
-            <div className="ask-admin-avatar">{getInitials(admin.name)}</div>
-            <div className="ask-admin-recipient-info">
-              <div className="ask-admin-recipient-name">
-                <span>{admin.name}</span>
-                <span className="ask-admin-role-badge">ADMIN</span>
-              </div>
-              <div className="ask-admin-recipient-actions">
-                <button
-                  type="button"
-                  className="ask-admin-profile-btn btn-wa-pill"
-                  onClick={handleSendWhatsApp}
-                  title={`Send WhatsApp message to ${admin.name} (${admin.mobileNumber})`}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-                  </svg>
-                  <span>{formatPhone(admin.mobileNumber)}</span>
-                  <span className="ask-admin-pill-badge wa">WhatsApp</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="ask-admin-profile-btn btn-email-pill"
-                  onClick={handleSendEmail}
-                  title={`Send email to ${admin.name} (${admin.email})`}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                    <polyline points="22,6 12,13 2,6" />
-                  </svg>
-                  <span>{admin.email || 'admin@ridesk.com'}</span>
-                  <span className="ask-admin-pill-badge email">Email</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
           {/* Ticket & Client Summary Card */}
           <div className="ask-admin-summary-card">
             <div className="ask-admin-summary-header">
@@ -320,18 +261,47 @@ export default function AskAdminDialog({ ticket, currentUser, onClose }) {
             )}
           </div>
 
-          {/* Employee Question / Doubt Textarea */}
+          {/* Description / Query Box */}
           <div className="ask-admin-field">
             <label htmlFor="ask-admin-doubt-input" className="ask-admin-field-label">
-              What doubt or question do you have for the Admin? <span className="opt">(optional)</span>
+              Description / Query for Admin <span className="opt">(optional)</span>
             </label>
             <textarea
               id="ask-admin-doubt-input"
               className="ask-admin-textarea"
               rows={3}
+              placeholder="Describe your query or doubt here..."
               value={employeeDoubt}
               onChange={(e) => setEmployeeDoubt(e.target.value)}
             />
+          </div>
+
+          {/* Two small buttons just below the description box */}
+          <div className="ask-admin-action-buttons">
+            <button
+              type="button"
+              className="ask-admin-action-btn btn-wa"
+              onClick={handleSendWhatsApp}
+              title={`Open WhatsApp chat with Admin (${admin.mobileNumber || ''})`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+              </svg>
+              <span>WhatsApp</span>
+            </button>
+
+            <button
+              type="button"
+              className="ask-admin-action-btn btn-email"
+              onClick={handleSendEmail}
+              title={`Send Email to Admin (${admin.email || ''})`}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22,6 12,13 2,6" />
+              </svg>
+              <span>Email</span>
+            </button>
           </div>
         </div>
 

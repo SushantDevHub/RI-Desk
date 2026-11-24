@@ -865,11 +865,12 @@ router.post('/:id/transfer', authenticate, (req, res) => {
     try {
       createdNotification = addNotification({
         recipientId: targetEmployee.id,
+        recipientName: newEmployeeName,
         senderId: req.user.id,
         senderName: performerName,
         ticketId: existing.id,
         ticketNumber: existing.ticketNumber || existing.id,
-        ticketSubject: existing.category || 'Ticket',
+        ticketSubject: existing.subject || existing.category || 'Ticket',
         workLeft: trimmedNotes,
         type: 'ticket_transferred',
       });
