@@ -283,7 +283,7 @@ export default function ExtrasPage({
   };
 
   // Notification State & Directory (Connected to backend)
-  const [notifTarget, setNotifTarget] = useState('All Users');
+  const [notifTarget, setNotifTarget] = useState('Clients');
   const [selectedClientId, setSelectedClientId] = useState('');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [notifTitle, setNotifTitle] = useState('');
@@ -374,17 +374,7 @@ export default function ExtrasPage({
     let targetId = null;
     let targetName = null;
 
-    if (notifTarget === 'Clients') {
-      if (selectedClientId) {
-        const c = clientsList.find((item) => String(item.id) === String(selectedClientId));
-        targetId = selectedClientId;
-        targetName = c
-          ? `${c.name || c.companyName || 'Client'} (${c.mobileNumber || ''})`
-          : `Client #${selectedClientId}`;
-      } else {
-        targetName = `All Clients (${clientsList.length})`;
-      }
-    } else if (notifTarget === 'Employees') {
+    if (notifTarget === 'Employees') {
       if (selectedEmployeeId) {
         const emp = employeesList.find((item) => String(item.id) === String(selectedEmployeeId));
         targetId = selectedEmployeeId;
@@ -395,8 +385,17 @@ export default function ExtrasPage({
         targetName = `All Employees (${employeesList.length})`;
       }
     } else {
-      target = 'All Users';
-      targetName = `All Users (${employeesList.length} Employees & ${clientsList.length} Clients)`;
+      // Clients
+      target = 'Clients';
+      if (selectedClientId) {
+        const c = clientsList.find((item) => String(item.id) === String(selectedClientId));
+        targetId = selectedClientId;
+        targetName = c
+          ? `${c.name || c.companyName || 'Client'} (${c.mobileNumber || ''})`
+          : `Client #${selectedClientId}`;
+      } else {
+        targetName = `All Clients (${clientsList.length})`;
+      }
     }
 
     setSendingNotif(true);
@@ -446,7 +445,7 @@ export default function ExtrasPage({
   };
 
   const handleResetNotification = () => {
-    setNotifTarget('All Users');
+    setNotifTarget('Clients');
     setSelectedClientId('');
     setSelectedEmployeeId('');
     setNotifTitle('');
@@ -472,13 +471,14 @@ export default function ExtrasPage({
 
   const handleResendNotification = (log) => {
     if (!log) return;
-    setNotifTarget(log.target || 'All Users');
-    if (log.target === 'Clients' && log.targetId) {
+    const target = String(log.target).toLowerCase().includes('employee') ? 'Employees' : 'Clients';
+    setNotifTarget(target);
+    if (target === 'Clients' && log.targetId) {
       setSelectedClientId(String(log.targetId));
     } else {
       setSelectedClientId('');
     }
-    if (log.target === 'Employees' && log.targetId) {
+    if (target === 'Employees' && log.targetId) {
       setSelectedEmployeeId(String(log.targetId));
     } else {
       setSelectedEmployeeId('');
@@ -827,7 +827,7 @@ export default function ExtrasPage({
               <div className="extras-screenshot-card">
                 <h2 className="extras-screenshot-subtitle">Notification's Details</h2>
 
-                {/* Usertype / Target Group */}
+                {/* Usertype / Target Group: exactly two options (Clients & Employees) */}
                 <div className="extras-screenshot-field">
                   <label className="extras-screenshot-label">
                     Usertype <span className="extras-req-star">*</span>
@@ -842,7 +842,6 @@ export default function ExtrasPage({
                     }}
                     required
                   >
-                    <option value="All Users">All Users (Clients & Employees)</option>
                     <option value="Clients">Clients</option>
                     <option value="Employees">Employees</option>
                   </select>
@@ -894,16 +893,14 @@ export default function ExtrasPage({
                 <div className="extras-notif-audience-hint">
                   <span>📱</span>
                   <span>
-                    {notifTarget === 'All Users'
-                      ? `Pushing to all active devices: ${clientsList.length} Clients & ${employeesList.length} Employees`
-                      : notifTarget === 'Clients'
+                    {notifTarget === 'Clients'
                       ? selectedClientId
-                        ? `Targeting specific client mobile: ${
+                        ? `Targeting client: ${
                             clientsList.find((c) => String(c.id) === String(selectedClientId))?.name || 'Selected Client'
                           }`
                         : `Targeting all ${clientsList.length} registered clients`
                       : selectedEmployeeId
-                      ? `Targeting specific employee mobile: ${
+                      ? `Targeting employee: ${
                           employeesList.find((e) => String(e.id) === String(selectedEmployeeId))?.name || 'Selected Employee'
                         }`
                       : `Targeting all ${employeesList.length} active employees`}
@@ -945,7 +942,7 @@ export default function ExtrasPage({
                   </label>
                   <textarea
                     className="extras-screenshot-textarea"
-                    placeholder="Type notification message to broadcast to mobile devices"
+                    placeholder="Type message to deliver"
                     rows={2}
                     value={notifBody}
                     onChange={(e) => setNotifBody(e.target.value)}
