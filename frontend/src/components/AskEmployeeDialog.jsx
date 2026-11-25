@@ -253,11 +253,8 @@ export default function AskEmployeeDialog({
             </div>
             <div>
               <h2 id="ask-emp-dialog-title" className="ask-emp-title">
-                Ask Employee / Query
+                Ask Employee ?
               </h2>
-              <p className="ask-emp-subtitle">
-                Select an employee to automatically load their mobile and email with full ticket & client details.
-              </p>
             </div>
           </div>
 
@@ -296,7 +293,7 @@ export default function AskEmployeeDialog({
                       String(ticket.assignedTo).trim().toLowerCase());
                 return (
                   <option key={emp.id} value={String(emp.id)}>
-                    {emp.name} {isCurrentlyAssigned ? '★ (Currently Assigned)' : ''}
+                    {emp.name} {isCurrentlyAssigned ? ' (Currently Assigned)' : ''}
                   </option>
                 );
               })}
@@ -320,7 +317,7 @@ export default function AskEmployeeDialog({
 
             <div className="ask-emp-client-box">
               <div className="ask-emp-client-row">
-                <span className="ask-emp-lbl">Client / Customer:</span>
+                <span className="ask-emp-lbl">Client :</span>
                 <strong>{clientName}</strong>
               </div>
               {clientMobile && (
@@ -355,13 +352,12 @@ export default function AskEmployeeDialog({
           {/* Admin Instructions / Doubt Textarea */}
           <div className="ask-emp-field">
             <label htmlFor="ask-emp-doubt-input" className="ask-emp-field-label">
-              Description / Query for {employeeName} <span className="opt">(optional)</span>
+            Query for {employeeName} <span className="opt">(optional)</span>
             </label>
             <textarea
               id="ask-emp-doubt-input"
               className="ask-emp-textarea"
               rows={3}
-              placeholder="e.g. Please update the status of this ticket immediately or check with client regarding recharge details."
               value={adminQuery}
               onChange={(e) => setAdminQuery(e.target.value)}
             />
