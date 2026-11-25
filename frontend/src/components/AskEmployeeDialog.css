@@ -93,20 +93,25 @@
 }
 
 .ask-emp-dialog-close {
-  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   border: none;
+  background: #f1f5f9;
+  color: #64748b;
   font-size: 22px;
   line-height: 1;
-  color: #94a3b8;
   cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
   transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
 .ask-emp-dialog-close:hover {
+  background: #e2e8f0;
   color: #0f172a;
-  background: #f1f5f9;
 }
 
 .ask-emp-body {
@@ -358,17 +363,17 @@
 
 .ask-emp-close-btn {
   padding: 8px 18px;
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
   font-size: 13px;
   font-weight: 600;
-  background: #4338ca;
-  color: #ffffff;
-  border: 1px solid #cbd5e1;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .ask-emp-close-btn:hover {
-  background: #382dad;
-  color: #ffffff;
+  background: #f1f5f9;
+  color: #0f172a;
 }
