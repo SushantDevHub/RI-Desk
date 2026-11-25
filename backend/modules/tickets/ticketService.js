@@ -26,14 +26,14 @@ export function raiseNewTicket(ticketData) {
   const rawCat = ticketData.category.trim();
   const formattedCategory = rawCat.charAt(0).toUpperCase() + rawCat.slice(1);
 
-  // Generate initial creation audit log
+  // Generate initial creation audit log (exclusively for clients)
   const initialLog = {
     id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     timestamp: now,
-    performedBy: ticketData.name || 'Public User',
-    performedByRole: (ticketData.userType || 'customer').toLowerCase(),
+    performedBy: ticketData.name || 'Client',
+    performedByRole: 'client',
     action: 'Ticket Raised',
-    message: `Ticket raised via Self-Service Portal with Priority: "Medium", Status: "Open", Category: "${formattedCategory}"`,
+    message: `Ticket raised by Client "${ticketData.name}" via Support Portal with Priority: "Medium", Status: "Open", Category: "${formattedCategory}"`,
     priority: {
       old: null,
       new: priority,
@@ -88,11 +88,11 @@ export function raiseNewTicket(ticketData) {
     });
   }
 
-  // Construct complete ticket matching existing database schema
+  // Construct complete ticket matching existing database schema (strictly for clients)
   const newTicket = {
     id: ticketId,
     subject: ticketData.subject,
-    userType: ticketData.userType,
+    userType: 'client',
     client: ticketData.name,
     customer: ticketData.name,
     clientMobile: ticketData.mobileNumber,

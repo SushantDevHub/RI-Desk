@@ -14,15 +14,6 @@ export const CATEGORIES = [
   'Other',
 ];
 
-export const USER_TYPES = [
-  'Retailer',
-  'Distributor',
-  'Master Distributor',
-  'Customer',
-  'Client / API Partner',
-  'Other',
-];
-
 export const OPERATORS = [
   'Airtel',
   'Jio',
@@ -56,12 +47,12 @@ export function isTransactionCategory(category = '') {
 }
 
 /**
- * Initial empty form values.
+ * Initial empty form values for Clients.
  */
 export const INITIAL_FORM_VALUES = {
   name: '',
   mobileNumber: '',
-  userType: 'Retailer',
+  userType: 'client',
   category: 'Recharge',
   subject: '',
   description: '',

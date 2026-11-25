@@ -34,9 +34,8 @@ export function validateRaiseTicket(body = {}) {
     ? String(body.mobileNumber)
     : '';
 
-  const userType = typeof body.userType === 'string' && body.userType.trim()
-    ? body.userType.trim()
-    : 'Customer';
+  // Tickets are exclusively for Clients (no retailer, no generic users)
+  const userType = 'client';
 
   const category = typeof body.category === 'string' ? body.category.trim() : '';
   const subject = typeof body.subject === 'string' ? body.subject.trim() : '';
@@ -51,16 +50,16 @@ export function validateRaiseTicket(body = {}) {
     ? body.screenshot.trim()
     : null;
 
-  // Name validation
+  // Client Name validation
   if (!name) {
-    errors.name = 'Full name is required.';
+    errors.name = 'Client name is required.';
   } else if (name.length < 2 || name.length > 100) {
-    errors.name = 'Name must be between 2 and 100 characters.';
+    errors.name = 'Client name must be between 2 and 100 characters.';
   }
 
-  // Mobile number validation (standard 10-digit Indian mobile number)
+  // Client Mobile number validation (standard 10-digit Indian mobile number)
   if (!mobileNumber) {
-    errors.mobileNumber = 'Mobile number is required.';
+    errors.mobileNumber = 'Client mobile number is required.';
   } else if (!/^[0-9]{10}$/.test(mobileNumber)) {
     errors.mobileNumber = 'Please enter a valid 10-digit mobile number.';
   }

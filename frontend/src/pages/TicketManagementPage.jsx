@@ -2250,14 +2250,14 @@ export default function TicketManagementPage() {
                 </div>
 
                 {/* Conditional Transaction Details if ticket was raised with transaction info */}
-                {(viewingTicket.transactionId || viewingTicket.amount || viewingTicket.operator || viewingTicket.userType) && (
+                {(viewingTicket.transactionId || viewingTicket.amount || viewingTicket.operator) && (
                   <div style={{ marginTop: '12px', background: '#f8fafc', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                     <div style={{ fontWeight: 600, fontSize: '12.5px', color: '#334155', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                         <rect width="20" height="14" x="2" y="5" rx="2" />
                         <line x1="2" x2="22" y1="10" y2="10" />
                       </svg>
-                      <span>Transaction & User Details</span>
+                      <span>Transaction & Payment Details</span>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px 14px', fontSize: '12px' }}>
                       {viewingTicket.transactionId && (
@@ -2276,12 +2276,6 @@ export default function TicketManagementPage() {
                         <div>
                           <span style={{ color: '#64748b' }}>Operator: </span>
                           <strong style={{ color: '#0f172a' }}>{viewingTicket.operator}</strong>
-                        </div>
-                      )}
-                      {viewingTicket.userType && (
-                        <div>
-                          <span style={{ color: '#64748b' }}>User Type: </span>
-                          <strong style={{ color: '#0f172a' }}>{viewingTicket.userType}</strong>
                         </div>
                       )}
                     </div>

@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react';
 import {
   CATEGORIES,
-  USER_TYPES,
   OPERATORS,
   DESCRIPTION_MAX_LENGTH,
   isTransactionCategory,
@@ -11,8 +10,8 @@ import { submitRaiseTicket } from './raiseTicketApi.js';
 import './raise-ticket.css';
 
 /**
- * Reusable Raise Ticket Form component.
- * Can be embedded standalone or in any dialog/dashboard page.
+ * Reusable Raise Ticket Form component for Clients.
+ * Standalone public form without user/retailer distinction.
  *
  * @param {object} props
  * @param {Function} [props.onSuccess] - Optional callback invoked with the created ticket data.
@@ -134,18 +133,14 @@ export default function RaiseTicketForm({ onSuccess, showHeader = true }) {
     const errors = {};
 
     if (!formData.name || formData.name.trim().length < 2) {
-      errors.name = 'Please enter your full name (minimum 2 characters).';
+      errors.name = 'Please enter your client or company name (minimum 2 characters).';
     }
 
     const cleanMobile = formData.mobileNumber.replace(/\D/g, '');
     if (!cleanMobile) {
-      errors.mobileNumber = 'Mobile number is required.';
+      errors.mobileNumber = 'Client mobile number is required.';
     } else if (cleanMobile.length !== 10 || !/^[6-9]/.test(cleanMobile)) {
-      errors.mobileNumber = 'Enter a valid 10-digit Indian mobile number (e.g. 9876543210).';
-    }
-
-    if (!formData.userType) {
-      errors.userType = 'Please select user type.';
+      errors.mobileNumber = 'Enter a valid 10-digit mobile number (e.g. 9876543210).';
     }
 
     if (!formData.category) {
@@ -199,11 +194,11 @@ export default function RaiseTicketForm({ onSuccess, showHeader = true }) {
     setFieldErrors({});
 
     try {
-      // Prepare payload
+      // Prepare payload (strictly for clients)
       const payload = {
         name: formData.name.trim(),
         mobileNumber: formData.mobileNumber.replace(/\D/g, ''),
-        userType: formData.userType,
+        userType: 'client',
         category: formData.category,
         subject: formData.subject.trim(),
         description: formData.description.trim(),
@@ -310,16 +305,12 @@ export default function RaiseTicketForm({ onSuccess, showHeader = true }) {
         {/* Summary Details */}
         <div className="rt-summary-box">
           <div className="rt-summary-row">
-            <span className="rt-summary-label">Submitted By</span>
+            <span className="rt-summary-label">Client Name</span>
             <span className="rt-summary-val">{submittedTicket.name}</span>
           </div>
           <div className="rt-summary-row">
-            <span className="rt-summary-label">Mobile Number</span>
+            <span className="rt-summary-label">Client Mobile</span>
             <span className="rt-summary-val">{submittedTicket.mobileNumber}</span>
-          </div>
-          <div className="rt-summary-row">
-            <span className="rt-summary-label">User Type</span>
-            <span className="rt-summary-val">{submittedTicket.userType}</span>
           </div>
           <div className="rt-summary-row">
             <span className="rt-summary-label">Category</span>
@@ -419,18 +410,18 @@ export default function RaiseTicketForm({ onSuccess, showHeader = true }) {
       )}
 
       <form className="rt-form" onSubmit={handleSubmit} noValidate>
-        {/* Name and Mobile Number */}
+        {/* Client Name and Mobile Number */}
         <div className="rt-form-grid">
           <div className="rt-field">
             <label className="rt-label" htmlFor="rt-name">
-              <span>Full Name <span className="rt-req">*</span></span>
+              <span>Client Name <span className="rt-req">*</span></span>
             </label>
             <input
               id="rt-name"
               name="name"
               type="text"
               className={`rt-input ${fieldErrors.name ? 'rt-input-error' : ''}`}
-              placeholder="e.g. Rahul Sharma"
+              placeholder="e.g. Acme Infotech / Rahul Sharma"
               value={formData.name}
               onChange={handleChange}
               disabled={loading}
@@ -443,7 +434,7 @@ export default function RaiseTicketForm({ onSuccess, showHeader = true }) {
 
           <div className="rt-field">
             <label className="rt-label" htmlFor="rt-mobile">
-              <span>Mobile Number <span className="rt-req">*</span></span>
+              <span>Client Mobile Number <span className="rt-req">*</span></span>
             </label>
             <input
               id="rt-mobile"
@@ -463,53 +454,28 @@ export default function RaiseTicketForm({ onSuccess, showHeader = true }) {
           </div>
         </div>
 
-        {/* User Type and Category */}
-        <div className="rt-form-grid">
-          <div className="rt-field">
-            <label className="rt-label" htmlFor="rt-userType">
-              <span>User Type <span className="rt-req">*</span></span>
-            </label>
-            <select
-              id="rt-userType"
-              name="userType"
-              className={`rt-select ${fieldErrors.userType ? 'rt-input-error' : ''}`}
-              value={formData.userType}
-              onChange={handleChange}
-              disabled={loading}
-            >
-              {USER_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-            {fieldErrors.userType && (
-              <span className="rt-field-err-text">{fieldErrors.userType}</span>
-            )}
-          </div>
-
-          <div className="rt-field">
-            <label className="rt-label" htmlFor="rt-category">
-              <span>Issue Category <span className="rt-req">*</span></span>
-            </label>
-            <select
-              id="rt-category"
-              name="category"
-              className={`rt-select ${fieldErrors.category ? 'rt-input-error' : ''}`}
-              value={formData.category}
-              onChange={handleChange}
-              disabled={loading}
-            >
-              {CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-            {fieldErrors.category && (
-              <span className="rt-field-err-text">{fieldErrors.category}</span>
-            )}
-          </div>
+        {/* Issue Category */}
+        <div className="rt-field">
+          <label className="rt-label" htmlFor="rt-category">
+            <span>Issue Category <span className="rt-req">*</span></span>
+          </label>
+          <select
+            id="rt-category"
+            name="category"
+            className={`rt-select ${fieldErrors.category ? 'rt-input-error' : ''}`}
+            value={formData.category}
+            onChange={handleChange}
+            disabled={loading}
+          >
+            {CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+          {fieldErrors.category && (
+            <span className="rt-field-err-text">{fieldErrors.category}</span>
+          )}
         </div>
 
         {/* Conditional Transaction Details Box */}
