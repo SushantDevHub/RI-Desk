@@ -120,49 +120,50 @@ export default function LoginPage({ onLogin, error, loading }) {
   const displayError = error || localError;
 
   return (
-    <div className="login-page">
-      <div className="login-center">
-        <div className="login-card">
+    <div className="ri-login-page">
+      <div className="ri-login-center">
+        <div className="ri-login-card">
 
-          {/* ── Brand ── */}
-          <div className="login-brand">
-            <div className="login-brand-name">
-              <img
-                src='img.jpg'
-                alt="Rambhiya Infotech"
-              />
-              <span className="brand-recharge">RI-</span>
-              <span className="brand-desk">Desk</span>
-            </div>
-            <div className="login-brand-slogan">
-              One-stop solution for all.
-            </div>
+          {/* ── Brand Logo ── */}
+          <div className="ri-brand-wrap">
+            <img
+              src="/rambhiya-logo.png"
+              alt="Rambhiya Infotech"
+              className="ri-brand-logo"
+              onError={(e) => {
+                // fallback if png path differs
+                e.currentTarget.src = 'rambhiya-logo.png';
+              }}
+            />
           </div>
 
           {view === 'login' ? (
             <>
-              {/* ── Title ── */}
-              <div className="login-title">
-                <h1>Access Your Dashboard</h1>
-                <p>Sign in with your mobile number to continue.</p>
-              </div>
+              {/* ── Subtitle ── */}
+              <h2 className="ri-login-heading">Login to your account</h2>
 
               {/* ── Alert Slot ── */}
-              <div className="login-alert-slot">
-                {displayError && (
-                  <div className="login-alert login-alert-error">⚠ {displayError}</div>
-                )}
-              </div>
+              {displayError && (
+                <div className="ri-login-alert ri-login-alert-error" role="alert">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <span>{displayError}</span>
+                </div>
+              )}
 
-              {/* ── Login form ── */}
-              <form onSubmit={handleLoginSubmit} method="post" action="/dashboard" name="loginForm" id="loginForm">
-                <div className="field">
-                  <label htmlFor="login-mobile">Mobile number</label>
+              {/* ── Login Form ── */}
+              <form onSubmit={handleLoginSubmit} className="ri-login-form" noValidate>
+                {/* Mobile No Input */}
+                <div className="ri-field-wrap">
                   <input
                     id="login-mobile"
                     name="username"
                     type="tel"
-                    placeholder="9876543210"
+                    className="ri-input"
+                    placeholder="Mobile No"
                     autoComplete="username tel"
                     value={mobileNumber}
                     onChange={(e) => {
@@ -179,47 +180,57 @@ export default function LoginPage({ onLogin, error, loading }) {
                   />
                 </div>
 
-                <div className="field">
-                  <label htmlFor="login-password">Password</label>
-                  <div className="field-input-wrap">
-                    <input
-                      id="login-password"
-                      name="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      autoComplete="current-password"
-                      value={password}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setPassword(val);
-                        if (remember) {
-                          if (val) {
-                            localStorage.setItem('ri_remembered_password', val);
-                          } else {
-                            localStorage.removeItem('ri_remembered_password');
-                          }
+                {/* Password Input with Eye Icon */}
+                <div className="ri-field-wrap ri-password-wrap">
+                  <input
+                    id="login-password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    className="ri-input ri-password-input"
+                    placeholder="Password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setPassword(val);
+                      if (remember) {
+                        if (val) {
+                          localStorage.setItem('ri_remembered_password', val);
+                        } else {
+                          localStorage.removeItem('ri_remembered_password');
                         }
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="field-toggle"
-                      onClick={() => setShowPassword((s) => !s)}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="ri-eye-toggle"
+                    onClick={() => setShowPassword((s) => !s)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? (
+                      /* Eye slashed */
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1 2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      /* Eye open */
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
                         <circle cx="12" cy="12" r="3" />
                       </svg>
-                    </button>
-                  </div>
+                    )}
+                  </button>
                 </div>
 
-                <div className="field-row">
-                  <label className="remember-me">
+                {/* Remember Me & Reset Password row */}
+                <div className="ri-options-row">
+                  <label className="ri-remember-label">
                     <input
                       type="checkbox"
                       id="remember-me-checkbox"
+                      className="ri-checkbox"
                       checked={remember}
                       onChange={(e) => {
                         const checked = e.target.checked;
@@ -239,48 +250,62 @@ export default function LoginPage({ onLogin, error, loading }) {
                         }
                       }}
                     />
-                    <span>Remember me</span>
+                    <span>Remember Me</span>
                   </label>
+
                   <button
                     type="button"
-                    className="forgot-link"
+                    className="ri-reset-link"
                     onClick={switchToForgot}
                   >
-                    Forgot password?
+                    Reset Password
                   </button>
                 </div>
 
-                <button type="submit" className="login-submit" disabled={loading}>
-                  {loading ? 'Logging in…' : 'Log in'}
+                {/* Sign In button */}
+                <button
+                  type="submit"
+                  className="ri-signin-btn"
+                  disabled={loading}
+                >
+                  {loading ? 'Signing In...' : 'Sign In'}
                 </button>
               </form>
             </>
           ) : (
             <>
-              {/* ── Forgot Password Title ── */}
-              <div className="login-title">
-                <h1>Reset Password</h1>
-                <p>Enter your registered Email ID to set a new password.</p>
-              </div>
+              {/* ── Forgot Password View ── */}
+              <h2 className="ri-login-heading">Reset Password</h2>
+              <p className="ri-login-subtext">Enter your registered Email ID to set a new password.</p>
 
-              {/* ── Alerts Slot ── */}
-              <div className="login-alert-slot">
-                {forgotError && (
-                  <div className="login-alert login-alert-error">⚠ {forgotError}</div>
-                )}
-                {forgotSuccess && (
-                  <div className="login-alert login-alert-success">✓ {forgotSuccess}</div>
-                )}
-              </div>
+              {/* Alerts */}
+              {forgotError && (
+                <div className="ri-login-alert ri-login-alert-error" role="alert">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <span>{forgotError}</span>
+                </div>
+              )}
+              {forgotSuccess && (
+                <div className="ri-login-alert ri-login-alert-success" role="alert">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                  <span>{forgotSuccess}</span>
+                </div>
+              )}
 
-              {/* ── Forgot Password form ── */}
-              <form onSubmit={handleForgotSubmit}>
-                <div className="field">
-                  <label htmlFor="forgot-email">Registered Email ID</label>
+              <form onSubmit={handleForgotSubmit} className="ri-login-form" noValidate>
+                <div className="ri-field-wrap">
                   <input
                     id="forgot-email"
                     type="email"
-                    placeholder="name@example.com"
+                    className="ri-input"
+                    placeholder="Registered Email ID"
                     autoComplete="email"
                     value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.target.value)}
@@ -288,38 +313,43 @@ export default function LoginPage({ onLogin, error, loading }) {
                   />
                 </div>
 
-                <div className="field">
-                  <label htmlFor="forgot-new-pwd">New Password</label>
-                  <div className="field-input-wrap">
-                    <input
-                      id="forgot-new-pwd"
-                      type={showForgotPwd ? 'text' : 'password'}
-                      placeholder="Minimum 4 characters"
-                      autoComplete="new-password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="field-toggle"
-                      onClick={() => setShowForgotPwd((s) => !s)}
-                      aria-label={showForgotPwd ? 'Hide password' : 'Show password'}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <div className="ri-field-wrap ri-password-wrap">
+                  <input
+                    id="forgot-new-pwd"
+                    type={showForgotPwd ? 'text' : 'password'}
+                    className="ri-input ri-password-input"
+                    placeholder="New Password (min 4 chars)"
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="ri-eye-toggle"
+                    onClick={() => setShowForgotPwd((s) => !s)}
+                    aria-label={showForgotPwd ? 'Hide password' : 'Show password'}
+                  >
+                    {showForgotPwd ? (
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1 2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                         <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
                         <circle cx="12" cy="12" r="3" />
                       </svg>
-                    </button>
-                  </div>
+                    )}
+                  </button>
                 </div>
 
-                <div className="field">
-                  <label htmlFor="forgot-confirm-pwd">Confirm New Password</label>
+                <div className="ri-field-wrap">
                   <input
                     id="forgot-confirm-pwd"
                     type={showForgotPwd ? 'text' : 'password'}
-                    placeholder="Re-enter new password"
+                    className="ri-input"
+                    placeholder="Confirm New Password"
                     autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
@@ -329,16 +359,16 @@ export default function LoginPage({ onLogin, error, loading }) {
 
                 <button
                   type="submit"
-                  className="login-submit"
+                  className="ri-signin-btn"
                   disabled={forgotLoading}
                 >
-                  {forgotLoading ? 'Resetting password…' : 'Reset Password'}
+                  {forgotLoading ? 'Resetting Password...' : 'Reset Password'}
                 </button>
 
-                <div className="forgot-back-wrap">
+                <div className="ri-back-wrap">
                   <button
                     type="button"
-                    className="forgot-back-btn"
+                    className="ri-back-btn"
                     onClick={switchToLogin}
                   >
                     ← Back to Login
@@ -349,11 +379,6 @@ export default function LoginPage({ onLogin, error, loading }) {
           )}
 
         </div>
-      </div>
-
-      <div className="login-footer">
-        <p>RI-Desk Support Portal · Secure Access</p>
-        <p>© 2026 RI-Desk. All rights reserved.</p>
       </div>
     </div>
   );
