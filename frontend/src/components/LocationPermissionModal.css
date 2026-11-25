@@ -1,0 +1,300 @@
+/* ── Location Permission Modal ── */
+
+.ri-location-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+  animation: riLocationFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+@keyframes riLocationFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ri-location-card {
+  background: #ffffff;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 430px;
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.22), 0 4px 12px rgba(15, 23, 42, 0.08);
+  border: 1px solid #e2e8f0;
+  padding: 32px 26px 24px 26px;
+  box-sizing: border-box;
+  position: relative;
+  text-align: center;
+  animation: riLocationScaleIn 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes riLocationScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Close Icon Button */
+.ri-location-close-btn {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.ri-location-close-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.ri-location-close-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Icon & Pulse Animation */
+.ri-location-icon-wrap {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ri-location-icon-badge {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+  color: #4338ca;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+  position: relative;
+  z-index: 2;
+}
+
+.ri-location-pulse {
+  position: absolute;
+  inset: -6px;
+  border-radius: 20px;
+  background: rgba(99, 102, 241, 0.2);
+  z-index: 1;
+  animation: riLocationPulseRing 2s infinite ease-out;
+}
+
+@keyframes riLocationPulseRing {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  70% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+}
+
+/* Body / Text */
+.ri-location-body {
+  margin-bottom: 22px;
+}
+
+.ri-location-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 8px 0;
+  line-height: 1.35;
+  letter-spacing: -0.2px;
+}
+
+.ri-location-desc {
+  font-size: 13.5px;
+  color: #64748b;
+  line-height: 1.5;
+  margin: 0;
+  padding: 0 6px;
+}
+
+/* Error Banner */
+.ri-location-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  margin-top: 14px;
+}
+
+/* Action Buttons */
+.ri-location-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.ri-location-btn {
+  width: 100%;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.16s ease;
+  outline: none;
+}
+
+/* Primary Button */
+.ri-location-btn-primary {
+  background: #4f46e5;
+  color: #ffffff;
+  border: 1px solid #4f46e5;
+  padding: 12px 18px;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+}
+
+.ri-location-btn-primary:hover:not(:disabled) {
+  background: #4338ca;
+  border-color: #4338ca;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
+}
+
+.ri-location-btn-primary:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+.ri-location-btn-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Secondary Button */
+.ri-location-btn-secondary {
+  background: #eef2ff;
+  color: #4338ca;
+  border: 1px solid #c7d2fe;
+  padding: 11px 18px;
+}
+
+.ri-location-btn-secondary:hover:not(:disabled) {
+  background: #e0e7ff;
+  border-color: #a5b4fc;
+}
+
+.ri-location-btn-secondary:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+.ri-location-btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Ghost / Cancel Button */
+.ri-location-btn-ghost {
+  background: transparent;
+  color: #64748b;
+  border: none;
+  padding: 9px 18px;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.ri-location-btn-ghost:hover:not(:disabled) {
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+.ri-location-btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Loading Spinner */
+.ri-location-loading-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.ri-location-spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: riLocationSpin 0.7s linear infinite;
+}
+
+@keyframes riLocationSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 480px) {
+  .ri-location-overlay {
+    padding: 12px;
+  }
+
+  .ri-location-card {
+    padding: 26px 18px 20px 18px;
+    border-radius: 16px;
+  }
+
+  .ri-location-title {
+    font-size: 16.5px;
+  }
+
+  .ri-location-desc {
+    font-size: 13px;
+    padding: 0;
+  }
+
+  .ri-location-btn {
+    padding: 12px 14px;
+  }
+}

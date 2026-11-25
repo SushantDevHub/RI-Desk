@@ -7,6 +7,7 @@ import {
 } from 'react-router-dom';
 import LoginPage from './components/LoginPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
+import LocationPermissionModal from './components/LocationPermissionModal.jsx';
 
 import {
   loginUser,
@@ -114,33 +115,38 @@ export default function App() {
   }
 
   return (
-    <Routes>
-      {/* Login */}
-      <Route
-        path="/login"
-        element={
-          user ? (
-            <Navigate to="/dashboard" replace />
-          ) : (
-            <LoginRoute onSuccess={setUser} />
-          )
-        }
-      />
+    <>
+      <Routes>
+        {/* Login */}
+        <Route
+          path="/login"
+          element={
+            user ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <LoginRoute onSuccess={setUser} />
+            )
+          }
+        />
 
-      {/* Main Authenticated Pages inside DashboardPage shell */}
-      <Route
-        path="/*"
-        element={
-          user ? (
-            <DashboardPage
-              user={user}
-              onLogout={handleLogout}
-            />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-    </Routes>
+        {/* Main Authenticated Pages inside DashboardPage shell */}
+        <Route
+          path="/*"
+          element={
+            user ? (
+              <DashboardPage
+                user={user}
+                onLogout={handleLogout}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+      </Routes>
+
+      {/* Responsive Location Permission Modal */}
+      <LocationPermissionModal />
+    </>
   );
 }
