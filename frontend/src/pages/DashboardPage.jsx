@@ -458,6 +458,7 @@ export default function DashboardPage({
   const [askEmployeeTicket, setAskEmployeeTicket] = useState(null);
   const [selectedStat, setSelectedStat] = useState(null);
 
+  const [viewingTicket, setViewingTicket] = useState(null);
   const [editingTicket, setEditingTicket] = useState(null);
   const [savingTicket, setSavingTicket] = useState(false);
   const [editActionError, setEditActionError] = useState('');
@@ -1129,7 +1130,7 @@ export default function DashboardPage({
       const response = await fetch(
         `http://localhost:4000/api/tickets/${encodeURIComponent(editingTicket.id)}`,
         {
-          method: 'PATCH',
+          method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${getToken()}`,
@@ -1164,6 +1165,8 @@ export default function DashboardPage({
       } catch (e) {}
 
       closeEditTicket();
+      await fetchTickets(true);
+      setNoticeMessage(`✓ Ticket #${editingTicket.id} updated successfully.`);
     } catch (err) {
       setEditActionError(err.message || 'Failed to update ticket.');
     } finally {
@@ -1299,7 +1302,12 @@ export default function DashboardPage({
                 >
                   <td className="db-mono">
                     <div className="ticket-id-cell">
-                      <span className="ticket-id-text">
+                      <span
+                        className="ticket-id-text"
+                        style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationColor: '#cbd5e1' }}
+                        title="Click to view ticket details"
+                        onClick={() => setViewingTicket(ticket)}
+                      >
                         {ticket.id}
                       </span>
                       {isNew && (
@@ -1615,8 +1623,18 @@ export default function DashboardPage({
 
                   <td className="ticket-actions-cell" style={{ textAlign: 'center' }}>
                     <div className="ticket-row-actions" style={{ justifyContent: 'center' }}>
-                      {/* Column 1: L & I */}
+                      {/* Column 1: View & Transfer History (Log) */}
                       <div className="ticket-action-col">
+                        <button
+                          type="button"
+                          className="ticket-icon-button ticket-view-icon"
+                          title="View ticket details"
+                          aria-label={`View ticket ${ticket.id} details`}
+                          onClick={() => setViewingTicket(ticket)}
+                        >
+                          <TicketIcon type="view" />
+                        </button>
+
                         <button
                           type="button"
                           className="ticket-icon-button ticket-log-icon"
@@ -1626,28 +1644,6 @@ export default function DashboardPage({
                         >
                           <TicketIcon type="log" />
                         </button>
-
-                        {!isAdmin ? (
-                          <button
-                            type="button"
-                            className="ticket-icon-button ticket-ask-admin-icon"
-                            title="Ask Admin for Help"
-                            aria-label={`Ask admin for help on ticket ${ticket.id}`}
-                            onClick={() => setAskAdminTicket(ticket)}
-                          >
-                            <TicketIcon type="ask-admin" />
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="ticket-icon-button ticket-ask-employee-icon"
-                            title="Ask Employee / Query"
-                            aria-label={`Ask employee on ticket ${ticket.id}`}
-                            onClick={() => setAskEmployeeTicket(ticket)}
-                          >
-                            <TicketIcon type="ask-admin" />
-                          </button>
-                        )}
                       </div>
 
                       {/* Column 2: Edit & Delete */}
@@ -1673,9 +1669,31 @@ export default function DashboardPage({
                         </button>
                       </div>
 
-                      {/* Column 3: Transfer button */}
-                      {!isAdmin && (
-                        <div className="ticket-action-col ticket-action-col-single">
+                      {/* Column 3: Query & Transfer */}
+                      <div className="ticket-action-col">
+                        {!isAdmin ? (
+                          <button
+                            type="button"
+                            className="ticket-icon-button ticket-ask-admin-icon"
+                            title="Ask Admin for Help"
+                            aria-label={`Ask admin for help on ticket ${ticket.id}`}
+                            onClick={() => setAskAdminTicket(ticket)}
+                          >
+                            <TicketIcon type="ask-admin" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="ticket-icon-button ticket-ask-employee-icon"
+                            title="Ask Employee / Query"
+                            aria-label={`Ask employee on ticket ${ticket.id}`}
+                            onClick={() => setAskEmployeeTicket(ticket)}
+                          >
+                            <TicketIcon type="ask-admin" />
+                          </button>
+                        )}
+
+                        {!isAdmin && (
                           <button
                             type="button"
                             className="ticket-icon-button ticket-transfer-icon"
@@ -1685,8 +1703,8 @@ export default function DashboardPage({
                           >
                             <TicketIcon type="transfer" />
                           </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -2740,15 +2758,294 @@ export default function DashboardPage({
       )}
 
       {/* ═══════════════════════════════════════
+          VIEW TICKET DETAILS POP-UP DIALOG
+      ═══════════════════════════════════════ */}
+      {viewingTicket && (
+        <div
+          className="ticket-dialog-overlay"
+          onClick={() => setViewingTicket(null)}
+        >
+          <section
+            className="ticket-dialog ticket-desc-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dashboard-view-desc-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="ticket-dialog-header">
+              <div>
+                <h2 id="dashboard-view-desc-title">Ticket Details</h2>
+                <p>Ticket #{viewingTicket.id}</p>
+              </div>
+
+              <button
+                type="button"
+                className="ticket-dialog-close"
+                onClick={() => setViewingTicket(null)}
+                aria-label="Close details dialog"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="ticket-desc-content">
+              <div className="ticket-desc-meta">
+                <div className="ticket-desc-meta-item">
+                  <span className="ticket-desc-meta-label">Category:</span>
+                  <span
+                    className="ticket-category"
+                    style={{
+                      color: '#334155',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      padding: '2px 8px',
+                      fontSize: '11px',
+                    }}
+                  >
+                    {capitalize(viewingTicket.category)}
+                  </span>
+                </div>
+
+                <div className="ticket-desc-meta-item">
+                  <span className="ticket-desc-meta-label">Priority:</span>
+                  <span
+                    className="ticket-priority"
+                    style={{
+                      color: viewingTicket.priority === 'high' ? '#dc2626' : '#334155',
+                      fontWeight: viewingTicket.priority === 'high' ? 600 : 500,
+                    }}
+                  >
+                    <span
+                      className="ticket-status-dot"
+                      style={{
+                        background: viewingTicket.priority === 'high' ? '#dc2626' : '#94a3b8',
+                      }}
+                    />
+                    {capitalize(viewingTicket.priority)}
+                  </span>
+                </div>
+
+                <div className="ticket-desc-meta-item">
+                  <span className="ticket-desc-meta-label">Status:</span>
+                  <span
+                    className="ticket-status"
+                    style={{
+                      color: '#334155',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      padding: '2px 8px',
+                      fontSize: '11px',
+                    }}
+                  >
+                    {formatStatus(viewingTicket.status)}
+                  </span>
+                </div>
+
+                <div className="ticket-desc-meta-item">
+                  <span className="ticket-desc-meta-label">Assigned:</span>
+                  <span
+                    className="ticket-assigned-status"
+                    style={{
+                      color: viewingTicket.assignedTo ? '#0f172a' : '#64748b',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      padding: '2px 8px',
+                      fontSize: '11px',
+                      borderRadius: '6px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      fontWeight: viewingTicket.assignedTo ? 600 : 500,
+                    }}
+                  >
+                    <span
+                      className="ticket-status-dot"
+                      style={{
+                        background: viewingTicket.assignedTo ? '#10b981' : '#94a3b8',
+                      }}
+                    />
+                    {viewingTicket.assignedTo
+                      ? `Assigned (${viewingTicket.assignedTo})`
+                      : 'Not Assigned'}
+                  </span>
+                </div>
+
+                {(viewingTicket.client || viewingTicket.customer) && (
+                  <div className="ticket-desc-meta-item">
+                    <span className="ticket-desc-meta-label">Client:</span>
+                    <span>{viewingTicket.client || viewingTicket.customer}</span>
+                  </div>
+                )}
+
+                {(viewingTicket.clientMobile || viewingTicket.customerMobile) && (
+                  <div className="ticket-desc-meta-item">
+                    <span className="ticket-desc-meta-label">Mobile:</span>
+                    <button
+                      type="button"
+                      className="ticket-client-phone"
+                      title={`Contact ${viewingTicket.client || viewingTicket.customer || 'client'} (${viewingTicket.clientMobile || viewingTicket.customerMobile})`}
+                      onClick={() =>
+                        setContactDialog({
+                          name: viewingTicket.client || viewingTicket.customer || 'Client',
+                          phone: viewingTicket.clientMobile || viewingTicket.customerMobile,
+                          email: viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email || '',
+                        })
+                      }
+                    >
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                      </svg>
+                      <span>{viewingTicket.clientMobile || viewingTicket.customerMobile}</span>
+                    </button>
+                  </div>
+                )}
+
+                {(viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email) && (
+                  <div className="ticket-desc-meta-item">
+                    <span className="ticket-desc-meta-label">Email:</span>
+                    <a
+                      href={`mailto:${viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email}`}
+                      className="ticket-client-email"
+                      title={`Send email to ${viewingTicket.client || viewingTicket.customer || 'client'} (${viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email})`}
+                      aria-label={`Send email to ${viewingTicket.client || viewingTicket.customer || 'client'} at ${viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email}`}
+                    >
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <rect width="20" height="16" x="2" y="4" rx="2" />
+                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                      </svg>
+                      <span>{viewingTicket.clientEmail || viewingTicket.customerEmail || viewingTicket.email}</span>
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              <div className="ticket-desc-body">
+                <label className="ticket-desc-label">Description</label>
+                <div className="ticket-desc-text">
+                  {viewingTicket.description || 'No description provided.'}
+                </div>
+
+                {/* Conditional Transaction Details if ticket was raised with transaction info */}
+                {(viewingTicket.transactionId || viewingTicket.amount || viewingTicket.operator) && (
+                  <div style={{ marginTop: '12px', background: '#f8fafc', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: 600, fontSize: '12.5px', color: '#334155', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                        <rect width="20" height="14" x="2" y="5" rx="2" />
+                        <line x1="2" x2="22" y1="10" y2="10" />
+                      </svg>
+                      <span>Transaction & Payment Details</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px 14px', fontSize: '12px' }}>
+                      {viewingTicket.transactionId && (
+                        <div>
+                          <span style={{ color: '#64748b' }}>Txn / UTR: </span>
+                          <strong style={{ color: '#0f172a' }}>{viewingTicket.transactionId}</strong>
+                        </div>
+                      )}
+                      {viewingTicket.amount !== undefined && viewingTicket.amount !== null && viewingTicket.amount !== '' && (
+                        <div>
+                          <span style={{ color: '#64748b' }}>Amount: </span>
+                          <strong style={{ color: '#0f172a' }}>₹{Number(viewingTicket.amount).toLocaleString('en-IN')}</strong>
+                        </div>
+                      )}
+                      {viewingTicket.operator && (
+                        <div>
+                          <span style={{ color: '#64748b' }}>Operator: </span>
+                          <strong style={{ color: '#0f172a' }}>{viewingTicket.operator}</strong>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Optional Screenshot Attachment */}
+                {viewingTicket.screenshot && (
+                  <div style={{ marginTop: '12px' }}>
+                    <label className="ticket-desc-label">Attachment / Screenshot</label>
+                    <div style={{ marginTop: '6px' }}>
+                      <a
+                        href={viewingTicket.screenshot}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Click to view full image in a new tab"
+                        style={{ display: 'inline-block' }}
+                      >
+                        <img
+                          src={viewingTicket.screenshot}
+                          alt="Ticket Attachment Preview"
+                          style={{
+                            maxWidth: '100%',
+                            maxHeight: '200px',
+                            borderRadius: '6px',
+                            border: '1px solid #cbd5e1',
+                            objectFit: 'contain',
+                            display: 'block',
+                          }}
+                        />
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="ticket-dialog-actions ticket-view-dialog-actions">
+              <button
+                type="button"
+                className="ticket-view-logs-btn"
+                onClick={() => {
+                  const t = viewingTicket;
+                  setViewingTicket(null);
+                  setViewingLogsTicket(t);
+                }}
+                title="View complete audit & change logs for this ticket"
+              >
+                <TicketIcon type="log" />
+                <span>View Ticket Logs</span>
+              </button>
+
+              <button
+                type="button"
+                className="ticket-view-close-btn"
+                onClick={() => setViewingTicket(null)}
+              >
+                Close
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════
           EDIT TICKET POP-UP DIALOG
       ═══════════════════════════════════════ */}
       {editingTicket && (
-        <div className="ticket-dialog-overlay">
+        <div className="ticket-dialog-overlay" onClick={closeEditTicket}>
           <section
             className="ticket-dialog"
             role="dialog"
             aria-modal="true"
             aria-labelledby="dashboard-edit-ticket-title"
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="ticket-dialog-header">
               <div>
@@ -2809,12 +3106,13 @@ export default function DashboardPage({
           DELETE CONFIRMATION DIALOG
       ═══════════════════════════════════════ */}
       {ticketToDelete && (
-        <div className="ticket-dialog-overlay">
+        <div className="ticket-dialog-overlay" onClick={closeDeleteTicket}>
           <section
             className="ticket-delete-dialog"
             role="dialog"
             aria-modal="true"
             aria-labelledby="dashboard-delete-ticket-title"
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="ticket-delete-symbol">
               <TicketIcon type="delete" />

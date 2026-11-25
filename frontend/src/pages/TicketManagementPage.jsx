@@ -305,6 +305,15 @@ export function TicketIcon({ type }) {
     );
   }
 
+  if (type === 'view' || type === 'eye') {
+    return (
+      <svg {...common} width={15} height={15}>
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+    );
+  }
+
   if (type === 'description') {
     return (
       <svg {...common} width={15} height={15}>
@@ -353,11 +362,14 @@ export function TicketIcon({ type }) {
  */
 export function TicketFormFields({ values, onChange, employees, idPrefix, isAdmin }) {
   const id = (name) => `${idPrefix}-ticket-${name}`;
+  const normCategory = String(values.category || '').trim().toLowerCase();
   const isCustomCategory =
-    !['recharge', 'payment', 'wallet', 'technical'].includes(values.category);
+    Boolean(values.isCustomCategory) ||
+    (Boolean(normCategory) &&
+      !['recharge', 'payment', 'wallet', 'technical'].includes(normCategory));
   const isStatusLocked =
     !isAdmin &&
-    idPrefix === 'edit' &&
+    (idPrefix === 'edit' || idPrefix === 'db-edit') &&
     (values.originalStatus === 'resolved' || values.status === 'resolved');
 
   return (
@@ -394,7 +406,7 @@ export function TicketFormFields({ values, onChange, employees, idPrefix, isAdmi
         />
       </div>
       <div className="ticket-form-field">
-        <label htmlFor={id('email')}>Email *</label>
+        <label htmlFor={id('email')}>Email</label>
         <input
           id={id('email')}
           type="email"
@@ -404,8 +416,7 @@ export function TicketFormFields({ values, onChange, employees, idPrefix, isAdmi
             onChange('clientEmail', val);
             onChange('customerEmail', val);
           }}
-          placeholder="Enter email address"
-          required
+          placeholder="Enter email address (optional)"
         />
       </div>
 
@@ -423,7 +434,10 @@ export function TicketFormFields({ values, onChange, employees, idPrefix, isAdmi
                 type="button"
                 className="ticket-category-switch-btn"
                 title="Choose from preset categories"
-                onClick={() => onChange('category', 'recharge')}
+                onClick={() => {
+                  onChange('isCustomCategory', false);
+                  onChange('category', 'recharge');
+                }}
               >
                 Choose from list ▾
               </button>
@@ -459,8 +473,10 @@ export function TicketFormFields({ values, onChange, employees, idPrefix, isAdmi
             onChange={(e) => {
               const val = e.target.value;
               if (val === 'custom') {
+                onChange('isCustomCategory', true);
                 onChange('category', '');
               } else {
+                onChange('isCustomCategory', false);
                 onChange('category', val);
               }
             }}
@@ -1466,7 +1482,12 @@ export default function TicketManagementPage() {
                         {/* 1. Ticket ID */}
                         <td className="db-mono">
                           <div className="ticket-id-cell">
-                            <span className="ticket-id-text">
+                            <span
+                              className="ticket-id-text"
+                              style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationColor: '#cbd5e1' }}
+                              title="Click to view ticket details"
+                              onClick={() => setViewingTicket(ticket)}
+                            >
                               {ticket.id}
                             </span>
                             {isNew && (
@@ -1788,8 +1809,18 @@ export default function TicketManagementPage() {
                         {/* 9. Actions */}
                         <td className="ticket-actions-cell">
                           <div className="ticket-row-actions">
-                            {/* Column 1: L & I */}
+                            {/* Column 1: View & Transfer History (Log) */}
                             <div className="ticket-action-col">
+                              <button
+                                type="button"
+                                className="ticket-icon-button ticket-view-icon"
+                                title="View ticket details"
+                                aria-label={`View ticket ${ticket.id} details`}
+                                onClick={() => setViewingTicket(ticket)}
+                              >
+                                <TicketIcon type="view" />
+                              </button>
+
                               <button
                                 type="button"
                                 className="ticket-icon-button ticket-log-icon"
@@ -1799,28 +1830,6 @@ export default function TicketManagementPage() {
                               >
                                 <TicketIcon type="log" />
                               </button>
-
-                              {!isAdmin ? (
-                                <button
-                                  type="button"
-                                  className="ticket-icon-button ticket-ask-admin-icon"
-                                  title="Ask Admin for Help"
-                                  aria-label={`Ask admin for help on ticket ${ticket.id}`}
-                                  onClick={() => setAskAdminTicket(ticket)}
-                                >
-                                  <TicketIcon type="ask-admin" />
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  className="ticket-icon-button ticket-ask-employee-icon"
-                                  title="Ask Employee / Query"
-                                  aria-label={`Ask employee on ticket ${ticket.id}`}
-                                  onClick={() => setAskEmployeeTicket(ticket)}
-                                >
-                                  <TicketIcon type="ask-admin" />
-                                </button>
-                              )}
                             </div>
 
                             {/* Column 2: Edit & Delete */}
@@ -1846,9 +1855,31 @@ export default function TicketManagementPage() {
                               </button>
                             </div>
 
-                            {/* Column 3: Transfer button */}
-                            {!isAdmin && (
-                              <div className="ticket-action-col ticket-action-col-single">
+                            {/* Column 3: Query & Transfer */}
+                            <div className="ticket-action-col">
+                              {!isAdmin ? (
+                                <button
+                                  type="button"
+                                  className="ticket-icon-button ticket-ask-admin-icon"
+                                  title="Ask Admin for Help"
+                                  aria-label={`Ask admin for help on ticket ${ticket.id}`}
+                                  onClick={() => setAskAdminTicket(ticket)}
+                                >
+                                  <TicketIcon type="ask-admin" />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="ticket-icon-button ticket-ask-employee-icon"
+                                  title="Ask Employee / Query"
+                                  aria-label={`Ask employee on ticket ${ticket.id}`}
+                                  onClick={() => setAskEmployeeTicket(ticket)}
+                                >
+                                  <TicketIcon type="ask-admin" />
+                                </button>
+                              )}
+
+                              {!isAdmin && (
                                 <button
                                   type="button"
                                   className="ticket-icon-button ticket-transfer-icon"
@@ -1858,8 +1889,8 @@ export default function TicketManagementPage() {
                                 >
                                   <TicketIcon type="transfer" />
                                 </button>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </div>
                         </td>
                       </tr>

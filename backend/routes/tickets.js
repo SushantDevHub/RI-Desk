@@ -977,7 +977,22 @@ router.patch('/:id', authenticate, (req, res) => {
       });
     }
 
-    const { status, priority, category, description, subject, assignedToId } = req.body;
+    const {
+      status,
+      priority,
+      category,
+      description,
+      subject,
+      assignedToId,
+      client,
+      customer,
+      clientMobile,
+      customerMobile,
+      clientEmail,
+      customerEmail,
+      email,
+      userType,
+    } = req.body;
     const updates = {};
     const changes = [];
 
@@ -991,6 +1006,59 @@ router.patch('/:id', authenticate, (req, res) => {
     const employeeName = existing.assignedTo || null;
     let newAssignedTo = employeeName;
     let newIsAssigned = isAssigned;
+
+    // Client Name updates
+    if (client !== undefined || customer !== undefined) {
+      const incomingClient = client !== undefined ? client : customer;
+      const oldClient = (existing.client || existing.customer || '').trim();
+      const newClient = incomingClient !== undefined ? String(incomingClient).trim() : oldClient;
+      if (oldClient !== newClient) {
+        changes.push({
+          field: 'Client',
+          oldValue: oldClient || 'None',
+          newValue: newClient || 'None',
+        });
+      }
+      updates.client = newClient;
+      updates.customer = newClient;
+    }
+
+    // Client Mobile updates
+    if (clientMobile !== undefined || customerMobile !== undefined) {
+      const incomingMobile = clientMobile !== undefined ? clientMobile : customerMobile;
+      const oldMobile = (existing.clientMobile || existing.customerMobile || '').trim();
+      const newMobile = incomingMobile !== undefined ? String(incomingMobile).trim() : oldMobile;
+      if (oldMobile !== newMobile) {
+        changes.push({
+          field: 'Mobile',
+          oldValue: oldMobile || 'None',
+          newValue: newMobile || 'None',
+        });
+      }
+      updates.clientMobile = newMobile;
+      updates.customerMobile = newMobile;
+    }
+
+    // Client Email updates
+    if (clientEmail !== undefined || customerEmail !== undefined || email !== undefined) {
+      const incomingEmail = clientEmail !== undefined ? clientEmail : customerEmail !== undefined ? customerEmail : email;
+      const oldEmail = (existing.clientEmail || existing.customerEmail || existing.email || '').trim();
+      const newEmail = incomingEmail !== undefined ? String(incomingEmail).trim() : oldEmail;
+      if (oldEmail !== newEmail) {
+        changes.push({
+          field: 'Email',
+          oldValue: oldEmail || 'None',
+          newValue: newEmail || 'None',
+        });
+      }
+      updates.clientEmail = newEmail;
+      updates.customerEmail = newEmail;
+      updates.email = newEmail;
+    }
+
+    if (userType !== undefined) {
+      updates.userType = userType;
+    }
 
     if (assignedToId !== undefined) {
       if (
