@@ -1743,23 +1743,26 @@ export default function DashboardPage({
         </button>
 
         <div className="db-brand">
-  <img
-    src="img.jpg"
-    className="login-brand-logo"
-    alt="RI-Desk Logo"
-  />
+          <img
+            src="/img.jpg"
+            className="db-brand-logo"
+            alt="RI-Desk Logo"
+            onError={(e) => {
+              e.currentTarget.src = 'img.jpg';
+            }}
+          />
 
-  <div className="db-brand-text">
-    <div>
-      <span className="db-brand-a">RI-</span>
-      <span className="db-brand-b">Desk</span>
-    </div>
+          <div className="db-brand-text">
+            <div className="db-brand-title">
+              <span className="db-brand-a">RI-</span>
+              <span className="db-brand-b">Desk</span>
+            </div>
 
-    <div className="db-brand-slogan">
-      One-stop Solution for all.
-    </div>
-  </div>
-</div>
+            <div className="db-brand-slogan">
+              One-stop Solution for all.
+            </div>
+          </div>
+        </div>
         <div className="db-topbar-right">
 
           {/* ── Notification Bell Logo with Count (Employees & Admin) ── */}
