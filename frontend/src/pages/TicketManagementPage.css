@@ -12,35 +12,50 @@
 }
 
 .ticket-controls {
-  display: grid;
-  grid-template-columns: 1fr 160px 160px 160px;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .ticket-filters-column {
-  display: contents;
-}
-
-.ticket-search,
-.ticket-filter-select {
-  width: 100%;
-  min-width: 0;
-  height: 42px;
-  padding: 0 14px;
-  border: 1px solid #dfe7f1;
-  border-radius: 10px;
-  background: #ffffff;
-  color: #1e293b;
-  font: inherit;
-  font-size: 14px;
-  box-sizing: border-box;
-  outline: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .ticket-search {
-  align-self: start;
+  flex: 1 1 200px;
+  max-width: 340px;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1e293b;
+  font: inherit;
+  font-size: 13px;
+  box-sizing: border-box;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.ticket-filter-select {
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  font: inherit;
+  font-size: 13px;
+  box-sizing: border-box;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 .ticket-search::placeholder {
@@ -49,8 +64,51 @@
 
 .ticket-search:focus,
 .ticket-filter-select:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+/* Filter color indicators matching Client Management */
+.select-status-filter {
+  border-left: 3px solid #6366f1 !important;
+}
+
+.select-services-filter,
+.select-category-filter {
+  border-left: 3px solid #3b82f6 !important;
+}
+
+.select-features-filter,
+.select-staff-filter {
+  border-left: 3px solid #10b981 !important;
+}
+
+.select-priority-filter {
+  border-left: 3px solid #ef4444 !important;
+}
+
+.ticket-clear-filters-btn {
+  height: 38px;
+  padding: 0 14px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.ticket-clear-filters-btn:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  color: #0f172a;
+  transform: translateY(-1px);
 }
 
 .ticket-table-card {
@@ -221,11 +279,22 @@
 
 @media (max-width: 900px) {
   .ticket-controls {
-    grid-template-columns: 1fr 1fr 1fr;
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .ticket-search {
-    grid-column: 1 / -1;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .ticket-filters-column {
+    width: 100%;
+  }
+
+  .ticket-filter-select {
+    flex: 1 1 calc(50% - 8px);
+    min-width: 130px;
   }
 }
 
@@ -251,13 +320,18 @@
   }
 
   .ticket-controls {
-    grid-template-columns: 1fr;
+    flex-direction: column;
     gap: 10px;
   }
 
-  .ticket-search,
   .ticket-filter-select {
-    height: 44px;
+    flex: 1 1 100%;
+    width: 100%;
+    height: 40px;
+  }
+
+  .ticket-search {
+    height: 40px;
   }
 }
 

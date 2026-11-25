@@ -1243,7 +1243,7 @@ export default function TicketManagementPage() {
 
           <div className="ticket-filters-column">
             <select
-              className="ticket-filter-select"
+              className="ticket-filter-select select-status-filter"
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
               aria-label="Filter by status"
@@ -1255,7 +1255,7 @@ export default function TicketManagementPage() {
             </select>
 
             <select
-              className="ticket-filter-select"
+              className="ticket-filter-select select-category-filter"
               value={categoryFilter}
               onChange={(event) => setCategoryFilter(event.target.value)}
               aria-label="Filter by category"
@@ -1268,7 +1268,7 @@ export default function TicketManagementPage() {
             </select>
 
             <select
-              className="ticket-filter-select"
+              className="ticket-filter-select select-priority-filter"
               value={priorityFilter}
               onChange={(event) => setPriorityFilter(event.target.value)}
               aria-label="Filter by priority"
@@ -1280,7 +1280,7 @@ export default function TicketManagementPage() {
             </select>
 
             <select
-              className="ticket-filter-select"
+              className="ticket-filter-select select-staff-filter"
               value={staffFilter}
               onChange={(event) => setStaffFilter(event.target.value)}
               aria-label="Choose support staff"
@@ -1293,6 +1293,23 @@ export default function TicketManagementPage() {
                 </option>
               ))}
             </select>
+
+            {(search || statusFilter !== 'all' || categoryFilter !== 'all' || priorityFilter !== 'all' || staffFilter !== 'all') && (
+              <button
+                type="button"
+                className="ticket-clear-filters-btn client-clear-filters-btn"
+                onClick={() => {
+                  setSearch('');
+                  setStatusFilter('all');
+                  setCategoryFilter('all');
+                  setPriorityFilter('all');
+                  setStaffFilter('all');
+                }}
+                title="Reset all filters"
+              >
+                Clear
+              </button>
+            )}
           </div>
         </div>
       ) : (
@@ -1317,7 +1334,7 @@ export default function TicketManagementPage() {
             </span>
             <select
               id="employee-staff-filter"
-              className="ticket-filter-select"
+              className="ticket-filter-select select-staff-filter"
               value={staffFilter}
               onChange={(event) => setStaffFilter(event.target.value)}
               aria-label="Choose support staff from the dropdown"

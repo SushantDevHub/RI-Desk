@@ -2450,14 +2450,14 @@ export default function DashboardPage({
                       </div>
                       <span style={{ display: 'block', marginTop: 2, fontSize: 12.5, color: '#64748b' }}>
                         {selectedStat === 'open'
-                          ? 'Listing all unresolved tickets currently awaiting action'
+                          ? ''
                           : selectedStat === 'high'
-                          ? 'Listing all urgent high-priority tickets'
+                          ? ''
                           : selectedStat === 'medium'
-                          ? 'Listing all medium-priority tickets'
+                          ? ''
                           : selectedStat === 'low'
-                          ? 'Listing all low-priority tickets'
-                          : 'Listing all closed and resolved conversations'}
+                          ? ''
+                          : ''}
                       </span>
                     </div>
 
@@ -2520,7 +2520,7 @@ export default function DashboardPage({
 
                     {renderTicketTable(
                       unassignedOpenTickets,
-                      '✓ No unassigned tickets. All tickets are currently assigned.'
+                      '✓ No unassigned tickets.'
                     )}
                   </div>
 
@@ -2577,7 +2577,7 @@ export default function DashboardPage({
 
                     {renderTicketTable(
                       openTicketsDescending,
-                      '✓ No assigned open tickets. All tickets are currently resolved or unassigned!'
+                      '✓ No assigned open tickets.'
                     )}
                   </div>
                 </>
@@ -3060,7 +3060,7 @@ export default function DashboardPage({
             <h2 id="logout-dialog-title">Log Out?</h2>
 
             <p id="logout-dialog-desc">
-              Are you sure you want to log out of <strong>RI-Desk</strong>? You will need to sign in again to access your dashboard.
+              Are you sure you want to log out of <strong>RI-Desk</strong>?
             </p>
 
             <div className="logout-dialog-actions">

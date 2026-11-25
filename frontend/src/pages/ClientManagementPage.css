@@ -361,12 +361,22 @@
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
 }
 
-.select-services-filter {
+.select-status-filter {
+  border-left: 3px solid #6366f1;
+}
+
+.select-services-filter,
+.select-category-filter {
   border-left: 3px solid #3b82f6;
 }
 
-.select-features-filter {
+.select-features-filter,
+.select-staff-filter {
   border-left: 3px solid #10b981;
+}
+
+.select-priority-filter {
+  border-left: 3px solid #ef4444;
 }
 
 .client-clear-filters-btn {

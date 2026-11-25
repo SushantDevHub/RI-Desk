@@ -56,7 +56,6 @@ const CLIENT_STAT_CONFIG = {
   total: {
     key: 'total',
     title: 'Total Registered Clients List',
-    description: 'Listing all registered company profiles and client accounts',
     color: '#4f46e5',
     pillBg: '#e0e7ff',
     pillColor: '#3730a3',
@@ -65,7 +64,6 @@ const CLIENT_STAT_CONFIG = {
   active: {
     key: 'active',
     title: 'Active Clients List',
-    description: 'Listing all active client accounts currently receiving services',
     color: '#059669',
     pillBg: '#d1fae5',
     pillColor: '#065f46',
@@ -74,7 +72,6 @@ const CLIENT_STAT_CONFIG = {
   revenue: {
     key: 'revenue',
     title: 'Monthly Rental Revenue List',
-    description: 'Listing paying clients sorted by highest monthly rental revenue',
     color: '#6366f1',
     pillBg: '#eef2ff',
     pillColor: '#3730a3',
@@ -83,7 +80,6 @@ const CLIENT_STAT_CONFIG = {
   services: {
     key: 'services',
     title: 'Subscribed Services Clients List',
-    description: 'Listing clients currently enrolled in active service packages',
     color: '#2563eb',
     pillBg: '#dbeafe',
     pillColor: '#1e40af',
@@ -92,7 +88,6 @@ const CLIENT_STAT_CONFIG = {
   features: {
     key: 'features',
     title: 'Active Features Clients List',
-    description: 'Listing clients with active enabled software features',
     color: '#0d9488',
     pillBg: '#ccfbf1',
     pillColor: '#115e59',
@@ -748,7 +743,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
 
         <div className="client-filters-wrap">
           <select
-            className="client-filter-select"
+            className="client-filter-select select-status-filter"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             aria-label="Filter by status"
