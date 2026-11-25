@@ -195,7 +195,7 @@ export default function AskAdminDialog({ ticket, currentUser, onClose }) {
             </div>
             <div>
               <h2 id="ask-admin-dialog-title" className="ask-admin-title">
-                Ask Admin for Help
+                Ask Admin For Help ?
               </h2>
             </div>
           </div>
@@ -229,7 +229,7 @@ export default function AskAdminDialog({ ticket, currentUser, onClose }) {
 
             <div className="ask-admin-client-box">
               <div className="ask-admin-client-row">
-                <span className="ask-admin-lbl">Client / Customer:</span>
+                <span className="ask-admin-lbl">Client:</span>
                 <strong>{clientName}</strong>
               </div>
               {clientMobile && (
@@ -264,7 +264,7 @@ export default function AskAdminDialog({ ticket, currentUser, onClose }) {
           {/* Description / Query Box */}
           <div className="ask-admin-field">
             <label htmlFor="ask-admin-doubt-input" className="ask-admin-field-label">
-              Description / Query for Admin <span className="opt">(optional)</span>
+              Query for Admin <span className="opt">(optional)</span>
             </label>
             <textarea
               id="ask-admin-doubt-input"
