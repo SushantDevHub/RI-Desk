@@ -132,7 +132,10 @@ export function syncClientsWithTickets() {
     if (existingIndex !== -1) {
       const existing = mergedClients[existingIndex];
       const mergedServices = Array.from(new Set([...(existing.services || []), ...servicesFromTickets]));
-      const features = Array.isArray(existing.features) && existing.features.length > 0 ? existing.features : ['WhatsApp', 'SMS'];
+      const features = (Array.isArray(existing.features) && existing.features.length > 0
+        ? existing.features
+        : ['WhatsApp', 'Email']
+      ).filter((f) => f !== 'SMS');
 
       mergedClients[existingIndex] = {
         ...existing,
@@ -149,7 +152,7 @@ export function syncClientsWithTickets() {
         updatedAt: group.latestUpdatedAt || existing.updatedAt,
       };
     } else {
-      const features = ['WhatsApp', 'SMS'];
+      const features = ['WhatsApp', 'Email'];
       const newClient = {
         id: `CLI-${nextCliNumber++}`,
         name: group.name || 'Client',
@@ -192,6 +195,16 @@ export function syncClientsWithTickets() {
         client.ticketCount = client.ticketCount || 0;
         client.tickets = client.tickets || [];
       }
+    }
+  });
+
+  // Clean any legacy 'SMS' features
+  mergedClients.forEach((client) => {
+    if (Array.isArray(client.features)) {
+      client.features = client.features.filter((f) => f !== 'SMS');
+    }
+    if (Array.isArray(client.servicesFeatures)) {
+      client.servicesFeatures = client.servicesFeatures.filter((f) => f !== 'SMS');
     }
   });
 

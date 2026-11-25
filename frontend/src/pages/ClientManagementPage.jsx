@@ -34,7 +34,6 @@ const SERVICES_VERSION = 'v2_recharge_utilities';
 const PREDEFINED_FEATURES = [
   'WhatsApp',
   'Email',
-  'SMS',
 ];
 
 const EMPTY_FORM = {
@@ -185,7 +184,12 @@ export default function ClientManagementPage({ isAdmin = true }) {
         },
       });
       const data = await readResponse(res);
-      const list = Array.isArray(data.clients) ? data.clients : [];
+      const rawList = Array.isArray(data.clients) ? data.clients : [];
+      const list = rawList.map((c) => ({
+        ...c,
+        features: (Array.isArray(c.features) ? c.features : []).filter((f) => f !== 'SMS'),
+        servicesFeatures: (Array.isArray(c.servicesFeatures) ? c.servicesFeatures : []).filter((f) => f !== 'SMS'),
+      }));
       setClients(list.slice().sort(sortClientsDescending));
     } catch (err) {
       setError(err.message || 'Failed to load clients.');
@@ -456,7 +460,9 @@ export default function ClientManagementPage({ isAdmin = true }) {
     clients.forEach((c) => {
       if (Array.isArray(c.features)) {
         c.features.forEach((f) => {
-          if (f && typeof f === 'string') set.add(f.trim());
+          if (f && typeof f === 'string' && f.trim().toUpperCase() !== 'SMS') {
+            set.add(f.trim());
+          }
         });
       }
     });
@@ -1393,7 +1399,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
                   </select>
                 </div>
 
-                {/* ── Features Dropdown (WhatsApp, Email, SMS, Custom) ── */}
+                {/* ── Features Dropdown (WhatsApp, Email, Custom) ── */}
                 <div className="client-form-field">
                   <div className="client-label-with-action">
                     <label htmlFor="client-features-select">
