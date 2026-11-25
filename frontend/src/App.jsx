@@ -8,6 +8,7 @@ import {
 import LoginPage from './components/LoginPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import LocationPermissionModal from './components/LocationPermissionModal.jsx';
+import RaiseTicketPage from './modules/raise-ticket/RaiseTicketPage.jsx';
 
 import {
   loginUser,
@@ -117,6 +118,9 @@ export default function App() {
   return (
     <>
       <Routes>
+        {/* Standalone Public Raise Ticket Route */}
+        <Route path="/raise-ticket" element={<RaiseTicketPage />} />
+
         {/* Login */}
         <Route
           path="/login"

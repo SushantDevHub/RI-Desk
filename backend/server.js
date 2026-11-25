@@ -8,13 +8,15 @@ import designationsRoutes from './routes/designations.js';
 import clientsRoutes from './routes/clients.js';
 import announcementsRoutes from './routes/announcements.js';
 import notificationsRoutes from './routes/notifications.js';
+import raiseTicketRoutes from './modules/tickets/ticketRoutes.js';
 
  
 const app = express();
 const PORT = process.env.PORT || 4000;
  
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use('/api/tickets', raiseTicketRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/tickets', ticketsRoutes);
 app.use('/api/users', usersRoutes);

@@ -270,6 +270,17 @@ export default function LoginPage({ onLogin, error, loading }) {
                 >
                   {loading ? 'Signing In...' : 'Sign In'}
                 </button>
+
+                {/* Public Raise Ticket Link */}
+                <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '13px', color: '#64748b' }}>
+                  Facing an issue?{' '}
+                  <a
+                    href="/raise-ticket"
+                    style={{ color: '#4f46e5', fontWeight: 600, textDecoration: 'none' }}
+                  >
+                    Raise Support Ticket
+                  </a>
+                </div>
               </form>
             </>
           ) : (
