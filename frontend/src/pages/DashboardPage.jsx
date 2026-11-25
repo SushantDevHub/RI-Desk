@@ -987,6 +987,11 @@ export default function DashboardPage({
       window.dispatchEvent(
         new CustomEvent('tickets-updated', { detail: data.ticket || { id: ticket.id, [field]: value } })
       );
+      if (data.notification) {
+        window.dispatchEvent(
+          new CustomEvent('notifications-updated', { detail: data.notification })
+        );
+      }
       try {
         localStorage.setItem('tickets_last_sync', String(Date.now()));
       } catch (e) {}
@@ -1149,6 +1154,11 @@ export default function DashboardPage({
           detail: data.ticket || optimisticUpdate,
         })
       );
+      if (data.notification) {
+        window.dispatchEvent(
+          new CustomEvent('notifications-updated', { detail: data.notification })
+        );
+      }
       try {
         localStorage.setItem('tickets_last_sync', String(Date.now()));
       } catch (e) {}
@@ -1797,12 +1807,13 @@ export default function DashboardPage({
                       <div className="db-notif-empty">
                         <div className="db-notif-empty-title">No notifications</div>
                         <div className="db-notif-empty-desc">
-                          Ticket transfers will appear here.
+                          Ticket assignments & transfers will appear here.
                         </div>
                       </div>
                     ) : (
                       notifications.map((notif) => {
                         const isMobile = notif.type === 'mobile_notification';
+                        const isAssigned = notif.type === 'ticket_assigned';
                         return (
                           <div
                             key={notif.id}
@@ -1827,32 +1838,65 @@ export default function DashboardPage({
                               ) : (
                                 <>
                                   <div className="db-notif-item-title">
-                                    {String(notif.senderId) === String(user?.id) ? (
-                                      <>
-                                        <strong>You</strong> transferred ticket{' '}
-                                        <span className="db-notif-ticket-id">
-                                          #{notif.ticketNumber || notif.ticketId}
-                                        </span>{' '}
-                                        to <strong>{notif.recipientName || 'assigned employee'}</strong>
-                                      </>
-                                    ) : String(notif.recipientId) === String(user?.id) ? (
-                                      <>
-                                        <strong>{notif.senderName}</strong> transferred ticket{' '}
-                                        <span className="db-notif-ticket-id">
-                                          #{notif.ticketNumber || notif.ticketId}
-                                        </span>{' '}
-                                        to you
-                                      </>
+                                    {isAssigned ? (
+                                      String(notif.senderId) === String(user?.id) ? (
+                                        <>
+                                          <strong>You</strong> assigned ticket{' '}
+                                          <span className="db-notif-ticket-id">
+                                            #{notif.ticketNumber || notif.ticketId}
+                                          </span>{' '}
+                                          to <strong>{notif.recipientName || 'assigned employee'}</strong>
+                                        </>
+                                      ) : String(notif.recipientId) === String(user?.id) ? (
+                                        <>
+                                          <strong>{notif.senderName || 'Admin'}</strong> assigned ticket{' '}
+                                          <span className="db-notif-ticket-id">
+                                            #{notif.ticketNumber || notif.ticketId}
+                                          </span>{' '}
+                                          to you
+                                        </>
+                                      ) : (
+                                        <>
+                                          <strong>{notif.senderName || 'Admin'}</strong> assigned ticket{' '}
+                                          <span className="db-notif-ticket-id">
+                                            #{notif.ticketNumber || notif.ticketId}
+                                          </span>{' '}
+                                          to <strong>{notif.recipientName || 'assigned employee'}</strong>
+                                        </>
+                                      )
                                     ) : (
-                                      <>
-                                        <strong>{notif.senderName}</strong> transferred ticket{' '}
-                                        <span className="db-notif-ticket-id">
-                                          #{notif.ticketNumber || notif.ticketId}
-                                        </span>{' '}
-                                        to <strong>{notif.recipientName || 'assigned employee'}</strong>
-                                      </>
+                                      String(notif.senderId) === String(user?.id) ? (
+                                        <>
+                                          <strong>You</strong> transferred ticket{' '}
+                                          <span className="db-notif-ticket-id">
+                                            #{notif.ticketNumber || notif.ticketId}
+                                          </span>{' '}
+                                          to <strong>{notif.recipientName || 'assigned employee'}</strong>
+                                        </>
+                                      ) : String(notif.recipientId) === String(user?.id) ? (
+                                        <>
+                                          <strong>{notif.senderName}</strong> transferred ticket{' '}
+                                          <span className="db-notif-ticket-id">
+                                            #{notif.ticketNumber || notif.ticketId}
+                                          </span>{' '}
+                                          to you
+                                        </>
+                                      ) : (
+                                        <>
+                                          <strong>{notif.senderName}</strong> transferred ticket{' '}
+                                          <span className="db-notif-ticket-id">
+                                            #{notif.ticketNumber || notif.ticketId}
+                                          </span>{' '}
+                                          to <strong>{notif.recipientName || 'assigned employee'}</strong>
+                                        </>
+                                      )
                                     )}
                                   </div>
+                                  {notif.ticketSubject && (
+                                    <div className="db-notif-item-desc">
+                                      Subject: {notif.ticketSubject}
+                                    </div>
+                                  )}
                                   {notif.workLeft && (
                                     <div className="db-notif-item-desc">
                                       Note: {notif.workLeft}

@@ -516,7 +516,7 @@
 }
 
 .ticket-form-field textarea {
-  resize: vertical;
+  resize: none;
   min-height: 110px;
 }
 
@@ -721,7 +721,7 @@
 }
 
 .ticket-dialog .ticket-form-field textarea {
-  resize: vertical;
+  resize: none;
   min-height: 100px;
 }
 
@@ -1032,7 +1032,7 @@
 }
 
 .ticket-dialog .ticket-form-field textarea {
-  resize: vertical;
+  resize: none;
 }
 
 .ticket-dialog .ticket-form-field input:focus,
@@ -1939,25 +1939,71 @@
 }
 
 .contact-dialog-footer {
+  margin: 16px -24px -24px -24px;
+  padding: 12px 20px 16px 20px;
+  border-top: 1px solid #f1f5f9;
+  background: #ffffff;
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 18px;
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 10px;
 }
 
+.contact-dialog-close-btn,
 .contact-dialog-cancel-btn {
   padding: 8px 18px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid transparent;
   border-radius: 8px;
-  background: #ffffff;
-  color: #475569;
+  background: #4338ca;
+  color: #ffffff;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.3;
   transition: all 0.15s ease;
 }
 
+.contact-dialog-close-btn:hover,
 .contact-dialog-cancel-btn:hover {
-  background: #f1f5f9;
-  color: #0f172a;
+  background: #382dad;
+  color: #ffffff;
+}
+
+.ticket-view-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 20px 16px 20px;
+  border-top: 1px solid #f1f5f9;
+  background: #ffffff;
+  margin-top: 20px;
+}
+
+.ticket-view-close-btn {
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  background: #4338ca;
+  color: #ffffff;
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.3;
+  transition: all 0.15s ease;
+}
+
+.ticket-view-close-btn:hover {
+  background: #382dad;
+  color: #ffffff;
 }
 
 .ticket-view-logs-btn {

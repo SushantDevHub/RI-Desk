@@ -253,7 +253,7 @@ export default function AskEmployeeDialog({
             </div>
             <div>
               <h2 id="ask-emp-dialog-title" className="ask-emp-title">
-                Ask Employee ?
+                Ask Employee For Help ?
               </h2>
             </div>
           </div>
@@ -293,7 +293,7 @@ export default function AskEmployeeDialog({
                       String(ticket.assignedTo).trim().toLowerCase());
                 return (
                   <option key={emp.id} value={String(emp.id)}>
-                    {emp.name} {isCurrentlyAssigned ? ' (Currently Assigned)' : ''}
+                    {emp.name} {isCurrentlyAssigned ? '(Currently Assigned)' : ''}
                   </option>
                 );
               })}
@@ -317,7 +317,7 @@ export default function AskEmployeeDialog({
 
             <div className="ask-emp-client-box">
               <div className="ask-emp-client-row">
-                <span className="ask-emp-lbl">Client :</span>
+                <span className="ask-emp-lbl">Client:</span>
                 <strong>{clientName}</strong>
               </div>
               {clientMobile && (
@@ -349,17 +349,24 @@ export default function AskEmployeeDialog({
             )}
           </div>
 
-          {/* Admin Instructions / Doubt Textarea */}
+          {/* Description / Query Box */}
           <div className="ask-emp-field">
-            <label htmlFor="ask-emp-doubt-input" className="ask-emp-field-label">
-            Query for {employeeName} <span className="opt">(optional)</span>
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label htmlFor="ask-emp-doubt-input" className="ask-emp-field-label">
+                Query for {employeeName} <span className="opt">(optional)</span>
+              </label>
+              <span style={{ fontSize: '11px', color: adminQuery.length >= 250 ? '#dc2626' : '#64748b', fontWeight: 600 }}>
+                {adminQuery.length}/250
+              </span>
+            </div>
             <textarea
               id="ask-emp-doubt-input"
               className="ask-emp-textarea"
               rows={3}
+              maxLength={250}
+              placeholder="Describe your query or doubt here (max 250 characters)..."
               value={adminQuery}
-              onChange={(e) => setAdminQuery(e.target.value)}
+              onChange={(e) => setAdminQuery(e.target.value.slice(0, 250))}
             />
           </div>
 

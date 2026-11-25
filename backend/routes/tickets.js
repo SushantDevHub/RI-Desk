@@ -469,6 +469,11 @@ router.post('/', authenticate, (req, res) => {
         error: 'Description is required.',
       });
     }
+    if (description.trim().length > 250) {
+      return res.status(400).json({
+        error: 'Description cannot exceed 250 characters.',
+      });
+    }
 
     // Validate category (up to 75 characters)
     const cleanedCategory = String(category || 'recharge').trim();
@@ -615,9 +620,28 @@ router.post('/', authenticate, (req, res) => {
       console.warn('Ticket client sync error:', syncErr.message);
     }
 
+    let createdNotification = null;
+    if (employee) {
+      try {
+        createdNotification = addNotification({
+          recipientId: employee.id,
+          recipientName: employee.name,
+          senderId: req.user.id,
+          senderName: req.user.name || 'Admin User',
+          ticketId: ticket.id,
+          ticketNumber: ticket.ticketNumber || ticket.id,
+          ticketSubject: ticket.subject || ticket.category || 'Ticket',
+          type: 'ticket_assigned',
+        });
+      } catch (notifErr) {
+        console.error('Failed to create assignment notification on create:', notifErr);
+      }
+    }
+
     return res.status(201).json({
       message: 'Ticket created successfully.',
       ticket,
+      notification: createdNotification,
     });
   } catch (error) {
     console.error('Create ticket error:', error);
@@ -724,9 +748,26 @@ router.patch(
         });
       }
 
+      let createdNotification = null;
+      try {
+        createdNotification = addNotification({
+          recipientId: employee.id,
+          recipientName: employee.name,
+          senderId: req.user.id,
+          senderName: req.user.name || 'Admin User',
+          ticketId: updated.id,
+          ticketNumber: updated.ticketNumber || updated.id,
+          ticketSubject: updated.subject || updated.category || 'Ticket',
+          type: 'ticket_assigned',
+        });
+      } catch (notifErr) {
+        console.error('Failed to create assignment notification on assign route:', notifErr);
+      }
+
       return res.json({
         message: 'Ticket assigned successfully.',
         ticket: updated,
+        notification: createdNotification,
       });
     } catch (error) {
       console.error('Assign ticket error:', error);
@@ -1031,6 +1072,11 @@ router.patch('/:id', authenticate, (req, res) => {
           error: 'Description cannot be empty.',
         });
       }
+      if (trimmedDesc.length > 250) {
+        return res.status(400).json({
+          error: 'Description cannot exceed 250 characters.',
+        });
+      }
       const oldDesc = (existing.description || '').trim();
       if (oldDesc !== trimmedDesc) {
         changes.push({
@@ -1142,12 +1188,34 @@ router.patch('/:id', authenticate, (req, res) => {
 
     const updated = updateTicket(req.params.id, updates);
 
+    let createdNotification = null;
+    if (
+      updates.assignedToId &&
+      String(updates.assignedToId) !== String(existing.assignedToId)
+    ) {
+      try {
+        createdNotification = addNotification({
+          recipientId: updates.assignedToId,
+          recipientName: updates.assignedTo,
+          senderId: req.user.id,
+          senderName: req.user.name || 'Admin User',
+          ticketId: updated.id,
+          ticketNumber: updated.ticketNumber || updated.id,
+          ticketSubject: updated.subject || updated.category || 'Ticket',
+          type: 'ticket_assigned',
+        });
+      } catch (notifErr) {
+        console.error('Failed to create assignment notification on inline update:', notifErr);
+      }
+    }
+
     return res.json({
       message:
         changes.length > 0
           ? buildLogMessage(changes, 'Ticket Updated')
           : 'Ticket updated successfully.',
       ticket: updated,
+      notification: createdNotification,
     });
   } catch (error) {
     console.error('Update ticket error:', error);
@@ -1172,6 +1240,9 @@ router.put('/:id', authenticate, (req, res) => {
 
     if (typeof description !== 'string' || !description.trim()) {
       return res.status(400).json({ error: 'Description is required.' });
+    }
+    if (description.trim().length > 250) {
+      return res.status(400).json({ error: 'Description cannot exceed 250 characters.' });
     }
     if (!['low', 'medium', 'high'].includes(priority)) {
       return res.status(400).json({ error: 'Invalid priority.' });
@@ -1389,12 +1460,31 @@ router.put('/:id', authenticate, (req, res) => {
       return res.status(404).json({ error: 'Ticket not found.' });
     }
 
+    let createdNotification = null;
+    if (employee && String(employee.id) !== String(existing.assignedToId)) {
+      try {
+        createdNotification = addNotification({
+          recipientId: employee.id,
+          recipientName: employee.name,
+          senderId: req.user.id,
+          senderName: req.user.name || 'Admin User',
+          ticketId: updated.id,
+          ticketNumber: updated.ticketNumber || updated.id,
+          ticketSubject: updated.subject || updated.category || 'Ticket',
+          type: 'ticket_assigned',
+        });
+      } catch (notifErr) {
+        console.error('Failed to create assignment notification on ticket edit:', notifErr);
+      }
+    }
+
     return res.json({
       message:
         changes.length > 0
           ? buildLogMessage(changes, 'Ticket Updated')
           : 'Ticket updated successfully.',
       ticket: updated,
+      notification: createdNotification,
     });
   } catch (error) {
     console.error('Update ticket error:', error);

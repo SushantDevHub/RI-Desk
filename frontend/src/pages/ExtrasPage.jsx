@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { getToken } from '../api/authApi.js';
 import {
   getAllAnnouncementsAdmin,
   createAnnouncement,
@@ -8,6 +7,7 @@ import {
 } from '../api/announcementApi.js';
 import './ExtrasPage.css';
 import './DashboardPage.css';
+import './TicketManagementPage.css';
 
 export const EXTRAS_MODULE_CONFIG = [
   {
@@ -35,85 +35,6 @@ export const EXTRAS_MODULE_CONFIG = [
         <path d="M18 14h-8" />
         <path d="M15 18h-5" />
         <path d="M10 6h8v4h-8V6Z" />
-      </svg>
-    ),
-  },
-  {
-    id: 'send_sms',
-    title: 'Send SMS',
-    tag: 'SMS Gateway',
-    tagColor: '#0ea5e9',
-    accentColor: '#0284c7',
-    iconBg: '#f0f9ff',
-    iconColor: '#0369a1',
-    description:
-      'Dispatch immediate transactional text messages, alert broadcasts, and verification SMS to client phone numbers.',
-    icon: (
-      <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        <line x1="9" y1="9" x2="15" y2="9" />
-        <line x1="9" y1="13" x2="13" y2="13" />
-      </svg>
-    ),
-  },
-  {
-    id: 'send_whatsapp',
-    title: 'Send Whatsapp',
-    tag: 'WhatsApp Connect',
-    tagColor: '#10b981',
-    accentColor: '#059669',
-    iconBg: '#ecfdf5',
-    iconColor: '#047857',
-    description:
-      'Engage clients directly with WhatsApp template notifications, service updates, and interactive alerts.',
-    icon: (
-      <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-        <path d="m9 10 2 2 4-4" />
-      </svg>
-    ),
-  },
-  {
-    id: 'send_email',
-    title: 'Send Email',
-    tag: 'Email Broadcast',
-    tagColor: '#f59e0b',
-    accentColor: '#d97706',
-    iconBg: '#fffbeb',
-    iconColor: '#b45309',
-    description:
-      'Compose, schedule, and distribute formal emails, service notices, newsletters, and reports directly to inboxes.',
-    icon: (
-      <svg
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-        <polyline points="22,6 12,13 2,6" />
       </svg>
     ),
   },
@@ -155,6 +76,11 @@ export default function ExtrasPage({
   const [newsList, setNewsList] = useState([]);
   const [loadingNews, setLoadingNews] = useState(false);
   const [publishing, setPublishing] = useState(false);
+
+  // Delete Announcement Modal State
+  const [announcementToDelete, setAnnouncementToDelete] = useState(null);
+  const [deletingAnnouncement, setDeletingAnnouncement] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // Form Fields
   const [newsTitle, setNewsTitle] = useState('');
@@ -238,87 +164,44 @@ export default function ExtrasPage({
     }
   };
 
-  // Delete Announcement
-  const handleDeleteNews = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this announcement?')) return;
+  // Delete Announcement Confirmation
+  const confirmDeleteAnnouncement = async () => {
+    if (!announcementToDelete) return;
+    setDeletingAnnouncement(true);
+    setDeleteError('');
     try {
-      await deleteAnnouncement(id);
-      setNewsList((prev) => prev.filter((item) => item.id !== id));
+      await deleteAnnouncement(announcementToDelete.id);
+      setNewsList((prev) => prev.filter((item) => item.id !== announcementToDelete.id));
       showSuccess('Announcement deleted successfully.');
+      setAnnouncementToDelete(null);
     } catch (err) {
-      setErrorMessage(err.message || 'Failed to delete announcement.');
+      console.error('Failed to delete announcement:', err);
+      setDeleteError(err.message || 'Failed to delete announcement.');
+    } finally {
+      setDeletingAnnouncement(false);
     }
   };
 
-  const handleSendSMS = (e) => {
-    e.preventDefault();
-    if (!smsPhone.trim() || !smsMessage.trim()) return;
-    const entry = {
-      id: Date.now(),
-      phone: smsPhone.trim(),
-      message: smsMessage.trim(),
-      time: 'Just now',
-      status: 'Sent',
-    };
-    setSmsLogs([entry, ...smsLogs]);
-    setSmsPhone('');
-    setSmsMessage('');
-    showSuccess(`SMS message sent successfully to ${entry.phone}!`);
-  };
-
-  const handleSendWhatsApp = (e) => {
-    e.preventDefault();
-    if (!waPhone.trim() || !waMessage.trim()) return;
-    const entry = {
-      id: Date.now(),
-      phone: waPhone.trim(),
-      message: waMessage.trim(),
-      time: 'Just now',
-      status: 'Delivered',
-    };
-    setWaLogs([entry, ...waLogs]);
-    setWaPhone('');
-    setWaMessage('');
-    showSuccess(`WhatsApp message dispatched to ${entry.phone}!`);
-  };
-
-  const handleSendEmail = (e) => {
-    e.preventDefault();
-    if (!emailTo.trim() || !emailSubject.trim() || !emailBody.trim()) return;
-    const entry = {
-      id: Date.now(),
-      to: emailTo.trim(),
-      subject: emailSubject.trim(),
-      time: 'Just now',
-      status: 'Delivered',
-    };
-    setEmailLogs([entry, ...emailLogs]);
-    setEmailTo('');
-    setEmailSubject('');
-    setEmailBody('');
-    showSuccess(`Email successfully delivered to ${entry.to}!`);
-  };
-
-  const currentModule = EXTRAS_MODULE_CONFIG.find((m) => m.id === activeSubTab);
-
   return (
     <div className="extras-page">
-      {/* ── Tab Switcher Bar ── */}
-      <div className="extras-tab-bar">
-        {EXTRAS_MODULE_CONFIG.map((mod) => (
-          <button
-            key={mod.id}
-            type="button"
-            className={`extras-tab-btn ${
-              activeSubTab === mod.id ? 'active' : ''
-            }`}
-            onClick={() => onSelectSubTab(mod.id)}
-          >
-            {mod.icon}
-            <span>{mod.title}</span>
-          </button>
-        ))}
-      </div>
+      {/* ── Tab Switcher Bar (Only rendered if multiple modules exist) ── */}
+      {EXTRAS_MODULE_CONFIG.length > 1 && (
+        <div className="extras-tab-bar">
+          {EXTRAS_MODULE_CONFIG.map((mod) => (
+            <button
+              key={mod.id}
+              type="button"
+              className={`extras-tab-btn ${
+                activeSubTab === mod.id ? 'active' : ''
+              }`}
+              onClick={() => onSelectSubTab(mod.id)}
+            >
+              {mod.icon}
+              <span>{mod.title}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── Status Banners ── */}
       {successBanner && (
@@ -374,15 +257,21 @@ export default function ExtrasPage({
                 </div>
 
                 <div className="extras-screenshot-field">
-                  <label className="extras-screenshot-label">
-                    Message <span className="extras-req-star">*</span>
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label className="extras-screenshot-label" style={{ margin: 0 }}>
+                      Message <span className="extras-req-star">*</span>
+                    </label>
+                    <span style={{ fontSize: '11.5px', color: newsBody.length >= 250 ? '#dc2626' : '#64748b', fontWeight: 600 }}>
+                      {newsBody.length}/250
+                    </span>
+                  </div>
                   <textarea
                     className="extras-screenshot-textarea"
-                    placeholder="Type news message"
+                    placeholder="Type news message (max 250 characters)..."
                     rows={2}
+                    maxLength={250}
                     value={newsBody}
-                    onChange={(e) => setNewsBody(e.target.value)}
+                    onChange={(e) => setNewsBody(e.target.value.slice(0, 250))}
                     required
                   />
                 </div>
@@ -544,7 +433,10 @@ export default function ExtrasPage({
                         <button
                           type="button"
                           className="extras-action-btn delete"
-                          onClick={() => handleDeleteNews(item.id)}
+                          onClick={() => {
+                            setAnnouncementToDelete(item);
+                            setDeleteError('');
+                          }}
                         >
                           Delete
                         </button>
@@ -558,302 +450,83 @@ export default function ExtrasPage({
         </div>
       )}
 
-      {/* ═══════════════════════════════════════════════════════════
-          VIEW 4: SEND SMS MODULE
-      ═══════════════════════════════════════════════════════════ */}
-      {activeSubTab === 'send_sms' && (
-        <div className="extras-module-view">
-          <div className="extras-module-header">
-            <div className="extras-module-header-left">
-              <div
-                className="extras-module-header-icon"
-                style={{
-                  backgroundColor: currentModule?.iconBg,
-                  color: currentModule?.iconColor,
-                }}
+      {/* ────────────────────────────────────────────────────────
+          DELETE CONFIRMATION DIALOG (UNIFIED SYSTEM DELETE DIALOG)
+      ──────────────────────────────────────────────────────── */}
+      {announcementToDelete && (
+        <div
+          className="ticket-dialog-overlay"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !deletingAnnouncement) {
+              setAnnouncementToDelete(null);
+              setDeleteError('');
+            }
+          }}
+        >
+          <section
+            className="ticket-delete-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-announcement-title"
+          >
+            <div className="ticket-delete-symbol">
+              <svg
+                width={18}
+                height={18}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
               >
-                {currentModule?.icon}
-              </div>
-              <div>
-                <h2 className="extras-module-title">Send SMS</h2>
-                <p className="extras-module-subtitle">
-                  Dispatch transactional and urgent text messages to mobile phones.
-                </p>
-              </div>
+                <path d="M3 6h18" />
+                <path d="M8 6V4h8v2" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v5M14 11v5" />
+              </svg>
             </div>
-          </div>
 
-          <div className="extras-workspace-grid">
-            <form className="extras-form-card" onSubmit={handleSendSMS}>
-              <h3 className="extras-card-heading">Dispatch SMS Broadcast</h3>
+            <h2 id="delete-announcement-title">Delete Announcement?</h2>
 
-              <div className="extras-form-group">
-                <label className="extras-form-label">Recipient Mobile Number</label>
-                <input
-                  type="tel"
-                  className="extras-form-input"
-                  placeholder="+91 98765 43210"
-                  value={smsPhone}
-                  onChange={(e) => setSmsPhone(e.target.value)}
-                  required
-                />
+            <p>
+              Are you sure you want to delete announcement{' '}
+              <strong>
+                "{announcementToDelete.title || announcementToDelete.content?.slice(0, 40) || 'this announcement'}"
+              </strong>?{' '}
+              This action cannot be undone.
+            </p>
+
+            {deleteError && (
+              <div className="ticket-dialog-error" role="alert" style={{ marginBottom: 16 }}>
+                {deleteError}
               </div>
+            )}
 
-              <div className="extras-form-group">
-                <label className="extras-form-label">Template</label>
-                <select
-                  className="extras-form-select"
-                  value={smsTemplate}
-                  onChange={(e) => setSmsTemplate(e.target.value)}
-                >
-                  <option value="General Alert">General Alert</option>
-                  <option value="Ticket Update">Ticket Resolution Update</option>
-                  <option value="Service Notice">Service Maintenance Notice</option>
-                  <option value="Custom">Custom Text</option>
-                </select>
-              </div>
-
-              <div className="extras-form-group">
-                <label className="extras-form-label">
-                  SMS Message ({smsMessage.length}/160 chars)
-                </label>
-                <textarea
-                  className="extras-form-textarea"
-                  placeholder="Enter text message..."
-                  rows={3}
-                  value={smsMessage}
-                  onChange={(e) => setSmsMessage(e.target.value)}
-                  required
-                />
-              </div>
-
-              <button type="submit" className="extras-submit-btn">
-                Send SMS Message
-              </button>
-            </form>
-
-            <div className="extras-list-card">
-              <h3 className="extras-card-heading">Recent SMS Dispatches ({smsLogs.length})</h3>
-              {smsLogs.length === 0 ? (
-                <div className="extras-empty-state">
-                  <p className="extras-empty-sub">No SMS messages dispatched yet.</p>
-                </div>
-              ) : (
-                <div className="extras-feed-list">
-                  {smsLogs.map((log) => (
-                    <div key={log.id} className="extras-feed-item">
-                      <div className="extras-feed-item-top">
-                        <h4 className="extras-feed-item-title">{log.phone}</h4>
-                        <span className="extras-feed-item-badge">{log.status}</span>
-                      </div>
-                      <p className="extras-feed-item-desc">{log.message}</p>
-                      <div className="extras-feed-item-meta">
-                        <span>{log.time}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════
-          VIEW 5: SEND WHATSAPP MODULE
-      ═══════════════════════════════════════════════════════════ */}
-      {activeSubTab === 'send_whatsapp' && (
-        <div className="extras-module-view">
-          <div className="extras-module-header">
-            <div className="extras-module-header-left">
-              <div
-                className="extras-module-header-icon"
-                style={{
-                  backgroundColor: currentModule?.iconBg,
-                  color: currentModule?.iconColor,
+            <div className="ticket-dialog-actions">
+              <button
+                type="button"
+                className="ticket-cancel-button"
+                onClick={() => {
+                  setAnnouncementToDelete(null);
+                  setDeleteError('');
                 }}
+                disabled={deletingAnnouncement}
               >
-                {currentModule?.icon}
-              </div>
-              <div>
-                <h2 className="extras-module-title">Send Whatsapp</h2>
-                <p className="extras-module-subtitle">
-                  Communicate with clients directly via official WhatsApp messages.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="extras-workspace-grid">
-            <form className="extras-form-card" onSubmit={handleSendWhatsApp}>
-              <h3 className="extras-card-heading">Send WhatsApp Message</h3>
-
-              <div className="extras-form-group">
-                <label className="extras-form-label">Client Mobile (WhatsApp)</label>
-                <input
-                  type="tel"
-                  className="extras-form-input"
-                  placeholder="+91 98200 12345"
-                  value={waPhone}
-                  onChange={(e) => setWaPhone(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="extras-form-group">
-                <label className="extras-form-label">Message Template</label>
-                <select
-                  className="extras-form-select"
-                  value={waTemplate}
-                  onChange={(e) => setWaTemplate(e.target.value)}
-                >
-                  <option value="Ticket Update">Ticket Status Update</option>
-                  <option value="Service Reminder">Service Reminder</option>
-                  <option value="Welcome">Client Welcome Greeting</option>
-                  <option value="Custom">Custom Direct Chat</option>
-                </select>
-              </div>
-
-              <div className="extras-form-group">
-                <label className="extras-form-label">WhatsApp Text</label>
-                <textarea
-                  className="extras-form-textarea"
-                  placeholder="Type WhatsApp message..."
-                  rows={4}
-                  value={waMessage}
-                  onChange={(e) => setWaMessage(e.target.value)}
-                  required
-                />
-              </div>
-
-              <button type="submit" className="extras-submit-btn">
-                Send WhatsApp Message
+                Cancel
               </button>
-            </form>
 
-            <div className="extras-list-card">
-              <h3 className="extras-card-heading">WhatsApp Activity Log ({waLogs.length})</h3>
-              {waLogs.length === 0 ? (
-                <div className="extras-empty-state">
-                  <p className="extras-empty-sub">No WhatsApp messages sent yet.</p>
-                </div>
-              ) : (
-                <div className="extras-feed-list">
-                  {waLogs.map((log) => (
-                    <div key={log.id} className="extras-feed-item">
-                      <div className="extras-feed-item-top">
-                        <h4 className="extras-feed-item-title">{log.phone}</h4>
-                        <span className="extras-feed-item-badge">{log.status}</span>
-                      </div>
-                      <p className="extras-feed-item-desc">{log.message}</p>
-                      <div className="extras-feed-item-meta">
-                        <span>{log.time}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════
-          VIEW 6: SEND EMAIL MODULE
-      ═══════════════════════════════════════════════════════════ */}
-      {activeSubTab === 'send_email' && (
-        <div className="extras-module-view">
-          <div className="extras-module-header">
-            <div className="extras-module-header-left">
-              <div
-                className="extras-module-header-icon"
-                style={{
-                  backgroundColor: currentModule?.iconBg,
-                  color: currentModule?.iconColor,
-                }}
+              <button
+                type="button"
+                className="ticket-confirm-delete"
+                onClick={confirmDeleteAnnouncement}
+                disabled={deletingAnnouncement}
               >
-                {currentModule?.icon}
-              </div>
-              <div>
-                <h2 className="extras-module-title">Send Email</h2>
-                <p className="extras-module-subtitle">
-                  Compose formal announcements, client notices, and support digest emails.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="extras-workspace-grid">
-            <form className="extras-form-card" onSubmit={handleSendEmail}>
-              <h3 className="extras-card-heading">Compose Email Broadcast</h3>
-
-              <div className="extras-form-group">
-                <label className="extras-form-label">Recipient Email</label>
-                <input
-                  type="email"
-                  className="extras-form-input"
-                  placeholder="client@company.com"
-                  value={emailTo}
-                  onChange={(e) => setEmailTo(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="extras-form-group">
-                <label className="extras-form-label">Subject</label>
-                <input
-                  type="text"
-                  className="extras-form-input"
-                  placeholder="e.g., Monthly Service & Support Report"
-                  value={emailSubject}
-                  onChange={(e) => setEmailSubject(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="extras-form-group">
-                <label className="extras-form-label">Email Body</label>
-                <textarea
-                  className="extras-form-textarea"
-                  placeholder="Write your email message here..."
-                  rows={4}
-                  value={emailBody}
-                  onChange={(e) => setEmailBody(e.target.value)}
-                  required
-                />
-              </div>
-
-              <button type="submit" className="extras-submit-btn">
-                Send Email
+                {deletingAnnouncement ? 'Deleting...' : 'Yes, Delete'}
               </button>
-            </form>
-
-            <div className="extras-list-card">
-              <h3 className="extras-card-heading">Recent Email Broadcasts ({emailLogs.length})</h3>
-              {emailLogs.length === 0 ? (
-                <div className="extras-empty-state">
-                  <p className="extras-empty-sub">No email broadcasts dispatched yet.</p>
-                </div>
-              ) : (
-                <div className="extras-feed-list">
-                  {emailLogs.map((log) => (
-                    <div key={log.id} className="extras-feed-item">
-                      <div className="extras-feed-item-top">
-                        <h4 className="extras-feed-item-title">{log.to}</h4>
-                        <span className="extras-feed-item-badge">{log.status}</span>
-                      </div>
-                      <p className="extras-feed-item-desc">
-                        <strong>Subject:</strong> {log.subject}
-                      </p>
-                      <div className="extras-feed-item-meta">
-                        <span>{log.time}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
-          </div>
+          </section>
         </div>
       )}
     </div>

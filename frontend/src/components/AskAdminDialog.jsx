@@ -263,16 +263,22 @@ export default function AskAdminDialog({ ticket, currentUser, onClose }) {
 
           {/* Description / Query Box */}
           <div className="ask-admin-field">
-            <label htmlFor="ask-admin-doubt-input" className="ask-admin-field-label">
-              Query for Admin <span className="opt">(optional)</span>
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label htmlFor="ask-admin-doubt-input" className="ask-admin-field-label">
+                Query for Admin <span className="opt">(optional)</span>
+              </label>
+              <span style={{ fontSize: '11px', color: employeeDoubt.length >= 250 ? '#dc2626' : '#64748b', fontWeight: 600 }}>
+                {employeeDoubt.length}/250
+              </span>
+            </div>
             <textarea
               id="ask-admin-doubt-input"
               className="ask-admin-textarea"
               rows={3}
-              placeholder="Describe your query or doubt here..."
+              maxLength={250}
+              placeholder="Describe your query or doubt here (max 250 characters)..."
               value={employeeDoubt}
-              onChange={(e) => setEmployeeDoubt(e.target.value)}
+              onChange={(e) => setEmployeeDoubt(e.target.value.slice(0, 250))}
             />
           </div>
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { getToken } from '../api/authApi.js';
 import ContactClientDialog from '../components/ContactClientDialog.jsx';
 import './ClientManagementPage.css';
+import './TicketManagementPage.css';
 
 const API_URL = 'http://localhost:4000/api/clients';
 
@@ -1593,7 +1594,36 @@ export default function ClientManagementPage({ isAdmin = true }) {
                   <div className="client-view-field">
                     <span className="client-field-label">Mobile Number</span>
                     <span className="client-field-value">
-                      <strong>{viewingClient.mobileNumber || '—'}</strong>
+                      {viewingClient.mobileNumber ? (
+                        <button
+                          type="button"
+                          className="client-phone-btn"
+                          title={`Contact ${viewingClient.name || viewingClient.companyName} (${viewingClient.mobileNumber})`}
+                          onClick={() =>
+                            setContactDialog({
+                              name: viewingClient.name || viewingClient.companyName || 'Client',
+                              phone: viewingClient.mobileNumber,
+                            })
+                          }
+                        >
+                          <svg
+                            width="11"
+                            height="11"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.4"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                          </svg>
+                          <span>{viewingClient.mobileNumber}</span>
+                        </button>
+                      ) : (
+                        '—'
+                      )}
                     </span>
                   </div>
 
@@ -1601,10 +1631,17 @@ export default function ClientManagementPage({ isAdmin = true }) {
                     <span className="client-field-label">WhatsApp Number</span>
                     <span className="client-field-value">
                       {viewingClient.whatsappNumber ? (
-                        <span className="client-wa-val">
+                        <a
+                          href={`https://wa.me/${viewingClient.whatsappNumber.replace(/\D/g, '').length === 10 ? '91' + viewingClient.whatsappNumber.replace(/\D/g, '') : viewingClient.whatsappNumber.replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="client-wa-val"
+                          style={{ textDecoration: 'none' }}
+                          title={`Chat with ${viewingClient.name || viewingClient.companyName} on WhatsApp`}
+                        >
                           <span className="client-wa-badge">WA</span>
                           {viewingClient.whatsappNumber}
-                        </span>
+                        </a>
                       ) : (
                         '—'
                       )}
@@ -1743,10 +1780,10 @@ export default function ClientManagementPage({ isAdmin = true }) {
               </div>
             </div>
 
-            <div className="client-view-footer ticket-dialog-actions">
+            <div className="client-view-footer">
               <button
                 type="button"
-                className="ticket-cancel-button client-edit-direct-btn"
+                className="client-edit-direct-btn"
                 onClick={() => {
                   const toEdit = viewingClient;
                   setViewingClient(null);
@@ -1771,7 +1808,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
               </button>
               <button
                 type="button"
-                className="ticket-create-button client-modal-close-action"
+                className="client-modal-close-action"
                 onClick={() => setViewingClient(null)}
               >
                 Close
@@ -1782,42 +1819,68 @@ export default function ClientManagementPage({ isAdmin = true }) {
       )}
 
       {/* ────────────────────────────────────────────────────────
-          DELETE CONFIRMATION DIALOG
+          DELETE CONFIRMATION DIALOG (SAME AS DELETE TICKET DIALOG)
       ──────────────────────────────────────────────────────── */}
       {clientToDelete && (
         <div
-          className="client-modal-overlay"
+          className="ticket-dialog-overlay"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget && !deleting) setClientToDelete(null);
           }}
         >
-          <div className="client-delete-box">
-            <div className="client-delete-icon">⚠️</div>
-            <h3>Delete Client?</h3>
+          <section
+            className="ticket-delete-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-client-title"
+          >
+            <div className="ticket-delete-symbol">
+              <svg
+                width={18}
+                height={18}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M3 6h18" />
+                <path d="M8 6V4h8v2" />
+                <path d="M19 6l-1 14H6L5 6" />
+                <path d="M10 11v5M14 11v5" />
+              </svg>
+            </div>
+
+            <h2 id="delete-client-title">Delete Client?</h2>
+
             <p>
-              Are you sure you want to delete <strong>{clientToDelete.companyName}</strong> (
-              {clientToDelete.name})? This will permanently remove their profile, monthly rental,
-              subscribed services, and features from the system.
+              Are you sure you want to delete client{' '}
+              <strong>"{clientToDelete.companyName || clientToDelete.name || 'this client'}"</strong>?{' '}
+              This action cannot be undone.
             </p>
-            <div className="client-delete-actions ticket-dialog-actions">
+
+            <div className="ticket-dialog-actions">
               <button
                 type="button"
-                className="ticket-cancel-button client-modal-cancel-btn"
+                className="ticket-cancel-button"
                 onClick={() => setClientToDelete(null)}
                 disabled={deleting}
               >
                 Cancel
               </button>
+
               <button
                 type="button"
-                className="ticket-confirm-delete client-confirm-delete-btn"
+                className="ticket-confirm-delete"
                 onClick={handleDeleteClient}
                 disabled={deleting}
               >
-                {deleting ? 'Deleting...' : 'Yes, Delete Client'}
+                {deleting ? 'Deleting...' : 'Yes, Delete'}
               </button>
             </div>
-          </div>
+          </section>
         </div>
       )}
 

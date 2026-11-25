@@ -304,7 +304,7 @@
 }
 
 .extras-form-textarea {
-  resize: vertical;
+  resize: none;
   min-height: 85px;
   font-family: inherit;
 }
@@ -687,7 +687,7 @@
   font-size: 13px;
   color: #1e293b;
   font-family: inherit;
-  resize: vertical;
+  resize: none;
   min-height: 42px;
   box-sizing: border-box;
   transition: all 0.15s ease;

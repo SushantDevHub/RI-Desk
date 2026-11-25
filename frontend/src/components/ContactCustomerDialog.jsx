@@ -2,7 +2,6 @@ export default function ContactCustomerDialog({ contact, onClose, title }) {
   if (!contact) return null;
 
   const rawPhone = String(contact.phone || '').trim();
-  const rawEmail = String(contact.email || '').trim();
   const digits = rawPhone.replace(/\D/g, '');
   const displayPhone =
     digits.length === 10
@@ -13,7 +12,6 @@ export default function ContactCustomerDialog({ contact, onClose, title }) {
   const waNumber = digits.length === 10 ? `91${digits}` : digits;
   const waUrl = `https://wa.me/${waNumber}`;
   const telUrl = `tel:${digits}`;
-  const mailtoUrl = `mailto:${rawEmail}`;
 
   function getInitials(name = '') {
     return (
@@ -28,7 +26,6 @@ export default function ContactCustomerDialog({ contact, onClose, title }) {
   }
 
   const isEmployee = Boolean(contact.isEmployee || contact.role === 'employee');
-  const contactName = contact.name || (isEmployee ? 'Employee' : 'Client');
 
   const dialogHeading =
     title ||
@@ -51,7 +48,7 @@ export default function ContactCustomerDialog({ contact, onClose, title }) {
         <div className="contact-dialog-header">
           <div className="contact-dialog-header-info">
             <h2 id="contact-dialog-title">{dialogHeading}</h2>
-            <p>Choose your preferred communication method</p>
+            <p>Choose Call or WhatsApp</p>
           </div>
           <button
             type="button"
@@ -89,26 +86,11 @@ export default function ContactCustomerDialog({ contact, onClose, title }) {
               </span>
             )}
             <span className="contact-dialog-number">{displayPhone}</span>
-            {rawEmail && (
-              <span
-                style={{
-                  fontSize: 12,
-                  color: '#64748b',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  marginTop: 2,
-                }}
-              >
-                <span>✉️</span>
-                {rawEmail}
-              </span>
-            )}
           </div>
         </div>
 
         <div className="contact-dialog-options">
-          {/* Option 1: Direct Call */}
+          {/* Option 1: Direct Phone Call */}
           <a
             href={telUrl}
             className="contact-dialog-btn call"
@@ -191,59 +173,15 @@ export default function ContactCustomerDialog({ contact, onClose, title }) {
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </a>
-
-          {/* Option 3: Send Email */}
-          {rawEmail && (
-            <a
-              href={mailtoUrl}
-              className="contact-dialog-btn email"
-              onClick={onClose}
-            >
-              <div className="contact-dialog-btn-icon email">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect width="20" height="16" x="2" y="4" rx="2" />
-                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                </svg>
-              </div>
-              <div className="contact-dialog-btn-text">
-                <span className="contact-dialog-btn-title">Send Email</span>
-                <span className="contact-dialog-btn-desc">{rawEmail}</span>
-              </div>
-              <svg
-                className="contact-dialog-btn-arrow"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </a>
-          )}
         </div>
 
         <div className="contact-dialog-footer">
           <button
             type="button"
-            className="contact-dialog-cancel-btn"
+            className="contact-dialog-close-btn"
             onClick={onClose}
           >
-            Cancel
+            Close
           </button>
         </div>
       </div>

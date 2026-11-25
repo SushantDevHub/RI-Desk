@@ -221,6 +221,10 @@ export function validateTicket(ticket) {
     return 'Please fill in all required fields.';
   }
 
+  if (ticket.description.trim().length > 250) {
+    return 'Description cannot exceed 250 characters.';
+  }
+
   if (!ticket.category || !String(ticket.category).trim()) {
     return 'Category is required.';
   }
@@ -523,13 +527,19 @@ export function TicketFormFields({ values, onChange, employees, idPrefix, isAdmi
       </div>
 
       <div className="ticket-form-field ticket-form-full">
-        <label htmlFor={id('description')}>Description *</label>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+          <label htmlFor={id('description')} style={{ margin: 0 }}>Description *</label>
+          <span style={{ fontSize: '11.5px', color: (values.description || '').length >= 250 ? '#dc2626' : '#64748b', fontWeight: 600 }}>
+            {(values.description || '').length}/250
+          </span>
+        </div>
         <textarea
           id={id('description')}
           rows={4}
+          maxLength={250}
           value={values.description}
-          onChange={(e) => onChange('description', e.target.value)}
-          placeholder="Explain the issue in detail..."
+          onChange={(e) => onChange('description', e.target.value.slice(0, 250))}
+          placeholder="Explain the issue in detail (max 250 characters)..."
           required
         />
       </div>
@@ -800,6 +810,11 @@ export default function TicketManagementPage() {
       window.dispatchEvent(
         new CustomEvent('tickets-updated', { detail: data.ticket })
       );
+      if (data.notification) {
+        window.dispatchEvent(
+          new CustomEvent('notifications-updated', { detail: data.notification })
+        );
+      }
       try {
         localStorage.setItem('tickets_last_sync', String(Date.now()));
       } catch (e) {}
@@ -906,6 +921,11 @@ export default function TicketManagementPage() {
       window.dispatchEvent(
         new CustomEvent('tickets-updated', { detail: data.ticket || optimisticUpdate })
       );
+      if (data.notification) {
+        window.dispatchEvent(
+          new CustomEvent('notifications-updated', { detail: data.notification })
+        );
+      }
       try {
         localStorage.setItem('tickets_last_sync', String(Date.now()));
       } catch (e) {}
@@ -1041,6 +1061,11 @@ export default function TicketManagementPage() {
       window.dispatchEvent(
         new CustomEvent('tickets-updated', { detail: data.ticket || { id: ticket.id, [field]: value } })
       );
+      if (data.notification) {
+        window.dispatchEvent(
+          new CustomEvent('notifications-updated', { detail: data.notification })
+        );
+      }
       try {
         localStorage.setItem('tickets_last_sync', String(Date.now()));
       } catch (e) {}
@@ -2209,7 +2234,7 @@ export default function TicketManagementPage() {
               </div>
             </div>
 
-            <div className="ticket-dialog-actions">
+            <div className="ticket-dialog-actions ticket-view-dialog-actions">
               <button
                 type="button"
                 className="ticket-view-logs-btn"
@@ -2226,7 +2251,7 @@ export default function TicketManagementPage() {
 
               <button
                 type="button"
-                className="ticket-create-button"
+                className="ticket-view-close-btn"
                 onClick={() => setViewingTicket(null)}
               >
                 Close
