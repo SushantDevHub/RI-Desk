@@ -123,6 +123,7 @@ function getOrSynthesizeLogs(ticket) {
   if (!ticket) return [];
 
   const isAssigned = Boolean(ticket.assignedTo || ticket.assignedToId);
+  const actualIsAssigned = isAssigned;
   const employeeName = ticket.assignedTo || null;
   const actualAssignmentText = isAssigned
     ? `Assigned (${employeeName})`

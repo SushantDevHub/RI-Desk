@@ -221,6 +221,13 @@ export default function RaiseTicketForm({ onSuccess, showHeader = true }) {
 
       setSubmittedTicket(ticketResult);
 
+      try {
+        window.dispatchEvent(
+          new CustomEvent('tickets-updated', { detail: response.ticket || ticketResult })
+        );
+        localStorage.setItem('tickets_last_sync', String(Date.now()));
+      } catch (e) {}
+
       if (typeof onSuccess === 'function') {
         onSuccess(ticketResult);
       }

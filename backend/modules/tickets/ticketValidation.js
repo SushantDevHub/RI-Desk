@@ -40,6 +40,7 @@ export function validateRaiseTicket(body = {}) {
   const category = typeof body.category === 'string' ? body.category.trim() : '';
   const subject = typeof body.subject === 'string' ? body.subject.trim() : '';
   const description = typeof body.description === 'string' ? body.description.trim() : '';
+  const email = typeof body.email === 'string' ? body.email.trim() : '';
 
   const transactionId = typeof body.transactionId === 'string' ? body.transactionId.trim() : '';
   const amount = body.amount !== undefined && body.amount !== null && String(body.amount).trim() !== ''
@@ -64,6 +65,11 @@ export function validateRaiseTicket(body = {}) {
     errors.mobileNumber = 'Please enter a valid 10-digit mobile number.';
   }
 
+  // Optional Email validation if provided
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errors.email = 'Please enter a valid email address.';
+  }
+
   // Category validation
   if (!category) {
     errors.category = 'Please select a category.';
@@ -78,9 +84,11 @@ export function validateRaiseTicket(body = {}) {
     errors.subject = 'Subject must be between 3 and 150 characters.';
   }
 
-  // Description validation (enforces 250 characters rule)
+  // Description validation (enforces 5-250 characters rule)
   if (!description) {
     errors.description = 'Description is required.';
+  } else if (description.length < 5) {
+    errors.description = 'Description must be at least 5 characters.';
   } else if (description.length > 250) {
     errors.description = 'Description cannot exceed 250 characters.';
   }
@@ -107,6 +115,7 @@ export function validateRaiseTicket(body = {}) {
     data: {
       name,
       mobileNumber,
+      email: email || null,
       userType,
       category,
       subject,

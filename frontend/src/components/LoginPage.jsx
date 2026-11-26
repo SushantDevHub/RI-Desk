@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { resetPassword } from '../api/authApi.js';
 import '../styles/base.css';
 import '../styles/login.css';
@@ -274,12 +275,12 @@ export default function LoginPage({ onLogin, error, loading }) {
                 {/* Public Raise Ticket Link */}
                 <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '13px', color: '#64748b' }}>
                   Facing an issue?{' '}
-                  <a
-                    href="/raise-ticket"
+                  <Link
+                    to="/raise-ticket"
                     style={{ color: '#4f46e5', fontWeight: 600, textDecoration: 'none' }}
                   >
                     Raise Support Ticket
-                  </a>
+                  </Link>
                 </div>
               </form>
             </>

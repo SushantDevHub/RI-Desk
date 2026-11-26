@@ -834,12 +834,18 @@ export default function DashboardPage({
   }
 
   const unassignedOpenTickets = tickets
-    .filter((ticket) => ticket.status !== 'resolved' && isTicketUnassigned(ticket))
+    .filter((ticket) => {
+      if (ticket.status === 'resolved') return false;
+      if (!isTicketUnassigned(ticket)) return false;
+      // Filter out pre-generated / sample ticket records from Unassigned
+      if (ticket.id === 'TKT-1001' && !ticket.source) return false;
+      return true;
+    })
     .sort(sortDescending);
 
   // Open tickets slab only includes assigned open tickets so unassigned tickets are not duplicated
   const openTicketsDescending = openStatTickets
-    .filter((ticket) => !isTicketUnassigned(ticket))
+    .filter((ticket) => !isTicketUnassigned(ticket) || (ticket.id === 'TKT-1001' && !ticket.source))
     .sort(sortDescending);
 
   const allOpenTicketsDescending = openStatTickets.slice().sort(sortDescending);
@@ -1243,9 +1249,32 @@ export default function DashboardPage({
       );
     }
     if (!ticketList || ticketList.length === 0) {
+      const isUnassigned = typeof emptyText === 'string' && emptyText.toLowerCase().includes('unassigned');
       return (
-        <div style={{ padding: 36, textAlign: 'center', color: '#94a3b8' }}>
-          {emptyText}
+        <div className="db-empty-state">
+          <div className="db-empty-icon-box">
+            {isUnassigned ? (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            ) : (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="20" height="14" x="2" y="5" rx="2" />
+                <line x1="2" x2="22" y1="10" y2="10" />
+              </svg>
+            )}
+          </div>
+          <div className="db-empty-title">
+            {isUnassigned ? 'No Unassigned Tickets' : 'No Tickets to Display'}
+          </div>
+          <div className="db-empty-subtext">
+            {isUnassigned
+              ? 'All submitted tickets have been assigned to support staff. Newly submitted client tickets will appear here.'
+              : typeof emptyText === 'string'
+              ? emptyText.replace(/^[✓•\s]+/, '')
+              : 'There are currently no tickets matching this view.'}
+          </div>
         </div>
       );
     }
