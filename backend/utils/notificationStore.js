@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getAllUsers } from './userStore.js';
+import { getAllUsersSync } from './userStore.js';
 import { getAllClients } from './clientStore.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -134,7 +134,7 @@ function isNotificationReadByUser(n, userId) {
 }
 
 export function getNotificationsForUser(userId, userRole = 'employee') {
-  const allUsers = getAllUsers();
+  const allUsers = getAllUsersSync();
   const all = getAllNotifications();
   return all
     .filter((n) => isUserRecipient(n, userId, userRole))
@@ -179,7 +179,7 @@ export function addNotification({
     return null;
   }
 
-  const allUsers = getAllUsers();
+  const allUsers = getAllUsersSync();
   const resolvedRecipientName =
     recipientName ||
     allUsers.find((u) => String(u.id) === String(recipientId))?.name ||
@@ -239,7 +239,7 @@ export function sendMobileNotification({
     (trimmedMessage.length > 50 ? `${trimmedMessage.slice(0, 47)}...` : trimmedMessage);
 
   // Calculate recipients
-  const allUsers = getAllUsers();
+  const allUsers = getAllUsersSync();
   const allClients = getAllClients();
   const employees = allUsers.filter((u) => u.role === 'employee' && u.status !== 'inactive');
 

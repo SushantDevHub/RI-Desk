@@ -5,7 +5,10 @@ import bcrypt from 'bcryptjs';
 import {
   getAllUsers,
   findUserByMobile,
+  findUserById,
   addUser,
+  updateUser,
+  deleteUser,
   saveAllUsers,
 } from '../utils/userStore.js';
 
@@ -78,8 +81,7 @@ router.post('/', requireAdmin, async (req, res) => {
       });
     }
 
-    const existingUser =
-      findUserByMobile(mobileNumber);
+    const existingUser = await findUserByMobile(mobileNumber);
 
     if (existingUser) {
       return res.status(409).json({
@@ -88,7 +90,7 @@ router.post('/', requireAdmin, async (req, res) => {
       });
     }
 
-    const users = getAllUsers();
+    const users = await getAllUsers();
 
     const nextId =
       users.length > 0
@@ -110,7 +112,7 @@ router.post('/', requireAdmin, async (req, res) => {
       status: status === 'inactive' ? 'inactive' : 'active',
     };
 
-    addUser(employee);
+    await addUser(employee);
 
     return res.status(201).json({
       message: 'Employee created successfully.',
@@ -140,9 +142,9 @@ router.post('/', requireAdmin, async (req, res) => {
    Get employees
 ───────────────────────────────────────────── */
 
-router.get('/', authenticate, (req, res) => {
+router.get('/', authenticate, async (req, res) => {
   try {
-    const users = getAllUsers();
+    const users = await getAllUsers();
 
     const employees = users
       .filter((user) => user.role === 'employee')
@@ -174,7 +176,7 @@ router.get('/', authenticate, (req, res) => {
    Delete employee
 ───────────────────────────────────────────── */
 
-router.delete('/:id', requireAdmin, (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     const employeeId = Number(req.params.id);
 
@@ -184,25 +186,15 @@ router.delete('/:id', requireAdmin, (req, res) => {
       });
     }
 
-    const users = getAllUsers();
+    const employee = await findUserById(employeeId);
 
-    const employee = users.find(
-      (user) =>
-        Number(user.id) === employeeId &&
-        user.role === 'employee'
-    );
-
-    if (!employee) {
+    if (!employee || employee.role !== 'employee') {
       return res.status(404).json({
         error: 'Employee not found.',
       });
     }
 
-    const updatedUsers = users.filter(
-      (user) => Number(user.id) !== employeeId
-    );
-
-    saveAllUsers(updatedUsers);
+    await deleteUser(employeeId);
 
     return res.json({
       message: 'Employee deleted successfully.',
@@ -243,15 +235,15 @@ router.put('/:id', requireAdmin, async (req, res) => {
       });
     }
 
-    const users = getAllUsers();
+    const users = await getAllUsers();
 
-    const employeeIndex = users.findIndex(
+    const employee = users.find(
       (user) =>
         Number(user.id) === employeeId &&
         user.role === 'employee'
     );
 
-    if (employeeIndex === -1) {
+    if (!employee) {
       return res.status(404).json({
         error: 'Employee not found.',
       });
@@ -269,19 +261,18 @@ router.put('/:id', requireAdmin, async (req, res) => {
       });
     }
 
-    users[employeeIndex] = {
-      ...users[employeeIndex],
+    const updates = {
       name: name.trim(),
       email: email.trim(),
       mobileNumber: String(mobileNumber),
       designation:
         designation !== undefined
           ? String(designation).trim()
-          : (users[employeeIndex].designation || ''),
+          : (employee.designation || ''),
       status:
         status !== undefined
           ? (status === 'inactive' ? 'inactive' : 'active')
-          : (users[employeeIndex].status || 'active'),
+          : (employee.status || 'active'),
     };
 
     if (password && typeof password === 'string' && password.trim()) {
@@ -290,21 +281,21 @@ router.put('/:id', requireAdmin, async (req, res) => {
           error: 'Password must be at least 8 characters long.',
         });
       }
-      users[employeeIndex].password = await bcrypt.hash(String(password), 10);
+      updates.password = await bcrypt.hash(String(password), 10);
     }
 
-    saveAllUsers(users);
+    const updatedEmployee = await updateUser(employeeId, updates);
 
     return res.json({
       message: 'Employee updated successfully.',
       employee: {
-        id: users[employeeIndex].id,
-        name: users[employeeIndex].name,
-        email: users[employeeIndex].email,
-        mobileNumber: users[employeeIndex].mobileNumber,
-        role: users[employeeIndex].role,
-        designation: users[employeeIndex].designation || '',
-        status: users[employeeIndex].status || 'active',
+        id: updatedEmployee.id,
+        name: updatedEmployee.name,
+        email: updatedEmployee.email,
+        mobileNumber: updatedEmployee.mobileNumber,
+        role: updatedEmployee.role,
+        designation: updatedEmployee.designation || '',
+        status: updatedEmployee.status || 'active',
       },
     });
   } catch (error) {
@@ -329,40 +320,41 @@ router.patch('/:id', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Invalid employee ID.' });
     }
 
-    const users = getAllUsers();
-    const employeeIndex = users.findIndex(
+    const users = await getAllUsers();
+    const employee = users.find(
       (user) => Number(user.id) === employeeId && user.role === 'employee'
     );
 
-    if (employeeIndex === -1) {
+    if (!employee) {
       return res.status(404).json({ error: 'Employee not found.' });
     }
 
+    const updates = {};
     if (status !== undefined) {
-      users[employeeIndex].status = status === 'inactive' ? 'inactive' : 'active';
+      updates.status = status === 'inactive' ? 'inactive' : 'active';
     }
     if (designation !== undefined) {
-      users[employeeIndex].designation = String(designation).trim();
+      updates.designation = String(designation).trim();
     }
     if (name !== undefined && name.trim()) {
-      users[employeeIndex].name = name.trim();
+      updates.name = name.trim();
     }
     if (email !== undefined && email.trim()) {
-      users[employeeIndex].email = email.trim();
+      updates.email = email.trim();
     }
 
-    saveAllUsers(users);
+    const updatedEmployee = await updateUser(employeeId, updates);
 
     return res.json({
       message: 'Employee updated successfully.',
       employee: {
-        id: users[employeeIndex].id,
-        name: users[employeeIndex].name,
-        email: users[employeeIndex].email,
-        mobileNumber: users[employeeIndex].mobileNumber,
-        role: users[employeeIndex].role,
-        designation: users[employeeIndex].designation || '',
-        status: users[employeeIndex].status || 'active',
+        id: updatedEmployee.id,
+        name: updatedEmployee.name,
+        email: updatedEmployee.email,
+        mobileNumber: updatedEmployee.mobileNumber,
+        role: updatedEmployee.role,
+        designation: updatedEmployee.designation || '',
+        status: updatedEmployee.status || 'active',
       },
     });
   } catch (error) {

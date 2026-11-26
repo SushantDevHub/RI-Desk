@@ -7,8 +7,10 @@ import { fileURLToPath } from 'url';
 
 import {
   getAllTickets,
+  findTicketById,
   addTicket,
   updateTicket,
+  deleteTicket,
 } from '../utils/ticketStore.js';
 
 import { syncClientsWithTickets } from '../utils/clientStore.js';
@@ -340,9 +342,9 @@ function requireAdmin(req, res, next) {
 // List tickets and statistics
 // --------------------------------------------------
 
-router.get('/', authenticate, (req, res) => {
+router.get('/', authenticate, async (req, res) => {
   try {
-    const tickets = getAllTickets();
+    const tickets = await getAllTickets();
 
     const openTickets = tickets.filter(
       (ticket) => ticket.status !== 'resolved'
@@ -390,9 +392,9 @@ router.get('/', authenticate, (req, res) => {
 // Fetch all employees for assignment dropdown (admin and employee)
 // --------------------------------------------------
 
-router.get('/employees', authenticate, (req, res) => {
+router.get('/employees', authenticate, async (req, res) => {
   try {
-    const users = getAllUsers();
+    const users = await getAllUsers();
     const employees = users
       .filter((user) => user.role === 'employee')
       .map((user) => ({
@@ -416,9 +418,9 @@ router.get('/employees', authenticate, (req, res) => {
 // Fetch admin contact details for employee help/query
 // --------------------------------------------------
 
-router.get('/admin-contact', authenticate, (req, res) => {
+router.get('/admin-contact', authenticate, async (req, res) => {
   try {
-    const allUsers = getAllUsers();
+    const allUsers = await getAllUsers();
     const admin = allUsers.find((u) => u.role === 'admin') || {
       id: 1,
       name: 'Admin User',
@@ -445,7 +447,7 @@ router.get('/admin-contact', authenticate, (req, res) => {
 // Create a ticket
 // --------------------------------------------------
 
-router.post('/', authenticate, (req, res) => {
+router.post('/', authenticate, async (req, res) => {
   try {
     const {
       subject,
@@ -511,7 +513,8 @@ router.post('/', authenticate, (req, res) => {
       assignedToId !== null &&
       String(assignedToId).trim() !== ''
     ) {
-      employee = getAllUsers().find(
+      const allUsers = await getAllUsers();
+      employee = allUsers.find(
         (user) =>
           String(user.id) === String(assignedToId) &&
           user.role === 'employee'
@@ -525,7 +528,7 @@ router.post('/', authenticate, (req, res) => {
     }
 
     // Generate the next ticket ID
-    const tickets = getAllTickets();
+    const tickets = await getAllTickets();
 
     const nextNumber =
       tickets.reduce((max, ticket) => {
@@ -588,9 +591,16 @@ router.post('/', authenticate, (req, res) => {
     const finalClientMobile = String(clientMobile || customerMobile || '').trim();
     const finalEmail = String(clientEmail || customerEmail || email || '').trim();
 
+    const ticketSubject =
+      typeof subject === 'string' && subject.trim()
+        ? subject.trim()
+        : description && description.trim()
+        ? description.trim().slice(0, 60)
+        : `${capitalize(cleanedCategory)} Request`;
+
     const ticket = {
       id: `TKT-${nextNumber}`,
-      subject: typeof subject === 'string' ? subject.trim() : '',
+      subject: ticketSubject,
       userType,
       client: finalClient,
       customer: finalClient,
@@ -609,12 +619,22 @@ router.post('/', authenticate, (req, res) => {
       // Save both the employee ID and employee name
       assignedTo: employee ? employee.name : null,
       assignedToId: employee ? employee.id : null,
+      assignedEmployeeId: employee ? employee.id : null,
+      isUnassigned: !Boolean(employee),
+
+      operator: req.body.operator || req.body.providerName || null,
+      providerName: req.body.providerName || req.body.operator || null,
+      transactionId: req.body.transactionId || null,
+      amount: req.body.amount ? Number(req.body.amount) : null,
+      screenshot: req.body.screenshot || null,
 
       createdAt,
+      updatedAt: createdAt,
       logs: [initialLog],
+      activityLog: [initialLog],
     };
 
-    addTicket(ticket);
+    await addTicket(ticket);
     try {
       syncClientsWithTickets();
     } catch (syncErr) {
@@ -664,7 +684,7 @@ router.patch(
   '/:id/assign',
   authenticate,
   requireAdmin,
-  (req, res) => {
+  async (req, res) => {
     try {
       const { employeeId } = req.body;
 
@@ -674,7 +694,8 @@ router.patch(
         });
       }
 
-      const employee = getAllUsers().find(
+      const allUsers = await getAllUsers();
+      const employee = allUsers.find(
         (user) =>
           String(user.id) === String(employeeId) &&
           user.role === 'employee'
@@ -686,9 +707,7 @@ router.patch(
         });
       }
 
-      const existing = getAllTickets().find(
-        (t) => String(t.id) === String(req.params.id)
-      );
+      const existing = await findTicketById(req.params.id);
 
       if (!existing) {
         return res.status(404).json({
@@ -736,7 +755,7 @@ router.patch(
 
       const currentLogs = getOrSynthesizeLogs(existing);
 
-      const updated = updateTicket(req.params.id, {
+      const updated = await updateTicket(req.params.id, {
         assignedTo: employee.name,
         assignedToId: employee.id,
         logs: [...currentLogs, assignLog],
@@ -786,7 +805,7 @@ router.patch(
 // Accessible by BOTH Admin and Employees!
 // --------------------------------------------------
 
-router.post('/:id/transfer', authenticate, (req, res) => {
+router.post('/:id/transfer', authenticate, async (req, res) => {
   try {
     const { transferToId, workLeftDescription } = req.body;
 
@@ -803,7 +822,7 @@ router.post('/:id/transfer', authenticate, (req, res) => {
       return res.status(400).json({ error: 'Work left description cannot exceed 250 characters.' });
     }
 
-    const allUsers = getAllUsers();
+    const allUsers = await getAllUsers();
     const targetEmployee = allUsers.find(
       (user) =>
         String(user.id) === String(transferToId) &&
@@ -818,9 +837,7 @@ router.post('/:id/transfer', authenticate, (req, res) => {
       return res.status(400).json({ error: 'Cannot transfer ticket to an inactive employee.' });
     }
 
-    const existing = getAllTickets().find(
-      (t) => String(t.id) === String(req.params.id)
-    );
+    const existing = await findTicketById(req.params.id);
 
     if (!existing) {
       return res.status(404).json({ error: 'Ticket not found.' });
@@ -889,7 +906,7 @@ router.post('/:id/transfer', authenticate, (req, res) => {
 
     const currentLogs = getOrSynthesizeLogs(existing);
 
-    const updated = updateTicket(req.params.id, {
+    const updated = await updateTicket(req.params.id, {
       assignedTo: newEmployeeName,
       assignedToId: targetEmployee.id,
       transferNotes: trimmedNotes,
@@ -965,12 +982,9 @@ function calculateResolutionTime(createdAt, resolvedAt) {
 // (Admins and employees)
 // --------------------------------------------------
 
-router.patch('/:id', authenticate, (req, res) => {
+router.patch('/:id', authenticate, async (req, res) => {
   try {
-    const tickets = getAllTickets();
-    const existing = tickets.find(
-      (ticket) => String(ticket.id) === String(req.params.id)
-    );
+    const existing = await findTicketById(req.params.id);
 
     if (!existing) {
       return res.status(404).json({
@@ -1073,7 +1087,8 @@ router.patch('/:id', authenticate, (req, res) => {
         newAssignedTo = null;
         newIsAssigned = false;
       } else {
-        const emp = getAllUsers().find(
+        const allUsers = await getAllUsers();
+        const emp = allUsers.find(
           (u) => String(u.id) === String(assignedToId) && u.role === 'employee'
         );
         if (emp) {
@@ -1255,7 +1270,7 @@ router.patch('/:id', authenticate, (req, res) => {
 
     updates.updatedAt = new Date().toISOString();
 
-    const updated = updateTicket(req.params.id, updates);
+    const updated = await updateTicket(req.params.id, updates);
 
     let createdNotification = null;
     if (
@@ -1299,7 +1314,7 @@ router.patch('/:id', authenticate, (req, res) => {
 // PUT /api/tickets/:id
 // Edit all ticket details (admin and employee)
 // --------------------------------------------------
-router.put('/:id', authenticate, (req, res) => {
+router.put('/:id', authenticate, async (req, res) => {
   try {
     const {
       subject, userType, client, customer, clientMobile, customerMobile,
@@ -1334,7 +1349,8 @@ router.put('/:id', authenticate, (req, res) => {
       assignedToId !== null &&
       String(assignedToId).trim() !== ''
     ) {
-      employee = getAllUsers().find(
+      const allUsers = await getAllUsers();
+      employee = allUsers.find(
         (user) =>
           String(user.id) === String(assignedToId) &&
           user.role === 'employee'
@@ -1344,7 +1360,7 @@ router.put('/:id', authenticate, (req, res) => {
       }
     }
 
-    const existing = getAllTickets().find((t) => String(t.id) === String(req.params.id));
+    const existing = await findTicketById(req.params.id);
     if (!existing) {
       return res.status(404).json({ error: 'Ticket not found.' });
     }
@@ -1500,7 +1516,7 @@ router.put('/:id', authenticate, (req, res) => {
       resolvedById = null;
     }
 
-    const updated = updateTicket(req.params.id, {
+    const updated = await updateTicket(req.params.id, {
       subject: typeof subject === 'string' ? subject.trim() : (existing.subject || ''),
       userType,
       client: newClient,
@@ -1566,11 +1582,9 @@ router.put('/:id', authenticate, (req, res) => {
 // Get single ticket by ID
 // --------------------------------------------------
 
-router.get('/:id', authenticate, (req, res) => {
+router.get('/:id', authenticate, async (req, res) => {
   try {
-    const ticket = getAllTickets().find(
-      (t) => String(t.id) === String(req.params.id)
-    );
+    const ticket = await findTicketById(req.params.id);
 
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found.' });
@@ -1591,11 +1605,9 @@ router.get('/:id', authenticate, (req, res) => {
 // Get ticket logs / audit history
 // --------------------------------------------------
 
-router.get('/:id/logs', authenticate, (req, res) => {
+router.get('/:id/logs', authenticate, async (req, res) => {
   try {
-    const ticket = getAllTickets().find(
-      (t) => String(t.id) === String(req.params.id)
-    );
+    const ticket = await findTicketById(req.params.id);
 
     if (!ticket) {
       return res.status(404).json({ error: 'Ticket not found.' });
@@ -1605,7 +1617,7 @@ router.get('/:id/logs', authenticate, (req, res) => {
 
     // If reconciled logs have added missing entries, persist to store
     if (!ticket.logs || ticket.logs.length !== logs.length) {
-      updateTicket(ticket.id, { logs });
+      await updateTicket(ticket.id, { logs });
     }
 
     return res.json({
@@ -1625,37 +1637,15 @@ router.get('/:id/logs', authenticate, (req, res) => {
 // Delete a ticket (admin and employee)
 // --------------------------------------------------
 
-router.delete('/:id', authenticate, (req, res) => {
+router.delete('/:id', authenticate, async (req, res) => {
   try {
-    if (!fs.existsSync(ticketsFile)) {
-      return res.status(404).json({
-        error: 'Ticket storage file not found.',
-      });
-    }
+    const deletedTicket = await deleteTicket(req.params.id);
 
-    const tickets = JSON.parse(
-      fs.readFileSync(ticketsFile, 'utf8')
-    );
-
-    const ticketIndex = tickets.findIndex(
-      (ticket) => String(ticket.id) === String(req.params.id)
-    );
-
-    if (ticketIndex === -1) {
+    if (!deletedTicket) {
       return res.status(404).json({
         error: 'Ticket not found.',
       });
     }
-
-    const deletedTicket = tickets[ticketIndex];
-
-    tickets.splice(ticketIndex, 1);
-
-    fs.writeFileSync(
-      ticketsFile,
-      JSON.stringify(tickets, null, 2),
-      'utf8'
-    );
 
     return res.json({
       message: 'Ticket deleted successfully.',

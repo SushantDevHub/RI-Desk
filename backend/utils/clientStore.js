@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getAllTickets } from './ticketStore.js';
+import { getAllTickets, getAllTicketsSync } from './ticketStore.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, '..', 'data');
@@ -46,8 +46,20 @@ export function syncClientsWithTickets() {
     return !dummyNames.includes(name) && !dummyNames.includes(comp);
   });
 
-  // Read all tickets
-  const tickets = getAllTickets();
+  // Read all tickets (handles both async and sync calls safely)
+  let tickets = [];
+  try {
+    const res = getAllTickets();
+    if (res && typeof res.then === 'function') {
+      tickets = getAllTicketsSync();
+    } else if (Array.isArray(res)) {
+      tickets = res;
+    } else {
+      tickets = getAllTicketsSync();
+    }
+  } catch {
+    tickets = getAllTicketsSync();
+  }
 
   // Group tickets by customer mobile or customer name
   const customerMap = new Map();

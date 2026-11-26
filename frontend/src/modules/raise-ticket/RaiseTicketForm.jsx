@@ -4,8 +4,11 @@ import {
   OPERATORS,
   DESCRIPTION_MAX_LENGTH,
   isTransactionCategory,
+  getCategoryProviderType,
+  CATEGORY_PROVIDERS,
   INITIAL_FORM_VALUES,
 } from './fieldConfig.js';
+import SearchableProviderSelect from './SearchableProviderSelect.jsx';
 import { submitRaiseTicket } from './raiseTicketApi.js';
 import './raise-ticket.css';
 
@@ -29,6 +32,81 @@ export default function RaiseTicketForm({ onSuccess, showHeader = true }) {
 
   // Check if current category requires transaction fields
   const showTxnFields = isTransactionCategory(formData.category);
+
+  // Check if current category requires a category-dependent searchable provider dropdown
+  const providerType = getCategoryProviderType(formData.category);
+  const providerConfig = providerType ? CATEGORY_PROVIDERS[providerType] : null;
+
+  // Category change handler: resets provider and customProvider (Req #6)
+  function handleCategoryChange(e) {
+    const newCategory = e.target.value;
+
+    setFormData((prev) => ({
+      ...prev,
+      category: newCategory,
+      provider: '',
+      customProvider: '',
+      operator: '',
+    }));
+
+    // Clear specific field errors for category, provider, customProvider, and operator
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next.category;
+      delete next.provider;
+      delete next.customProvider;
+      delete next.operator;
+      return next;
+    });
+
+    if (generalError) {
+      setGeneralError('');
+    }
+  }
+
+  // Searchable provider selection handler
+  function handleProviderChange(selectedVal) {
+    setFormData((prev) => ({
+      ...prev,
+      provider: selectedVal,
+      operator: selectedVal !== 'Other' ? selectedVal : (prev.customProvider || ''),
+      customProvider: selectedVal === 'Other' ? prev.customProvider : '',
+    }));
+
+    if (fieldErrors.provider) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next.provider;
+        return next;
+      });
+    }
+
+    if (selectedVal !== 'Other' && fieldErrors.customProvider) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next.customProvider;
+        return next;
+      });
+    }
+  }
+
+  // Custom provider text change handler (when "Other" is selected)
+  function handleCustomProviderChange(e) {
+    const val = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      customProvider: val,
+      operator: val.trim() || 'Other',
+    }));
+
+    if (fieldErrors.customProvider) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next.customProvider;
+        return next;
+      });
+    }
+  }
 
   // Field change handler
   function handleChange(e) {
@@ -170,6 +248,20 @@ export default function RaiseTicketForm({ onSuccess, showHeader = true }) {
       ) {
         errors.amount = 'Please enter a valid transaction amount greater than ₹0.';
       }
+    }
+
+    // Category-dependent searchable provider validation (Req #2, #4, #5)
+    if (providerType) {
+      if (!formData.provider || !formData.provider.trim()) {
+        errors.provider = `Please select a ${providerConfig?.label?.toLowerCase() || 'provider'}.`;
+      } else if (formData.provider === 'Other') {
+        if (!formData.customProvider || !formData.customProvider.trim()) {
+          errors.customProvider = 'Please enter your provider / board name.';
+        } else if (formData.customProvider.trim().length < 2) {
+          errors.customProvider = 'Provider name must be at least 2 characters.';
+        }
+      }
+    } else if (showTxnFields) {
       if (!formData.operator) {
         errors.operator = 'Please select operator/service.';
       }
@@ -194,7 +286,19 @@ export default function RaiseTicketForm({ onSuccess, showHeader = true }) {
     setFieldErrors({});
 
     try {
+      // Determine final provider name
+      let finalProvider = null;
+      if (providerType) {
+        finalProvider =
+          formData.provider === 'Other'
+            ? formData.customProvider.trim()
+            : formData.provider.trim();
+      } else if (formData.operator) {
+        finalProvider = formData.operator.trim();
+      }
+
       // Prepare payload (strictly for clients)
+      // Save providerName and operator consistently (Req #7, #10, #11)
       const payload = {
         name: formData.name.trim(),
         mobileNumber: formData.mobileNumber.replace(/\D/g, ''),
@@ -203,12 +307,13 @@ export default function RaiseTicketForm({ onSuccess, showHeader = true }) {
         subject: formData.subject.trim(),
         description: formData.description.trim(),
         screenshot: formData.screenshot || null,
+        providerName: finalProvider || null,
+        operator: finalProvider || null,
       };
 
       if (showTxnFields) {
         payload.transactionId = formData.transactionId.trim();
         payload.amount = Number(formData.amount);
-        payload.operator = formData.operator;
       }
 
       const response = await submitRaiseTicket(payload);
@@ -217,6 +322,8 @@ export default function RaiseTicketForm({ onSuccess, showHeader = true }) {
         ticketId: response.ticketId,
         ...response.ticket,
         ...formData,
+        providerName: finalProvider,
+        operator: finalProvider,
       };
 
       setSubmittedTicket(ticketResult);
@@ -342,10 +449,10 @@ export default function RaiseTicketForm({ onSuccess, showHeader = true }) {
             </div>
           )}
 
-          {isTxn && submittedTicket.operator && (
+          {(submittedTicket.providerName || submittedTicket.operator) && (
             <div className="rt-summary-row">
-              <span className="rt-summary-label">Operator / Service</span>
-              <span className="rt-summary-val">{submittedTicket.operator}</span>
+              <span className="rt-summary-label">Provider / Operator</span>
+              <span className="rt-summary-val">{submittedTicket.providerName || submittedTicket.operator}</span>
             </div>
           )}
 
@@ -471,7 +578,7 @@ export default function RaiseTicketForm({ onSuccess, showHeader = true }) {
             name="category"
             className={`rt-select ${fieldErrors.category ? 'rt-input-error' : ''}`}
             value={formData.category}
-            onChange={handleChange}
+            onChange={handleCategoryChange}
             disabled={loading}
           >
             {CATEGORIES.map((cat) => (
@@ -537,28 +644,68 @@ export default function RaiseTicketForm({ onSuccess, showHeader = true }) {
                 )}
               </div>
 
-              <div className="rt-field rt-field-full">
-                <label className="rt-label" htmlFor="rt-operator">
-                  <span>Operator / Gateway <span className="rt-req">*</span></span>
-                </label>
-                <select
-                  id="rt-operator"
-                  name="operator"
-                  className={`rt-select ${fieldErrors.operator ? 'rt-input-error' : ''}`}
-                  value={formData.operator}
-                  onChange={handleChange}
-                  disabled={loading}
-                >
-                  {OPERATORS.map((op) => (
-                    <option key={op} value={op}>
-                      {op}
-                    </option>
-                  ))}
-                </select>
-                {fieldErrors.operator && (
-                  <span className="rt-field-err-text">{fieldErrors.operator}</span>
-                )}
-              </div>
+              {providerType ? (
+                <>
+                  <div className="rt-field rt-field-full">
+                    <SearchableProviderSelect
+                      id="rt-provider"
+                      label={providerConfig.label}
+                      placeholder={providerConfig.searchPlaceholder}
+                      options={providerConfig.options}
+                      value={formData.provider}
+                      onChange={handleProviderChange}
+                      error={fieldErrors.provider}
+                      disabled={loading}
+                      required={true}
+                    />
+                  </div>
+
+                  {formData.provider === 'Other' && (
+                    <div className="rt-field rt-field-full rt-custom-provider-field">
+                      <label className="rt-label" htmlFor="rt-custom-provider">
+                        <span>Specify Provider / Board Name <span className="rt-req">*</span></span>
+                      </label>
+                      <input
+                        id="rt-custom-provider"
+                        name="customProvider"
+                        type="text"
+                        className={`rt-input ${fieldErrors.customProvider ? 'rt-input-error' : ''}`}
+                        placeholder={`Enter your ${providerConfig.label.toLowerCase()} name...`}
+                        value={formData.customProvider}
+                        onChange={handleCustomProviderChange}
+                        disabled={loading}
+                        autoFocus
+                      />
+                      {fieldErrors.customProvider && (
+                        <span className="rt-field-err-text">{fieldErrors.customProvider}</span>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="rt-field rt-field-full">
+                  <label className="rt-label" htmlFor="rt-operator">
+                    <span>Operator / Gateway <span className="rt-req">*</span></span>
+                  </label>
+                  <select
+                    id="rt-operator"
+                    name="operator"
+                    className={`rt-select ${fieldErrors.operator ? 'rt-input-error' : ''}`}
+                    value={formData.operator}
+                    onChange={handleChange}
+                    disabled={loading}
+                  >
+                    {OPERATORS.map((op) => (
+                      <option key={op} value={op}>
+                        {op}
+                      </option>
+                    ))}
+                  </select>
+                  {fieldErrors.operator && (
+                    <span className="rt-field-err-text">{fieldErrors.operator}</span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

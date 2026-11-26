@@ -46,7 +46,14 @@ export function validateRaiseTicket(body = {}) {
   const amount = body.amount !== undefined && body.amount !== null && String(body.amount).trim() !== ''
     ? Number(String(body.amount).replace(/[^0-9.]/g, ''))
     : null;
-  const operator = typeof body.operator === 'string' ? body.operator.trim() : '';
+  const rawProvider =
+    typeof body.providerName === 'string' && body.providerName.trim()
+      ? body.providerName.trim()
+      : typeof body.operator === 'string' && body.operator.trim()
+      ? body.operator.trim()
+      : '';
+  const providerName = rawProvider || null;
+  const operator = rawProvider || null;
   const screenshot = typeof body.screenshot === 'string' && body.screenshot.trim()
     ? body.screenshot.trim()
     : null;
@@ -104,6 +111,21 @@ export function validateRaiseTicket(body = {}) {
     }
   }
 
+  // Category-dependent provider validation (Mobile, DTH, Payment, Electricity)
+  const normCat = category.toLowerCase();
+  const requiresProvider =
+    normCat.includes('mobile') ||
+    normCat === 'recharge' ||
+    normCat.includes('dth') ||
+    normCat.includes('gateway') ||
+    normCat.includes('payment') ||
+    normCat.includes('electric') ||
+    normCat.includes('bijli');
+
+  if (requiresProvider && !providerName) {
+    errors.provider = 'Provider / operator name is required.';
+  }
+
   // Screenshot validation (if provided as base64 string, limit to roughly 5MB)
   if (screenshot && screenshot.length > 7 * 1024 * 1024) {
     errors.screenshot = 'Screenshot file size exceeds 5MB limit.';
@@ -123,6 +145,7 @@ export function validateRaiseTicket(body = {}) {
       transactionId: transactionId || null,
       amount: amount && !isNaN(amount) ? amount : null,
       operator: operator || null,
+      providerName: providerName || null,
       screenshot: screenshot || null,
     },
   };

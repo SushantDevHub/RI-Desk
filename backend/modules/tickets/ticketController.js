@@ -5,7 +5,7 @@ import { raiseNewTicket } from './ticketService.js';
  * Controller handler for raising a public ticket.
  * POST /api/tickets/raise
  */
-export function raiseTicketController(req, res) {
+export async function raiseTicketController(req, res) {
   try {
     const { isValid, errors, data } = validateRaiseTicket(req.body);
 
@@ -17,7 +17,7 @@ export function raiseTicketController(req, res) {
       });
     }
 
-    const ticket = raiseNewTicket(data);
+    const ticket = await raiseNewTicket(data);
 
     return res.status(201).json({
       success: true,

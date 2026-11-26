@@ -7,8 +7,8 @@ import { syncClientsWithTickets } from '../../utils/clientStore.js';
  * @param {object} ticketData - Sanitized data from validateRaiseTicket
  * @returns {object} The saved ticket object
  */
-export function raiseNewTicket(ticketData) {
-  const tickets = getAllTickets();
+export async function raiseNewTicket(ticketData) {
+  const tickets = await getAllTickets();
 
   // Generate next sequential ticket ID matching #TKT-xxxx format
   const nextNumber =
@@ -87,6 +87,13 @@ export function raiseNewTicket(ticketData) {
       newValue: `₹${ticketData.amount}`,
     });
   }
+  if (ticketData.providerName || ticketData.operator) {
+    initialLog.changes.push({
+      field: 'Provider / Operator',
+      oldValue: 'None',
+      newValue: ticketData.providerName || ticketData.operator,
+    });
+  }
 
   // Construct complete ticket matching existing database schema (strictly for clients)
   const newTicket = {
@@ -108,10 +115,11 @@ export function raiseNewTicket(ticketData) {
     createdById: null,
     source: 'self_service_portal',
 
-    // Conditional transaction fields
+    // Conditional transaction & provider fields (Req #7, #8, #10, #11)
     transactionId: ticketData.transactionId || null,
     amount: ticketData.amount || null,
-    operator: ticketData.operator || null,
+    operator: ticketData.providerName || ticketData.operator || null,
+    providerName: ticketData.providerName || ticketData.operator || null,
     screenshot: ticketData.screenshot || null,
 
     // Initial assignment status (Unassigned by default, will appear in admin/employee dashboard)
@@ -129,8 +137,8 @@ export function raiseNewTicket(ticketData) {
     logs: [initialLog],
   };
 
-  // Persist ticket to existing tickets.json
-  addTicket(newTicket);
+  // Persist ticket to MongoDB storage
+  await addTicket(newTicket);
 
   // Sync with client list so customer profile is indexed if applicable
   try {

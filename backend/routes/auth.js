@@ -27,7 +27,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Find user by mobile number
-    const user = findUserByMobile(mobileNumber);
+    const user = await findUserByMobile(mobileNumber);
 
     // User doesn't exist
     if (!user) {
@@ -58,7 +58,7 @@ router.post('/login', async (req, res) => {
     // Auto-migrate legacy plain text password to bcrypt hash on successful login
     if (!isBcrypt && user.password) {
       const newHash = await bcrypt.hash(password, 10);
-      updateUser(user.id, { password: newHash });
+      await updateUser(user.id, { password: newHash });
     }
     // Create JWT - 30 days if remember me is checked, 1 day if not
     const token = jwt.sign(
@@ -156,7 +156,7 @@ router.post('/forgot-password', async (req, res) => {
       });
     }
 
-    const user = findUserByEmail(String(email).trim());
+    const user = await findUserByEmail(String(email).trim());
 
     if (!user) {
       return res.status(404).json({
@@ -168,7 +168,7 @@ router.post('/forgot-password', async (req, res) => {
     const hashedPassword = await bcrypt.hash(String(newPassword), 10);
 
     // Update the user's password
-    updateUser(user.id, {
+    await updateUser(user.id, {
       password: hashedPassword,
     });
 
@@ -208,7 +208,7 @@ router.post('/change-password', async (req, res) => {
       });
     }
 
-    const user = findUserById(decoded.id);
+    const user = await findUserById(decoded.id);
     if (!user) {
       return res.status(404).json({
         error: 'User not found.',
@@ -230,7 +230,7 @@ router.post('/change-password', async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(String(newPassword), 10);
-    updateUser(user.id, {
+    await updateUser(user.id, {
       password: hashedPassword,
     });
 

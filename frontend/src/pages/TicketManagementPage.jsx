@@ -1583,7 +1583,7 @@ export default function TicketManagementPage() {
 
                         {/* 3. Category */}
                         <td>
-                          <div className="ticket-row-cell-wrap">
+                          <div className="ticket-row-cell-wrap" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
                             <select
                               className="ticket-row-badge-select"
                               style={{
@@ -1615,6 +1615,28 @@ export default function TicketManagementPage() {
                                 </option>
                               )}
                             </select>
+                            {(ticket.providerName || ticket.operator) && (
+                              <span
+                                className="ticket-provider-badge"
+                                title={`Provider: ${ticket.providerName || ticket.operator}`}
+                                style={{
+                                  fontSize: '11px',
+                                  color: '#475569',
+                                  background: '#f1f5f9',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '4px',
+                                  padding: '1px 6px',
+                                  fontWeight: 500,
+                                  maxWidth: '130px',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  display: 'inline-block',
+                                }}
+                              >
+                                {ticket.providerName || ticket.operator}
+                              </span>
+                            )}
                           </div>
                         </td>
 
@@ -2142,6 +2164,25 @@ export default function TicketManagementPage() {
                   </span>
                 </div>
 
+                {(viewingTicket.providerName || viewingTicket.operator) && (
+                  <div className="ticket-desc-meta-item">
+                    <span className="ticket-desc-meta-label">Provider:</span>
+                    <span
+                      style={{
+                        color: '#0f172a',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        padding: '2px 8px',
+                        fontSize: '11px',
+                        borderRadius: '4px',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {viewingTicket.providerName || viewingTicket.operator}
+                    </span>
+                  </div>
+                )}
+
                 <div className="ticket-desc-meta-item">
                   <span className="ticket-desc-meta-label">Priority:</span>
                   <span
@@ -2281,7 +2322,7 @@ export default function TicketManagementPage() {
                 </div>
 
                 {/* Conditional Transaction Details if ticket was raised with transaction info */}
-                {(viewingTicket.transactionId || viewingTicket.amount || viewingTicket.operator) && (
+                {(viewingTicket.transactionId || viewingTicket.amount || viewingTicket.providerName || viewingTicket.operator) && (
                   <div style={{ marginTop: '12px', background: '#f8fafc', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                     <div style={{ fontWeight: 600, fontSize: '12.5px', color: '#334155', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -2303,10 +2344,10 @@ export default function TicketManagementPage() {
                           <strong style={{ color: '#0f172a' }}>₹{Number(viewingTicket.amount).toLocaleString('en-IN')}</strong>
                         </div>
                       )}
-                      {viewingTicket.operator && (
+                      {(viewingTicket.providerName || viewingTicket.operator) && (
                         <div>
-                          <span style={{ color: '#64748b' }}>Operator: </span>
-                          <strong style={{ color: '#0f172a' }}>{viewingTicket.operator}</strong>
+                          <span style={{ color: '#64748b' }}>Provider / Operator: </span>
+                          <strong style={{ color: '#0f172a' }}>{viewingTicket.providerName || viewingTicket.operator}</strong>
                         </div>
                       )}
                     </div>

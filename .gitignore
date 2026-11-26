@@ -12,6 +12,7 @@ backend/.env
 
 # Database / local data (keep sample or state files safe)
 backend/data/*.json
+backend/.mongo-bin/
 
 # Logs
 logs/

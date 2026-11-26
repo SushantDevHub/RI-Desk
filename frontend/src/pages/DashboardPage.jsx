@@ -836,16 +836,13 @@ export default function DashboardPage({
   const unassignedOpenTickets = tickets
     .filter((ticket) => {
       if (ticket.status === 'resolved') return false;
-      if (!isTicketUnassigned(ticket)) return false;
-      // Filter out pre-generated / sample ticket records from Unassigned
-      if (ticket.id === 'TKT-1001' && !ticket.source) return false;
-      return true;
+      return isTicketUnassigned(ticket);
     })
     .sort(sortDescending);
 
   // Open tickets slab only includes assigned open tickets so unassigned tickets are not duplicated
   const openTicketsDescending = openStatTickets
-    .filter((ticket) => !isTicketUnassigned(ticket) || (ticket.id === 'TKT-1001' && !ticket.source))
+    .filter((ticket) => !isTicketUnassigned(ticket))
     .sort(sortDescending);
 
   const allOpenTicketsDescending = openStatTickets.slice().sort(sortDescending);
@@ -1430,7 +1427,7 @@ export default function DashboardPage({
                   </td>
 
                   <td>
-                    <div className="ticket-row-cell-wrap">
+                    <div className="ticket-row-cell-wrap" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '3px' }}>
                       <select
                         className="ticket-row-badge-select"
                         style={{
@@ -1463,6 +1460,28 @@ export default function DashboardPage({
                           </option>
                         )}
                       </select>
+                      {(ticket.providerName || ticket.operator) && (
+                        <span
+                          className="ticket-provider-badge"
+                          title={`Provider: ${ticket.providerName || ticket.operator}`}
+                          style={{
+                            fontSize: '11px',
+                            color: '#475569',
+                            background: '#f1f5f9',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '4px',
+                            padding: '1px 6px',
+                            fontWeight: 500,
+                            maxWidth: '130px',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            display: 'inline-block',
+                          }}
+                        >
+                          {ticket.providerName || ticket.operator}
+                        </span>
+                      )}
                     </div>
                   </td>
 
@@ -2835,6 +2854,25 @@ export default function DashboardPage({
                   </span>
                 </div>
 
+                {(viewingTicket.providerName || viewingTicket.operator) && (
+                  <div className="ticket-desc-meta-item">
+                    <span className="ticket-desc-meta-label">Provider:</span>
+                    <span
+                      style={{
+                        color: '#0f172a',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        padding: '2px 8px',
+                        fontSize: '11px',
+                        borderRadius: '4px',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {viewingTicket.providerName || viewingTicket.operator}
+                    </span>
+                  </div>
+                )}
+
                 <div className="ticket-desc-meta-item">
                   <span className="ticket-desc-meta-label">Priority:</span>
                   <span
@@ -2974,7 +3012,7 @@ export default function DashboardPage({
                 </div>
 
                 {/* Conditional Transaction Details if ticket was raised with transaction info */}
-                {(viewingTicket.transactionId || viewingTicket.amount || viewingTicket.operator) && (
+                {(viewingTicket.transactionId || viewingTicket.amount || viewingTicket.providerName || viewingTicket.operator) && (
                   <div style={{ marginTop: '12px', background: '#f8fafc', padding: '12px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                     <div style={{ fontWeight: 600, fontSize: '12.5px', color: '#334155', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
@@ -2996,10 +3034,10 @@ export default function DashboardPage({
                           <strong style={{ color: '#0f172a' }}>₹{Number(viewingTicket.amount).toLocaleString('en-IN')}</strong>
                         </div>
                       )}
-                      {viewingTicket.operator && (
+                      {(viewingTicket.providerName || viewingTicket.operator) && (
                         <div>
-                          <span style={{ color: '#64748b' }}>Operator: </span>
-                          <strong style={{ color: '#0f172a' }}>{viewingTicket.operator}</strong>
+                          <span style={{ color: '#64748b' }}>Provider / Operator: </span>
+                          <strong style={{ color: '#0f172a' }}>{viewingTicket.providerName || viewingTicket.operator}</strong>
                         </div>
                       )}
                     </div>
