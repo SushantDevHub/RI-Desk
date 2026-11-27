@@ -15,7 +15,30 @@ import raiseTicketRoutes from './modules/tickets/ticketRoutes.js';
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
+// Respect X-Forwarded-For behind reverse proxies (Nginx, Cloudflare, Render, etc.)
+// so rateLimiter.js identifies real visitor IPs instead of the proxy IP.
+app.set('trust proxy', 1);
+
+const allowedOrigins = (
+  process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173'
+)
+  .split(',')
+  .map((origin) => origin.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Allow requests without an Origin header (e.g. PHP server cURL, curl, health checks)
+      // or explicitly listed browser origins.
+      if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin.replace(/\/+$/, ''))) {
+        return callback(null, true);
+      }
+      return callback(new Error(`Origin ${origin} not allowed by CORS`));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: '10mb' }));
 app.use('/api/tickets', raiseTicketRoutes);
 app.use('/api/auth', authRoutes);

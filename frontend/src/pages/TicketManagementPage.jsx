@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getToken } from '../api/authApi.js';
+import { API_BASE } from '../config/api.js';
 import ContactClientDialog from '../components/ContactClientDialog.jsx';
 import TicketLogsDialog from '../components/TicketLogsDialog.jsx';
 import TransferTicketDialog from '../components/TransferTicketDialog.jsx';
@@ -7,7 +8,7 @@ import AskAdminDialog from '../components/AskAdminDialog.jsx';
 import AskEmployeeDialog from '../components/AskEmployeeDialog.jsx';
 import './TicketManagementPage.css';
 
-const API = 'http://localhost:4000/api';
+const API = API_BASE;
 
 const INITIAL_FORM = {
   subject: '',
@@ -837,7 +838,7 @@ export default function TicketManagementPage() {
 
       await fetchTickets(true);
     } catch (err) {
-      setFormError(err.message || 'Failed to create ticket.');
+      setFormError(err.message || 'Failed to add ticket.');
     } finally {
       setCreatingTicket(false);
     }
@@ -1235,13 +1236,13 @@ export default function TicketManagementPage() {
         </div>
 
         <div className="ticket-header-actions">
-          {/* Create Ticket Button */}
+          {/* Add Ticket Button */}
           <button
             type="button"
             className="ticket-create-button"
             onClick={openCreateDialog}
           >
-            + Create Ticket
+            + Add Ticket
           </button>
         </div>
       </div>
@@ -1398,7 +1399,7 @@ export default function TicketManagementPage() {
 
       {isAdmin && !employeesLoading && !employeeError && employees.length === 0 && (
         <div className="ticket-notice">
-          No employees found. Create an employee before assigning tickets.
+          No employees found. Add an employee before assigning tickets.
         </div>
       )}
 
@@ -1941,7 +1942,7 @@ export default function TicketManagementPage() {
           >
             <div className="ticket-dialog-header">
               <div>
-                <h2 id="create-ticket-title">Create Ticket</h2>
+                <h2 id="create-ticket-title">Add Ticket</h2>
                 <p>Enter the details of the support request.</p>
               </div>
 
@@ -1973,7 +1974,7 @@ export default function TicketManagementPage() {
 
               {employeeError && (
                 <p className="ticket-form-hint">
-                  Employee list unavailable. You can create the ticket without
+                  Employee list unavailable. You can add the ticket without
                   assigning an employee.
                 </p>
               )}
@@ -1993,7 +1994,7 @@ export default function TicketManagementPage() {
                   className="ticket-create-button"
                   disabled={creatingTicket}
                 >
-                  {creatingTicket ? 'Creating...' : 'Create Ticket'}
+                  {creatingTicket ? 'Adding...' : 'Add Ticket'}
                 </button>
               </div>
             </form>

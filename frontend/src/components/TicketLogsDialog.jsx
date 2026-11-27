@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { getToken } from '../api/authApi.js';
+import { API_BASE } from '../config/api.js';
 import './TicketLogsDialog.css';
 
-const API = 'http://localhost:4000/api';
+const API = API_BASE;
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   year: 'numeric',

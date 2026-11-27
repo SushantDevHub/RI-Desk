@@ -1,6 +1,7 @@
 import { getToken } from './authApi.js';
+import { API_BASE as API_ROOT_BASE } from '../config/api.js';
 
-const API_BASE = 'http://localhost:4000/api/notifications';
+const API_BASE = `${API_ROOT_BASE}/notifications`;
 
 async function req(url, options = {}) {
   const token = getToken();

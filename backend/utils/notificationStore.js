@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getAllUsersSync } from './userStore.js';
-import { getAllClients } from './clientStore.js';
+import { getAllClientsSync } from './clientStore.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, '..', 'data');
@@ -240,7 +240,7 @@ export function sendMobileNotification({
 
   // Calculate recipients
   const allUsers = getAllUsersSync();
-  const allClients = getAllClients();
+  const allClients = getAllClientsSync();
   const employees = allUsers.filter((u) => u.role === 'employee' && u.status !== 'inactive');
 
   let deliveredCount = 0;

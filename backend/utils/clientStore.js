@@ -1,11 +1,15 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import mongoose from 'mongoose';
+import Client from '../models/Client.js';
 import { getAllTickets, getAllTicketsSync } from './ticketStore.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const CLIENTS_FILE = path.join(DATA_DIR, 'clients.json');
+
+let cachedClients = [];
 
 function ensureFile() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -17,18 +21,82 @@ function ensureFile() {
   }
 }
 
+function syncJsonBackup(clients) {
+  try {
+    ensureFile();
+    cachedClients = Array.isArray(clients) ? [...clients] : [];
+    fs.writeFileSync(CLIENTS_FILE, JSON.stringify(clients, null, 2));
+  } catch {
+    // Non-critical backup sync
+  }
+}
+
+export function getAllClientsSync() {
+  if (fs.existsSync(CLIENTS_FILE)) {
+    try {
+      const raw = fs.readFileSync(CLIENTS_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      cachedClients = Array.isArray(parsed) ? parsed : [];
+      return cachedClients;
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function sortClientsList(clients) {
+  return clients.slice().sort((a, b) => {
+    const timeA = new Date(a.createdAt || 0).getTime();
+    const timeB = new Date(b.createdAt || 0).getTime();
+    if (!isNaN(timeA) && !isNaN(timeB) && timeB !== timeA) {
+      return timeB - timeA;
+    }
+    return String(b.id || '').localeCompare(String(a.id || ''), undefined, {
+      numeric: true,
+    });
+  });
+}
+
+function cleanStringArray(arr) {
+  if (Array.isArray(arr)) {
+    return Array.from(
+      new Set(
+        arr
+          .map((item) => String(item || '').trim())
+          .filter(Boolean)
+      )
+    );
+  }
+  if (typeof arr === 'string') {
+    return Array.from(
+      new Set(
+        arr
+          .split(/[,;|]/)
+          .map((item) => item.trim())
+          .filter(Boolean)
+      )
+    );
+  }
+  return [];
+}
+
+function escapeRegExp(str) {
+  return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
- * Synchronizes client data with real ticket customers, removing mock/dummy data.
+ * Synchronizes client data with ticket customers, removing mock/dummy data.
+ * Optionally merges onto a provided base client list (e.g. from MongoDB).
  */
-export function syncClientsWithTickets() {
+export function syncClientsWithTickets(baseClients = null) {
   ensureFile();
   let existingClients = [];
-  try {
-    const raw = fs.readFileSync(CLIENTS_FILE, 'utf-8');
-    const parsed = JSON.parse(raw);
-    existingClients = Array.isArray(parsed) ? parsed : [];
-  } catch {
-    existingClients = [];
+
+  if (Array.isArray(baseClients)) {
+    existingClients = [...baseClients];
+  } else {
+    existingClients = getAllClientsSync();
   }
 
   // Remove dummy/mock clients
@@ -46,7 +114,7 @@ export function syncClientsWithTickets() {
     return !dummyNames.includes(name) && !dummyNames.includes(comp);
   });
 
-  // Read all tickets (handles both async and sync calls safely)
+  // Read tickets safely
   let tickets = [];
   try {
     const res = getAllTickets();
@@ -70,7 +138,6 @@ export function syncClientsWithTickets() {
     const email = String(ticket.email || ticket.clientEmail || ticket.customerEmail || '').trim();
     if (!customer && !mobile) return;
 
-    // Use normalized mobile or customer name as key
     const key = mobile.replace(/\D/g, '') || customer.toLowerCase();
 
     if (!customerMap.has(key)) {
@@ -117,7 +184,6 @@ export function syncClientsWithTickets() {
   let nextCliNumber = 1001;
   const mergedClients = [...existingClients];
 
-  // Find highest existing CLI-xxx ID
   mergedClients.forEach((c) => {
     const m = String(c.id || '').match(/^CLI-(\d+)$/i);
     if (m) {
@@ -136,7 +202,6 @@ export function syncClientsWithTickets() {
     });
   };
 
-  // Merge ticket customers into clients list
   customerMap.forEach((group) => {
     const existingIndex = findExistingIndex(group);
     const servicesFromTickets = Array.from(group.categories);
@@ -190,7 +255,6 @@ export function syncClientsWithTickets() {
     }
   });
 
-  // Attach ticket metadata to any remaining clients
   mergedClients.forEach((client) => {
     if (!client.ticketCount && !client.tickets) {
       const normMob = (client.mobileNumber || '').replace(/\D/g, '');
@@ -210,7 +274,6 @@ export function syncClientsWithTickets() {
     }
   });
 
-  // Clean any legacy 'SMS' features
   mergedClients.forEach((client) => {
     if (Array.isArray(client.features)) {
       client.features = client.features.filter((f) => f !== 'SMS');
@@ -220,43 +283,88 @@ export function syncClientsWithTickets() {
     }
   });
 
-  fs.writeFileSync(CLIENTS_FILE, JSON.stringify(mergedClients, null, 2));
+  syncJsonBackup(mergedClients);
   return mergedClients;
 }
 
-export function getAllClients() {
+export async function getAllClients() {
+  if (mongoose.connection.readyState === 1) {
+    const docs = await Client.find({}).lean();
+    const mapped = docs.map((c) => ({
+      ...c,
+      _id: c._id?.toString(),
+    }));
+    const synced = syncClientsWithTickets(mapped);
+    return sortClientsList(synced);
+  }
+
   const clients = syncClientsWithTickets();
-  return clients.slice().sort((a, b) => {
-    const timeA = new Date(a.createdAt || 0).getTime();
-    const timeB = new Date(b.createdAt || 0).getTime();
-    if (!isNaN(timeA) && !isNaN(timeB) && timeB !== timeA) {
-      return timeB - timeA;
+  return sortClientsList(clients);
+}
+
+export async function saveAllClients(items) {
+  if (mongoose.connection.readyState === 1 && Array.isArray(items)) {
+    for (const c of items) {
+      if (!c.id) continue;
+      await Client.findOneAndUpdate(
+        { id: String(c.id) },
+        { $set: c },
+        { upsert: true, returnDocument: 'after' }
+      );
     }
-    return String(b.id || '').localeCompare(String(a.id || ''), undefined, {
-      numeric: true,
-    });
-  });
+  }
+  syncJsonBackup(items);
 }
 
-export function saveAllClients(items) {
-  ensureFile();
-  fs.writeFileSync(CLIENTS_FILE, JSON.stringify(items, null, 2));
+export async function findClientById(id) {
+  if (mongoose.connection.readyState === 1) {
+    const doc = await Client.findOne({
+      id: { $regex: new RegExp(`^${escapeRegExp(id)}$`, 'i') },
+    }).lean();
+    if (doc) {
+      return { ...doc, _id: doc._id?.toString() };
+    }
+  }
+
+  const items = await getAllClients();
+  return items.find((item) => String(item.id).toLowerCase() === String(id).toLowerCase()) || null;
 }
 
-export function findClientById(id) {
-  const items = getAllClients();
-  return items.find((item) => String(item.id).toLowerCase() === String(id).toLowerCase());
-}
+export async function addClient(item) {
+  if (mongoose.connection.readyState === 1) {
+    const created = await Client.create(item);
+    const result = created.toObject();
+    const all = await Client.find({}).lean();
+    syncJsonBackup(all.map((c) => ({ ...c, _id: c._id?.toString() })));
+    return result;
+  }
 
-export function addClient(item) {
-  const items = getAllClients();
-  items.unshift(item); // Newest on top
-  saveAllClients(items);
+  const items = await getAllClients();
+  items.unshift(item);
+  syncJsonBackup(items);
   return item;
 }
 
-export function updateClient(id, updates) {
-  const items = getAllClients();
+export async function updateClient(id, updates) {
+  const stampedUpdates = {
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (mongoose.connection.readyState === 1) {
+    const updated = await Client.findOneAndUpdate(
+      { id: { $regex: new RegExp(`^${escapeRegExp(id)}$`, 'i') } },
+      { $set: stampedUpdates },
+      { returnDocument: 'after' }
+    ).lean();
+    if (updated) {
+      const all = await Client.find({}).lean();
+      syncJsonBackup(all.map((c) => ({ ...c, _id: c._id?.toString() })));
+      return { ...updated, _id: updated._id?.toString() };
+    }
+  }
+
+  const items = await getAllClients();
   const index = items.findIndex(
     (item) => String(item.id).toLowerCase() === String(id).toLowerCase()
   );
@@ -264,21 +372,190 @@ export function updateClient(id, updates) {
 
   items[index] = {
     ...items[index],
-    ...updates,
-    updatedAt: new Date().toISOString(),
+    ...stampedUpdates,
   };
-  saveAllClients(items);
+  syncJsonBackup(items);
   return items[index];
 }
 
-export function deleteClient(id) {
-  const items = getAllClients();
+export async function deleteClient(id) {
+  if (mongoose.connection.readyState === 1) {
+    const removed = await Client.findOneAndDelete({
+      id: { $regex: new RegExp(`^${escapeRegExp(id)}$`, 'i') },
+    }).lean();
+    if (removed) {
+      const all = await Client.find({}).lean();
+      syncJsonBackup(all.map((c) => ({ ...c, _id: c._id?.toString() })));
+      return { ...removed, _id: removed._id?.toString() };
+    }
+  }
+
+  const items = await getAllClients();
   const index = items.findIndex(
     (item) => String(item.id).toLowerCase() === String(id).toLowerCase()
   );
   if (index === -1) return null;
 
   const [removed] = items.splice(index, 1);
-  saveAllClients(items);
+  syncJsonBackup(items);
   return removed;
+}
+
+/**
+ * Bulk imports or updates multiple clients cleanly in one batch.
+ * Persists to MongoDB via insertMany/bulkWrite when connected and updates JSON backup.
+ */
+export async function bulkUpsertClients(
+  rawRows = [],
+  { duplicateMode = 'skip', createdBy = 'Bulk Import' } = {}
+) {
+  const existingClients = await getAllClients();
+  const byMobile = new Map();
+  let nextNumber = 1001;
+
+  existingClients.forEach((client) => {
+    const match = String(client.id || '').match(/^CLI-(\d+)$/i);
+    if (match) {
+      nextNumber = Math.max(nextNumber, Number(match[1]) + 1);
+    }
+    const normMob = String(client.mobileNumber || '').replace(/\D/g, '');
+    if (normMob) {
+      byMobile.set(normMob, client);
+    }
+  });
+
+  const toInsert = [];
+  const toUpdate = [];
+  const errors = [];
+  let skippedCount = 0;
+  const now = new Date().toISOString();
+
+  rawRows.forEach((raw, idx) => {
+    const rowNumber = raw._rowNumber || idx + 2;
+    const trimmedName = String(raw.name || '').trim();
+    const trimmedCompany = String(raw.companyName || '').trim();
+    const rawMobile = String(raw.mobileNumber || '').trim();
+    const digitsMobile = rawMobile.replace(/\D/g, '');
+
+    if (!trimmedName) {
+      errors.push({ row: rowNumber, reason: 'Contact person name is required.' });
+      return;
+    }
+    if (!trimmedCompany) {
+      errors.push({ row: rowNumber, reason: 'Company name is required.' });
+      return;
+    }
+    if (!digitsMobile || digitsMobile.length < 7) {
+      errors.push({ row: rowNumber, reason: 'Valid mobile number is required.' });
+      return;
+    }
+
+    const cleanedServices = cleanStringArray(raw.services);
+    const cleanedFeatures = cleanStringArray(raw.features).filter((f) => f !== 'SMS');
+    const mergedServicesFeatures = Array.from(
+      new Set([
+        ...cleanedServices,
+        ...cleanedFeatures,
+        ...cleanStringArray(raw.servicesFeatures).filter((f) => f !== 'SMS'),
+      ])
+    );
+
+    const parsedRental = Number(String(raw.monthlyRental ?? 0).replace(/[^0-9.-]/g, ''));
+    const monthlyRental = Number.isFinite(parsedRental) && parsedRental >= 0 ? parsedRental : 0;
+    const rawStatus = String(raw.status || 'active').trim().toLowerCase();
+    const status = rawStatus === 'inactive' ? 'inactive' : 'active';
+    const whatsapp = String(raw.whatsappNumber || '').replace(/\D/g, '') || digitsMobile;
+
+    const existing = byMobile.get(digitsMobile);
+    if (existing) {
+      if (duplicateMode === 'update') {
+        const updatedRecord = {
+          ...existing,
+          name: trimmedName,
+          companyName: trimmedCompany,
+          address: raw.address !== undefined ? String(raw.address).trim() : existing.address || '',
+          website: raw.website !== undefined ? String(raw.website).trim() : existing.website || '',
+          mobileNumber: digitsMobile,
+          email: raw.email !== undefined ? String(raw.email).trim() : existing.email || '',
+          whatsappNumber: whatsapp,
+          cityState: raw.cityState !== undefined ? String(raw.cityState).trim() : existing.cityState || '',
+          monthlyRental: raw.monthlyRental !== undefined && raw.monthlyRental !== '' ? monthlyRental : existing.monthlyRental || 0,
+          services: cleanedServices.length > 0 ? cleanedServices : existing.services || [],
+          features: cleanedFeatures.length > 0 ? cleanedFeatures : existing.features || [],
+          servicesFeatures:
+            mergedServicesFeatures.length > 0
+              ? mergedServicesFeatures
+              : existing.servicesFeatures || [],
+          status,
+          updatedAt: now,
+        };
+        toUpdate.push(updatedRecord);
+        byMobile.set(digitsMobile, updatedRecord);
+      } else {
+        skippedCount++;
+      }
+      return;
+    }
+
+    const newClient = {
+      id: `CLI-${nextNumber++}`,
+      name: trimmedName,
+      companyName: trimmedCompany,
+      address: String(raw.address || '').trim(),
+      website: String(raw.website || '').trim(),
+      mobileNumber: digitsMobile,
+      email: String(raw.email || '').trim(),
+      whatsappNumber: whatsapp,
+      cityState: String(raw.cityState || '').trim(),
+      monthlyRental,
+      services: cleanedServices,
+      features: cleanedFeatures,
+      servicesFeatures: mergedServicesFeatures,
+      status,
+      createdAt: now,
+      updatedAt: now,
+      createdBy,
+      ticketCount: 0,
+      tickets: [],
+    };
+
+    toInsert.push(newClient);
+    byMobile.set(digitsMobile, newClient);
+  });
+
+  if (mongoose.connection.readyState === 1) {
+    if (toInsert.length > 0) {
+      await Client.insertMany(toInsert, { ordered: false });
+    }
+    if (toUpdate.length > 0) {
+      const bulkOps = toUpdate.map((doc) => {
+        const { _id, ...fields } = doc;
+        return {
+          updateOne: {
+            filter: { id: doc.id },
+            update: { $set: fields },
+            upsert: true,
+          },
+        };
+      });
+      await Client.bulkWrite(bulkOps);
+    }
+    const refreshed = await Client.find({}).lean();
+    syncJsonBackup(refreshed.map((c) => ({ ...c, _id: c._id?.toString() })));
+  } else {
+    const updateMap = new Map(toUpdate.map((u) => [u.id, u]));
+    const updatedList = existingClients.map((c) => updateMap.get(c.id) || c);
+    const finalClients = [...toInsert.reverse(), ...updatedList];
+    syncJsonBackup(finalClients);
+  }
+
+  return {
+    importedCount: toInsert.length,
+    updatedCount: toUpdate.length,
+    skippedCount,
+    errorCount: errors.length,
+    errors,
+    importedClients: toInsert,
+    updatedClients: toUpdate,
+  };
 }

@@ -45,6 +45,7 @@ export const envConfig = {
   PORT: process.env.PORT || 4000,
   JWT_SECRET: process.env.JWT_SECRET || 'dev_only_change_this_before_deploying_anywhere_real',
   MONGODB_URI: process.env.MONGODB_URI || '',
+  ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173',
   loadedPath,
 };
 

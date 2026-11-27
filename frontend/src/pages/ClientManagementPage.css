@@ -1888,3 +1888,359 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ────────────────────────────────────────────────────────
+   BULK CSV / EXCEL IMPORT STYLES
+──────────────────────────────────────────────────────── */
+
+.client-import-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 15px;
+  border-radius: 8px;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+
+.client-import-btn:hover {
+  background: #e0e7ff;
+  border-color: #a5b4fc;
+  transform: translateY(-1px);
+}
+
+.client-import-modal-box {
+  max-width: 860px;
+}
+
+.client-import-template-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.client-import-template-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: #475569;
+  flex: 1;
+  min-width: 240px;
+}
+
+.client-import-template-info strong {
+  color: #0f172a;
+  font-size: 12.5px;
+}
+
+.client-import-template-info code {
+  background: #e2e8f0;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #1e293b;
+}
+
+.client-import-template-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.client-template-dl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 7px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+/* ── Download / Export Clients Button & Menu ── */
+.client-download-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.client-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.15s ease;
+}
+
+.client-download-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  transform: translateY(-1px);
+}
+
+.client-download-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.client-download-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 175px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.12), 0 4px 8px -2px rgba(15, 23, 42, 0.05);
+  padding: 6px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: fadeIn 0.12s ease-out;
+}
+
+.client-download-menu-meta {
+  padding: 5px 9px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 3px;
+}
+
+.client-download-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #1e293b;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.client-download-menu-item:hover {
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.client-template-dl-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.client-import-dropzone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 24px 16px;
+  text-align: center;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.client-import-dropzone:hover,
+.client-import-dropzone.dragging {
+  border-color: #4f46e5;
+  background: #eef2ff;
+}
+
+.client-import-drop-icon {
+  font-size: 28px;
+  margin-bottom: 6px;
+}
+
+.client-import-drop-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.client-import-drop-sub {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.client-import-options-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.client-import-mode-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.client-import-mode-pills {
+  display: flex;
+  gap: 8px;
+}
+
+.client-import-mode-btn {
+  padding: 6px 12px;
+  border-radius: 7px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.client-import-mode-btn.active {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: #ffffff;
+}
+
+.client-import-stats-strip {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.client-import-pill {
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid transparent;
+}
+
+.client-import-pill.pill-total {
+  background: #f1f5f9;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+
+.client-import-pill.pill-new {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.client-import-pill.pill-dup {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+
+.client-import-pill.pill-err {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.client-import-preview-wrap {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.client-import-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.client-import-preview-table th {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  text-align: left;
+  padding: 8px 10px;
+  font-weight: 600;
+  color: #475569;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.client-import-preview-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #1e293b;
+}
+
+.import-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.import-badge.badge-new {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.import-badge.badge-dup {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.import-badge.badge-err {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.client-import-preview-more {
+  padding: 8px 12px;
+  font-size: 11.5px;
+  color: #64748b;
+  background: #f8fafc;
+  text-align: center;
+  border-top: 1px solid #e2e8f0;
+}
+
+.client-import-footer {
+  padding: 14px 24px 18px;
+  margin-top: 0;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-shrink: 0;
+}

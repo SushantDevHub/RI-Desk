@@ -2,7 +2,9 @@
  * API integration for raising tickets from the public / standalone module.
  */
 
-const BASE_URL = 'http://localhost:4000/api/tickets/raise';
+import { API_BASE } from '../../config/api.js';
+
+const BASE_URL = `${API_BASE}/tickets/raise`;
 
 /**
  * Submits a newly raised ticket to the backend.

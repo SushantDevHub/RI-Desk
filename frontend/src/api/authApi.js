@@ -1,4 +1,6 @@
-const API_BASE = 'http://localhost:4000/api/auth';
+import { API_BASE as API_ROOT_BASE } from '../config/api.js';
+
+const API_BASE = `${API_ROOT_BASE}/auth`;
 const TOKEN_KEY = 'auth_token';
 
 async function request(path, body) {

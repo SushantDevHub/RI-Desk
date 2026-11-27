@@ -6,6 +6,7 @@ import {
   addClient,
   updateClient,
   deleteClient,
+  bulkUpsertClients,
 } from '../utils/clientStore.js';
 
 const router = express.Router();
@@ -26,48 +27,6 @@ function authenticate(req, res, next) {
   }
 }
 
-// --------------------------------------------------
-// GET /api/clients - list all clients
-// --------------------------------------------------
-router.get('/', authenticate, (req, res) => {
-  try {
-    const rawClients = getAllClients();
-    const clients = rawClients.map((client) => {
-      const services = Array.isArray(client.services)
-        ? client.services
-        : Array.isArray(client.servicesFeatures)
-        ? client.servicesFeatures.filter((s) => !isCommonFeature(s))
-        : [];
-
-      const features = Array.isArray(client.features)
-        ? client.features
-        : Array.isArray(client.servicesFeatures)
-        ? client.servicesFeatures.filter((s) => isCommonFeature(s))
-        : [];
-
-      return {
-        ...client,
-        services,
-        features,
-        servicesFeatures: Array.from(new Set([...(client.servicesFeatures || []), ...services, ...features])),
-      };
-    }).sort((a, b) => {
-      const timeA = new Date(a.createdAt || 0).getTime();
-      const timeB = new Date(b.createdAt || 0).getTime();
-      if (!isNaN(timeA) && !isNaN(timeB) && timeB !== timeA) {
-        return timeB - timeA;
-      }
-      return String(b.id || '').localeCompare(String(a.id || ''), undefined, {
-        numeric: true,
-      });
-    });
-    return res.json({ clients });
-  } catch (error) {
-    console.error('Get clients error:', error);
-    return res.status(500).json({ error: 'Failed to load clients.' });
-  }
-});
-
 function isCommonFeature(str = '') {
   const s = String(str).toLowerCase();
   return (
@@ -84,9 +43,92 @@ function isCommonFeature(str = '') {
 }
 
 // --------------------------------------------------
+// GET /api/clients - list all clients
+// --------------------------------------------------
+router.get('/', authenticate, async (req, res) => {
+  try {
+    const rawClients = await getAllClients();
+    const clients = rawClients
+      .map((client) => {
+        const services = Array.isArray(client.services)
+          ? client.services
+          : Array.isArray(client.servicesFeatures)
+          ? client.servicesFeatures.filter((s) => !isCommonFeature(s))
+          : [];
+
+        const features = Array.isArray(client.features)
+          ? client.features
+          : Array.isArray(client.servicesFeatures)
+          ? client.servicesFeatures.filter((s) => isCommonFeature(s))
+          : [];
+
+        return {
+          ...client,
+          services,
+          features,
+          servicesFeatures: Array.from(
+            new Set([...(client.servicesFeatures || []), ...services, ...features])
+          ),
+        };
+      })
+      .sort((a, b) => {
+        const timeA = new Date(a.createdAt || 0).getTime();
+        const timeB = new Date(b.createdAt || 0).getTime();
+        if (!isNaN(timeA) && !isNaN(timeB) && timeB !== timeA) {
+          return timeB - timeA;
+        }
+        return String(b.id || '').localeCompare(String(a.id || ''), undefined, {
+          numeric: true,
+        });
+      });
+    return res.json({ clients });
+  } catch (error) {
+    console.error('Get clients error:', error);
+    return res.status(500).json({ error: 'Failed to load clients.' });
+  }
+});
+
+// --------------------------------------------------
+// POST /api/clients/bulk - bulk import clients from CSV / Excel
+// --------------------------------------------------
+router.post('/bulk', authenticate, async (req, res) => {
+  try {
+    const { clients: rawRows, duplicateMode = 'skip' } = req.body || {};
+
+    if (!Array.isArray(rawRows) || rawRows.length === 0) {
+      return res.status(400).json({ error: 'No client rows provided for import.' });
+    }
+
+    const result = await bulkUpsertClients(rawRows, {
+      duplicateMode: duplicateMode === 'update' ? 'update' : 'skip',
+      createdBy: req.user?.name || 'Bulk Import',
+    });
+
+    const parts = [];
+    if (result.importedCount > 0) parts.push(`${result.importedCount} imported`);
+    if (result.updatedCount > 0) parts.push(`${result.updatedCount} updated`);
+    if (result.skippedCount > 0) parts.push(`${result.skippedCount} duplicate(s) skipped`);
+    if (result.errorCount > 0) parts.push(`${result.errorCount} row(s) had errors`);
+
+    const message =
+      parts.length > 0
+        ? `Bulk import finished: ${parts.join(', ')}.`
+        : 'Bulk import completed with no changes.';
+
+    return res.status(result.importedCount > 0 ? 201 : 200).json({
+      message,
+      ...result,
+    });
+  } catch (error) {
+    console.error('Bulk import clients error:', error);
+    return res.status(500).json({ error: error.message || 'Failed to import clients.' });
+  }
+});
+
+// --------------------------------------------------
 // POST /api/clients - create a new client
 // --------------------------------------------------
-router.post('/', authenticate, (req, res) => {
+router.post('/', authenticate, async (req, res) => {
   try {
     const {
       name,
@@ -119,7 +161,6 @@ router.post('/', authenticate, (req, res) => {
       return res.status(400).json({ error: 'Mobile number is required.' });
     }
 
-    // Clean services array
     const cleanedServices = Array.isArray(services)
       ? Array.from(
           new Set(
@@ -130,7 +171,6 @@ router.post('/', authenticate, (req, res) => {
         )
       : [];
 
-    // Clean features array
     const cleanedFeatures = Array.isArray(features)
       ? Array.from(
           new Set(
@@ -145,11 +185,13 @@ router.post('/', authenticate, (req, res) => {
       new Set([
         ...cleanedServices,
         ...cleanedFeatures,
-        ...(Array.isArray(servicesFeatures) ? servicesFeatures.map((x) => String(x || '').trim()) : []),
+        ...(Array.isArray(servicesFeatures)
+          ? servicesFeatures.map((x) => String(x || '').trim())
+          : []),
       ])
     ).filter(Boolean);
 
-    const clients = getAllClients();
+    const clients = await getAllClients();
     const nextNumber =
       clients.reduce((max, client) => {
         const match = String(client.id || '').match(/^CLI-(\d+)$/i);
@@ -176,11 +218,11 @@ router.post('/', authenticate, (req, res) => {
       createdBy: req.user?.name || 'Admin User',
     };
 
-    addClient(newClient);
+    const created = await addClient(newClient);
 
     return res.status(201).json({
       message: 'Client created successfully.',
-      client: newClient,
+      client: created,
     });
   } catch (error) {
     console.error('Create client error:', error);
@@ -191,9 +233,9 @@ router.post('/', authenticate, (req, res) => {
 // --------------------------------------------------
 // PUT & PATCH /api/clients/:id - update an existing client
 // --------------------------------------------------
-const handleUpdateClient = (req, res) => {
+const handleUpdateClient = async (req, res) => {
   try {
-    const existing = findClientById(req.params.id);
+    const existing = await findClientById(req.params.id);
     if (!existing) {
       return res.status(404).json({ error: 'Client not found.' });
     }
@@ -283,7 +325,7 @@ const handleUpdateClient = (req, res) => {
       ])
     ).filter(Boolean);
 
-    const updated = updateClient(req.params.id, updates);
+    const updated = await updateClient(req.params.id, updates);
 
     return res.json({
       message: 'Client updated successfully.',
@@ -301,14 +343,14 @@ router.patch('/:id', authenticate, handleUpdateClient);
 // --------------------------------------------------
 // DELETE /api/clients/:id - delete a client
 // --------------------------------------------------
-router.delete('/:id', authenticate, (req, res) => {
+router.delete('/:id', authenticate, async (req, res) => {
   try {
-    const existing = findClientById(req.params.id);
+    const existing = await findClientById(req.params.id);
     if (!existing) {
       return res.status(404).json({ error: 'Client not found.' });
     }
 
-    deleteClient(req.params.id);
+    await deleteClient(req.params.id);
 
     return res.json({
       message: `Client "${existing.name}" (${existing.companyName}) deleted successfully.`,

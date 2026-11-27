@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getToken } from '../api/authApi.js';
+import { API_BASE } from '../config/api.js';
 import './CreateEmployeePage.css';
 
 const DEFAULT_DESIGNATIONS = [
@@ -79,7 +80,7 @@ export default function CreateEmployeePage({ onBack }) {
     let isMounted = true;
     async function loadDesignations() {
       try {
-        const res = await fetch('http://localhost:4000/api/designations', {
+        const res = await fetch(`${API_BASE}/designations`, {
           headers: {
             Authorization: `Bearer ${getToken()}`,
           },
@@ -166,7 +167,7 @@ export default function CreateEmployeePage({ onBack }) {
       setLoading(true);
 
       const res = await fetch(
-        'http://localhost:4000/api/users',
+        `${API_BASE}/users`,
         {
           method: 'POST',
           headers: {
@@ -188,7 +189,7 @@ export default function CreateEmployeePage({ onBack }) {
 
       if (!res.ok) {
         throw new Error(
-          data.error || 'Failed to create employee.'
+          data.error || 'Failed to add employee.'
         );
       }
 
@@ -623,7 +624,7 @@ export default function CreateEmployeePage({ onBack }) {
             className="create-employee-btn"
             disabled={loading}
           >
-            {loading ? 'Creating...' : 'Create Employee'}
+            {loading ? 'Adding...' : 'Add Employee'}
           </button>
         </form>
 

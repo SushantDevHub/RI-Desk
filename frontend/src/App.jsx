@@ -7,7 +7,6 @@ import {
 } from 'react-router-dom';
 import LoginPage from './components/LoginPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
-import LocationPermissionModal from './components/LocationPermissionModal.jsx';
 import RaiseTicketPage from './modules/raise-ticket/RaiseTicketPage.jsx';
 
 import {
@@ -16,6 +15,7 @@ import {
   clearToken,
   getToken,
 } from './api/authApi.js';
+import { API_BASE } from './config/api.js';
 
 // Login route wrapper
 function LoginRoute({ onSuccess }) {
@@ -68,6 +68,40 @@ function LoginRoute({ onSuccess }) {
 export default function App() {
   const [user, setUser] = useState(null);
   const [checkingSession, setCheckingSession] = useState(true);
+  const locationRequestedRef = useRef(false);
+
+  useEffect(() => {
+    if (locationRequestedRef.current) return;
+    locationRequestedRef.current = true;
+
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          try {
+            sessionStorage.setItem(
+              'ridesk_coords',
+              JSON.stringify({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy,
+                timestamp: position.timestamp || Date.now(),
+              })
+            );
+          } catch {
+            // Ignore storage errors
+          }
+        },
+        () => {
+          // Browser handles permission prompt and denials natively
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 60000,
+        }
+      );
+    }
+  }, []);
 
   useEffect(() => {
     async function restoreSession() {
@@ -80,7 +114,7 @@ export default function App() {
 
       try {
         const res = await fetch(
-          'http://localhost:4000/api/auth/me',
+          `${API_BASE}/auth/me`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -148,9 +182,6 @@ export default function App() {
           }
         />
       </Routes>
-
-      {/* Responsive Location Permission Modal */}
-      <LocationPermissionModal />
     </>
   );
 }

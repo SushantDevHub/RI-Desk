@@ -1,10 +1,16 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { getToken } from '../api/authApi.js';
+import { API_BASE } from '../config/api.js';
 import ContactClientDialog from '../components/ContactClientDialog.jsx';
+import {
+  parseClientSpreadsheet,
+  downloadClientTemplate,
+  exportClientsSpreadsheet,
+} from '../utils/clientImportParser.js';
 import './ClientManagementPage.css';
 import './TicketManagementPage.css';
 
-const API_URL = 'http://localhost:4000/api/clients';
+const API_URL = `${API_BASE}/clients`;
 
 // Predefined catalog for Services (Alphabetical order matching filter dropdown)
 const PREDEFINED_SERVICES = [
@@ -162,6 +168,20 @@ export default function ClientManagementPage({ isAdmin = true }) {
   const [clientToDelete, setClientToDelete] = useState(null);
   const [contactDialog, setContactDialog] = useState(null);
 
+  // Bulk Import Modal state
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFileName, setImportFileName] = useState('');
+  const [importRows, setImportRows] = useState([]);
+  const [importError, setImportError] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [duplicateMode, setDuplicateMode] = useState('skip');
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const importFileInputRef = useRef(null);
+
+  // Download dropdown state
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+  const downloadMenuRef = useRef(null);
+
   // Form state
   const [form, setForm] = useState(EMPTY_FORM);
   const [customFeatureInput, setCustomFeatureInput] = useState('');
@@ -173,6 +193,24 @@ export default function ClientManagementPage({ isAdmin = true }) {
   useEffect(() => {
     fetchClients();
   }, []);
+
+  useEffect(() => {
+    if (!downloadMenuOpen) return;
+    function handleOutside(e) {
+      if (downloadMenuRef.current && !downloadMenuRef.current.contains(e.target)) {
+        setDownloadMenuOpen(false);
+      }
+    }
+    function handleEsc(e) {
+      if (e.key === 'Escape') setDownloadMenuOpen(false);
+    }
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('keydown', handleEsc);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [downloadMenuOpen]);
 
   async function fetchClients() {
     try {
@@ -409,6 +447,155 @@ export default function ClientManagementPage({ isAdmin = true }) {
     }
   }
 
+  // ── Bulk CSV / Excel Import Handlers ──
+  const existingMobileSet = useMemo(() => {
+    const set = new Set();
+    clients.forEach((c) => {
+      const digits = String(c.mobileNumber || '').replace(/\D/g, '');
+      if (digits) set.add(digits);
+    });
+    return set;
+  }, [clients]);
+
+  const importSummary = useMemo(() => {
+    let validNewCount = 0;
+    let duplicateCount = 0;
+    let invalidCount = 0;
+
+    const annotatedRows = importRows.map((row) => {
+      if (row._validationError) {
+        invalidCount++;
+        return { ...row, _status: 'error' };
+      }
+      const isDuplicate = existingMobileSet.has(row.mobileNumber);
+      if (isDuplicate) {
+        duplicateCount++;
+        return { ...row, _status: 'duplicate' };
+      }
+      validNewCount++;
+      return { ...row, _status: 'new' };
+    });
+
+    const actionableCount =
+      duplicateMode === 'update' ? validNewCount + duplicateCount : validNewCount;
+
+    return {
+      total: importRows.length,
+      validNewCount,
+      duplicateCount,
+      invalidCount,
+      actionableCount,
+      annotatedRows,
+    };
+  }, [importRows, existingMobileSet, duplicateMode]);
+
+  function openImportDialog() {
+    setImportFileName('');
+    setImportRows([]);
+    setImportError('');
+    setDuplicateMode('skip');
+    setIsDraggingFile(false);
+    setImportDialogOpen(true);
+  }
+
+  function closeImportDialog() {
+    if (importing) return;
+    setImportDialogOpen(false);
+  }
+
+  async function processSelectedFile(file) {
+    if (!file) return;
+    setImportError('');
+    setImportRows([]);
+    setImportFileName(file.name);
+
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (!['csv', 'xlsx', 'xls', 'ods'].includes(ext)) {
+      setImportError('Please select a valid .csv, .xlsx, or .xls file.');
+      return;
+    }
+
+    try {
+      const rows = await parseClientSpreadsheet(file);
+      setImportRows(rows);
+    } catch (err) {
+      setImportError(err.message || 'Could not read the spreadsheet file.');
+    }
+  }
+
+  function handleImportFileInputChange(e) {
+    const file = e.target.files?.[0];
+    if (file) {
+      processSelectedFile(file);
+    }
+    e.target.value = '';
+  }
+
+  function handleImportDrop(e) {
+    e.preventDefault();
+    setIsDraggingFile(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processSelectedFile(file);
+    }
+  }
+
+  async function handleConfirmBulkImport() {
+    if (importing || importSummary.actionableCount === 0) return;
+
+    const validPayloadRows = importSummary.annotatedRows
+      .filter((r) => r._status === 'new' || r._status === 'duplicate')
+      .map(({ _status, _validationError, ...rest }) => rest);
+
+    if (validPayloadRows.length === 0) {
+      setImportError('No valid rows available to import.');
+      return;
+    }
+
+    try {
+      setImporting(true);
+      setImportError('');
+
+      const res = await fetch(`${API_URL}/bulk`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({
+          clients: validPayloadRows,
+          duplicateMode,
+        }),
+      });
+
+      const data = await readResponse(res);
+      await fetchClients();
+      setImportDialogOpen(false);
+      showNotice(`✓ ${data.message || 'Clients imported successfully!'}`);
+    } catch (err) {
+      setImportError(err.message || 'Failed to import clients.');
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function handleDownloadClients(format) {
+    setDownloadMenuOpen(false);
+    const listToExport = filteredClients.length > 0 ? filteredClients : clients;
+    if (listToExport.length === 0) {
+      showNotice('No clients available to download.');
+      return;
+    }
+    try {
+      exportClientsSpreadsheet(listToExport, format);
+      showNotice(
+        `✓ Downloaded ${listToExport.length} client${listToExport.length === 1 ? '' : 's'} as .${format}`
+      );
+    } catch (err) {
+      setError(err.message || 'Failed to download clients.');
+    }
+  }
+
   // Instant inline client status toggle (Active / Inactive)
   async function handleStatusChange(client, newStatus) {
     if (!client || !newStatus) return;
@@ -560,12 +747,137 @@ export default function ClientManagementPage({ isAdmin = true }) {
         </div>
 
         <div className="client-header-actions ticket-header-actions">
+          <div className="client-download-wrap" ref={downloadMenuRef}>
+            <button
+              type="button"
+              className="client-download-btn"
+              onClick={() => setDownloadMenuOpen((prev) => !prev)}
+              disabled={clients.length === 0}
+              title={
+                clients.length === 0
+                  ? 'No clients to download yet'
+                  : 'Download clients list as CSV or Excel (.xlsx)'
+              }
+              aria-haspopup="menu"
+              aria-expanded={downloadMenuOpen}
+            >
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span>Download</span>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+
+            {downloadMenuOpen && (
+              <div className="client-download-menu" role="menu">
+                <div className="client-download-menu-meta">
+                  Export {(filteredClients.length > 0 ? filteredClients : clients).length} client
+                  {(filteredClients.length > 0 ? filteredClients : clients).length === 1 ? '' : 's'}
+                </div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="client-download-menu-item"
+                  onClick={() => handleDownloadClients('xlsx')}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.1"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  <span>Excel (.xlsx)</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="client-download-menu-item"
+                  onClick={() => handleDownloadClients('csv')}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.1"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  <span>CSV (.csv)</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="client-import-btn"
+            onClick={openImportDialog}
+            title="Bulk import clients from .csv or .xlsx spreadsheet"
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            <span>Import CSV / Excel</span>
+          </button>
+
           <button
             type="button"
             className="ticket-create-button client-create-btn"
             onClick={openCreateDialog}
           >
-            + Create Client
+            + Add Client
           </button>
         </div>
       </div>
@@ -872,7 +1184,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
               <p>
                 {search || statusFilter !== 'all' || serviceFilter !== 'all' || featureFilter !== 'all' || cardFilter
                   ? 'No clients match the active filter criteria. Try adjusting or clearing filters.'
-                  : 'Get started by creating your first client profile with company details, services, and features.'}
+                  : 'Get started by adding your first client profile with company details, services, and features.'}
               </p>
               {cardFilter || search || statusFilter !== 'all' || serviceFilter !== 'all' || featureFilter !== 'all' ? (
                 <button
@@ -896,7 +1208,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
                   style={{ marginTop: 12 }}
                   onClick={openCreateDialog}
                 >
-                  + Create Client
+                  + Add Client
                 </button>
               )}
             </div>
@@ -1238,7 +1550,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
 
                 <div className="client-form-field">
                   <label htmlFor="client-contact-name">
-                    Contact Person Name <span className="req-star">*</span>
+                   Client Name <span className="req-star">*</span>
                   </label>
                   <input
                     id="client-contact-name"
@@ -1275,7 +1587,6 @@ export default function ClientManagementPage({ isAdmin = true }) {
                       className="client-same-mobile-btn"
                       onClick={handleSameAsMobile}
                     >
-                      Same as Mobile
                     </button>
                   </div>
                   <input
@@ -1514,7 +1825,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
                   className="ticket-create-button client-modal-submit-btn"
                   disabled={saving}
                 >
-                  {saving ? 'Saving...' : editingClient ? 'Save Changes' : 'Create Client'}
+                  {saving ? 'Saving...' : editingClient ? 'Save Changes' : 'Add Client'}
                 </button>
               </div>
             </form>
@@ -1882,6 +2193,262 @@ export default function ClientManagementPage({ isAdmin = true }) {
               </button>
             </div>
           </section>
+        </div>
+      )}
+
+      {/* ────────────────────────────────────────────────────────
+          BULK IMPORT CLIENTS DIALOG (CSV / XLSX)
+      ──────────────────────────────────────────────────────── */}
+      {importDialogOpen && (
+        <div
+          className="client-modal-overlay"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closeImportDialog();
+          }}
+        >
+          <div
+            className="client-modal-box client-import-modal-box"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="import-clients-title"
+          >
+            <div className="client-modal-header">
+              <div>
+                <h2 id="import-clients-title" className="client-modal-title">
+                  Bulk Import Clients (CSV / Excel)
+                </h2>
+                <p className="client-modal-sub">
+                  Upload your .csv or .xlsx file to add or update hundreds of clients in seconds.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="client-modal-close-btn"
+                onClick={closeImportDialog}
+                disabled={importing}
+                aria-label="Close import dialog"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="client-modal-form">
+              {/* Step 1: Template Download Bar */}
+              <div className="client-import-template-bar">
+                <div className="client-import-template-info">
+                  <strong>Need the exact column format?</strong>
+                  <span>
+                    Required: <code>name</code>, <code>companyName</code>,{' '}
+                    <code>mobileNumber</code>. Optional: <code>email</code>,{' '}
+                    <code>whatsappNumber</code>, <code>cityState</code>, <code>monthlyRental</code>,{' '}
+                    <code>services</code>, <code>features</code>, <code>status</code>.
+                  </span>
+                </div>
+                <div className="client-import-template-btns">
+                  <button
+                    type="button"
+                    className="client-template-dl-btn"
+                    onClick={() => downloadClientTemplate('xlsx')}
+                  >
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    <span>.xlsx Template</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="client-template-dl-btn"
+                    onClick={() => downloadClientTemplate('csv')}
+                  >
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    <span>.csv Template</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Step 2: File Upload Dropzone */}
+              <div
+                className={`client-import-dropzone ${isDraggingFile ? 'dragging' : ''}`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDraggingFile(true);
+                }}
+                onDragLeave={() => setIsDraggingFile(false)}
+                onDrop={handleImportDrop}
+                onClick={() => importFileInputRef.current?.click()}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    importFileInputRef.current?.click();
+                  }
+                }}
+              >
+                <input
+                  ref={importFileInputRef}
+                  type="file"
+                  accept=".csv,.xlsx,.xls,.ods"
+                  onChange={handleImportFileInputChange}
+                  style={{ display: 'none' }}
+                />
+                <div className="client-import-drop-icon">📄</div>
+                <div className="client-import-drop-title">
+                  {importFileName
+                    ? `Selected: ${importFileName}`
+                    : 'Click to browse or drag & drop your .csv / .xlsx file here'}
+                </div>
+                <div className="client-import-drop-sub">
+                  Supports Excel (.xlsx, .xls) and CSV spreadsheets
+                </div>
+              </div>
+
+              {importError && (
+                <div className="client-form-error" role="alert">
+                  {importError}
+                </div>
+              )}
+
+              {/* Step 3: Preview Summary & Options */}
+              {importRows.length > 0 && (
+                <>
+                  <div className="client-import-options-row">
+                    <label className="client-import-mode-label">
+                      If Mobile Number already exists:
+                    </label>
+                    <div className="client-import-mode-pills">
+                      <button
+                        type="button"
+                        className={`client-import-mode-btn ${duplicateMode === 'skip' ? 'active' : ''}`}
+                        onClick={() => setDuplicateMode('skip')}
+                      >
+                        Skip Duplicates
+                      </button>
+                      <button
+                        type="button"
+                        className={`client-import-mode-btn ${duplicateMode === 'update' ? 'active' : ''}`}
+                        onClick={() => setDuplicateMode('update')}
+                      >
+                        Update Existing
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="client-import-stats-strip">
+                    <span className="client-import-pill pill-total">
+                      Total Rows: <strong>{importSummary.total}</strong>
+                    </span>
+                    <span className="client-import-pill pill-new">
+                      New Clients: <strong>{importSummary.validNewCount}</strong>
+                    </span>
+                    <span className="client-import-pill pill-dup">
+                      Existing / Duplicates: <strong>{importSummary.duplicateCount}</strong>
+                    </span>
+                    {importSummary.invalidCount > 0 && (
+                      <span className="client-import-pill pill-err">
+                        Invalid Rows: <strong>{importSummary.invalidCount}</strong>
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="client-import-preview-wrap">
+                    <table className="client-import-preview-table">
+                      <thead>
+                        <tr>
+                          <th>Row</th>
+                          <th>Name</th>
+                          <th>Company</th>
+                          <th>Mobile</th>
+                          <th>City / State</th>
+                          <th>Rental</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importSummary.annotatedRows.slice(0, 100).map((row) => (
+                          <tr key={row._rowNumber} className={`row-${row._status}`}>
+                            <td>#{row._rowNumber}</td>
+                            <td>{row.name || '—'}</td>
+                            <td>{row.companyName || '—'}</td>
+                            <td>{row.mobileNumber || '—'}</td>
+                            <td>{row.cityState || '—'}</td>
+                            <td>{formatCurrency(row.monthlyRental)}</td>
+                            <td>
+                              {row._status === 'new' && (
+                                <span className="import-badge badge-new">Ready (New)</span>
+                              )}
+                              {row._status === 'duplicate' && (
+                                <span className="import-badge badge-dup">
+                                  {duplicateMode === 'update' ? 'Will Update' : 'Skip (Exists)'}
+                                </span>
+                              )}
+                              {row._status === 'error' && (
+                                <span className="import-badge badge-err">
+                                  {row._validationError}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {importSummary.annotatedRows.length > 100 && (
+                      <div className="client-import-preview-more">
+                        Showing first 100 of {importSummary.annotatedRows.length} rows. All valid rows will be imported.
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="client-import-footer client-modal-actions ticket-dialog-actions">
+              <button
+                type="button"
+                className="ticket-cancel-button client-modal-cancel-btn"
+                onClick={closeImportDialog}
+                disabled={importing}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="ticket-create-button client-modal-submit-btn"
+                onClick={handleConfirmBulkImport}
+                disabled={importing || importSummary.actionableCount === 0}
+              >
+                {importing
+                  ? 'Importing Clients...'
+                  : `Import ${importSummary.actionableCount} Client${importSummary.actionableCount === 1 ? '' : 's'}`}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

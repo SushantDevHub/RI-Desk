@@ -1,10 +1,11 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { getToken } from '../api/authApi.js';
+import { API_BASE } from '../config/api.js';
 import ContactClientDialog from '../components/ContactClientDialog.jsx';
 import '../pages/DashboardPage.css';
 
-const API_URL = 'http://localhost:4000/api/users';
+const API_URL = `${API_BASE}/users`;
 
 const STANDARD_DESIGNATIONS = [
   'Support Specialist',
@@ -172,7 +173,7 @@ export default function EmployeeListPage({ onCreateEmployee }) {
 
   async function fetchOrgDesignations() {
     try {
-      const res = await fetch('http://localhost:4000/api/designations', {
+      const res = await fetch(`${API_BASE}/designations`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (!res.ok) return;
@@ -304,7 +305,7 @@ export default function EmployeeListPage({ onCreateEmployee }) {
       showTemporaryMessage('Employee created successfully.');
     } catch (err) {
       setCreateError(
-        err.message || 'Failed to create employee.'
+        err.message || 'Failed to add employee.'
       );
     } finally {
       setCreating(false);
@@ -466,7 +467,7 @@ export default function EmployeeListPage({ onCreateEmployee }) {
           className="create-employee-top-btn"
           onClick={openCreateDialog}
         >
-          + Create Employee
+          + Add Employee
         </button>
       </header>
 
@@ -492,7 +493,7 @@ export default function EmployeeListPage({ onCreateEmployee }) {
         <div className="employee-empty">
           <h2>No employees yet</h2>
           <p>
-            Create an employee account to get your support team started.
+            Add an employee account to get your support team started.
           </p>
 
           <button
@@ -500,7 +501,7 @@ export default function EmployeeListPage({ onCreateEmployee }) {
             className="create-employee-empty-btn"
             onClick={openCreateDialog}
           >
-            Create First Employee
+            Add First Employee
           </button>
         </div>
       ) : (
@@ -703,7 +704,7 @@ export default function EmployeeListPage({ onCreateEmployee }) {
             <div className="employee-dialog-header">
               <div>
                 <h2 id="create-employee-title">
-                  Create Employee
+                  Add Employee
                 </h2>
                 <p>Add a new member to your support team.</p>
               </div>
@@ -711,7 +712,7 @@ export default function EmployeeListPage({ onCreateEmployee }) {
               <button
                 type="button"
                 className="employee-dialog-close"
-                aria-label="Close create employee form"
+                aria-label="Close add employee form"
                 onClick={closeCreateDialog}
                 disabled={creating}
               >
@@ -901,7 +902,7 @@ export default function EmployeeListPage({ onCreateEmployee }) {
                     type={showCreatePassword ? 'text' : 'password'}
                     value={createForm.password}
                     onChange={updateCreateField}
-                    placeholder="Create a password"
+                    placeholder="Add a password"
                     autoComplete="new-password"
                     minLength={8}
                     required
@@ -964,7 +965,7 @@ export default function EmployeeListPage({ onCreateEmployee }) {
                   className="employee-submit-button"
                   disabled={creating}
                 >
-                  {creating ? 'Creating...' : 'Create Employee'}
+                  {creating ? 'Adding...' : 'Add Employee'}
                 </button>
               </div>
             </form>

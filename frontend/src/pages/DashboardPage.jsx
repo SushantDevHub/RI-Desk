@@ -6,6 +6,7 @@ import {
   getToken,
   changePassword,
 } from '../api/authApi.js';
+import { API_BASE } from '../config/api.js';
 import TicketManagementPage, {
   validateTicket,
   buildPayload,
@@ -478,7 +479,7 @@ export default function DashboardPage({
     try {
       const token = getToken();
       if (!token) return;
-      const res = await fetch('http://localhost:4000/api/notifications', {
+      const res = await fetch(`${API_BASE}/notifications`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -552,7 +553,7 @@ export default function DashboardPage({
     try {
       const token = getToken();
       if (!token) return;
-      await fetch(`http://localhost:4000/api/notifications/${notifId}/read`, {
+      await fetch(`${API_BASE}/notifications/${notifId}/read`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -570,7 +571,7 @@ export default function DashboardPage({
     try {
       const token = getToken();
       if (!token) return;
-      await fetch('http://localhost:4000/api/notifications/mark-all-read', {
+      await fetch(`${API_BASE}/notifications/mark-all-read`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -600,7 +601,7 @@ export default function DashboardPage({
       const token = getToken();
       if (token) {
         const res = await fetch(
-          `http://localhost:4000/api/tickets/${notif.ticketId}`,
+          `${API_BASE}/tickets/${notif.ticketId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -664,7 +665,7 @@ export default function DashboardPage({
         }
 
         const res = await fetch(
-          'http://localhost:4000/api/tickets',
+          `${API_BASE}/tickets`,
           {
             headers: {
               Authorization: `Bearer ${getToken()}`,
@@ -696,7 +697,7 @@ export default function DashboardPage({
 
     async function fetchEmployees() {
       try {
-        let res = await fetch('http://localhost:4000/api/tickets/employees', {
+        let res = await fetch(`${API_BASE}/tickets/employees`, {
           headers: { Authorization: `Bearer ${getToken()}` },
         });
         if (res.ok) {
@@ -706,7 +707,7 @@ export default function DashboardPage({
             return;
           }
         }
-        res = await fetch('http://localhost:4000/api/users', {
+        res = await fetch(`${API_BASE}/users`, {
           headers: { Authorization: `Bearer ${getToken()}` },
         });
         if (res.ok) {
@@ -966,7 +967,7 @@ export default function DashboardPage({
 
     try {
       const res = await fetch(
-        `http://localhost:4000/api/tickets/${encodeURIComponent(ticket.id)}`,
+        `${API_BASE}/tickets/${encodeURIComponent(ticket.id)}`,
         {
           method: 'PATCH',
           headers: {
@@ -1131,7 +1132,7 @@ export default function DashboardPage({
       );
 
       const response = await fetch(
-        `http://localhost:4000/api/tickets/${encodeURIComponent(editingTicket.id)}`,
+        `${API_BASE}/tickets/${encodeURIComponent(editingTicket.id)}`,
         {
           method: 'PUT',
           headers: {
@@ -1197,7 +1198,7 @@ export default function DashboardPage({
       setDeleteActionError('');
 
       const response = await fetch(
-        `http://localhost:4000/api/tickets/${encodeURIComponent(ticketToDelete.id)}`,
+        `${API_BASE}/tickets/${encodeURIComponent(ticketToDelete.id)}`,
         {
           method: 'DELETE',
           headers: {
@@ -1267,7 +1268,7 @@ export default function DashboardPage({
           </div>
           <div className="db-empty-subtext">
             {isUnassigned
-              ? 'All submitted tickets have been assigned to support staff. Newly submitted client tickets will appear here.'
+              ? ''
               : typeof emptyText === 'string'
               ? emptyText.replace(/^[✓•\s]+/, '')
               : 'There are currently no tickets matching this view.'}

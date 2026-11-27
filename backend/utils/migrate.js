@@ -3,11 +3,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import User from '../models/User.js';
 import Ticket from '../models/Ticket.js';
+import Client from '../models/Client.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const TICKETS_FILE = path.join(DATA_DIR, 'tickets.json');
+const CLIENTS_FILE = path.join(DATA_DIR, 'clients.json');
 
 /**
  * Migrates existing users and tickets from local JSON files into MongoDB Atlas
@@ -33,7 +35,6 @@ export async function migrateFromJSON() {
         { subject: 'Payment Issue updated' },
         { subject: 'test1' },
         { subject: 'Electricity board payment pending credit' },
-        { id: { $in: ['TKT-1001', 'TKT-1002', 'TKT-1003', 'TKT-1004', 'TKT-1005', 'TKT-1006', 'TKT-1007', 'TKT-1008'] } },
       ],
     });
     await User.deleteMany({
@@ -109,9 +110,44 @@ export async function migrateFromJSON() {
     }
   }
 
+  // 3. Migrate Clients
+  let clientsMigrated = 0;
+  let clientsSkipped = 0;
+
+  if (fs.existsSync(CLIENTS_FILE)) {
+    try {
+      const raw = fs.readFileSync(CLIENTS_FILE, 'utf-8');
+      const clients = JSON.parse(raw);
+
+      if (Array.isArray(clients) && clients.length > 0) {
+        for (const c of clients) {
+          if (!c || !c.id) continue;
+
+          const normMob = String(c.mobileNumber || '').replace(/\D/g, '');
+          const query = normMob
+            ? { $or: [{ id: String(c.id) }, { mobileNumber: normMob }] }
+            : { id: String(c.id) };
+
+          const existing = await Client.findOne(query);
+          if (!existing) {
+            await Client.create({
+              ...c,
+              id: String(c.id),
+            });
+            clientsMigrated++;
+          } else {
+            clientsSkipped++;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Migration] Warning: Could not migrate clients.json:', err.message);
+    }
+  }
+
   console.log(
-    `[Migration] Summary -> Users: ${usersMigrated} imported (${usersSkipped} existing) | Tickets: ${ticketsMigrated} imported (${ticketsSkipped} existing).`
+    `[Migration] Summary -> Users: ${usersMigrated} imported (${usersSkipped} existing) | Tickets: ${ticketsMigrated} imported (${ticketsSkipped} existing) | Clients: ${clientsMigrated} imported (${clientsSkipped} existing).`
   );
 
-  return { usersMigrated, ticketsMigrated };
+  return { usersMigrated, ticketsMigrated, clientsMigrated };
 }

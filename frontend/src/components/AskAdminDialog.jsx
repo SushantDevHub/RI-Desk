@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getToken } from '../api/authApi.js';
+import { API_BASE } from '../config/api.js';
 import './AskAdminDialog.css';
 
-const API = 'http://localhost:4000/api';
+const API = API_BASE;
 
 export default function AskAdminDialog({ ticket, currentUser, onClose }) {
   if (!ticket) return null;
