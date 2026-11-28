@@ -182,6 +182,10 @@ export default function ClientManagementPage({ isAdmin = true }) {
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   const downloadMenuRef = useRef(null);
 
+  // Pagination state (keeps 400+ client tables ultra-responsive)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
   // Form state
   const [form, setForm] = useState(EMPTY_FORM);
   const [customFeatureInput, setCustomFeatureInput] = useState('');
@@ -211,6 +215,31 @@ export default function ClientManagementPage({ isAdmin = true }) {
       document.removeEventListener('keydown', handleEsc);
     };
   }, [downloadMenuOpen]);
+
+  // Reset pagination whenever filters or search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, serviceFilter, featureFilter, cardFilter, pageSize]);
+
+  // Close topmost open modal on Escape key for smooth keyboard UX
+  useEffect(() => {
+    function handleModalEscape(e) {
+      if (e.key !== 'Escape') return;
+      if (contactDialog) {
+        setContactDialog(null);
+      } else if (clientToDelete && !deleting) {
+        setClientToDelete(null);
+      } else if (importDialogOpen && !importing) {
+        setImportDialogOpen(false);
+      } else if (dialogOpen && !saving) {
+        setDialogOpen(false);
+      } else if (viewingClient) {
+        setViewingClient(null);
+      }
+    }
+    window.addEventListener('keydown', handleModalEscape);
+    return () => window.removeEventListener('keydown', handleModalEscape);
+  }, [contactDialog, clientToDelete, deleting, importDialogOpen, importing, dialogOpen, saving, viewingClient]);
 
   async function fetchClients() {
     try {
@@ -579,7 +608,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
     }
   }
 
-  function handleDownloadClients(format) {
+  async function handleDownloadClients(format) {
     setDownloadMenuOpen(false);
     const listToExport = filteredClients.length > 0 ? filteredClients : clients;
     if (listToExport.length === 0) {
@@ -587,7 +616,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
       return;
     }
     try {
-      exportClientsSpreadsheet(listToExport, format);
+      await exportClientsSpreadsheet(listToExport, format);
       showNotice(
         `✓ Downloaded ${listToExport.length} client${listToExport.length === 1 ? '' : 's'} as .${format}`
       );
@@ -633,28 +662,47 @@ export default function ClientManagementPage({ isAdmin = true }) {
     }
   }
 
-  // Catalogs across active clients for filter dropdowns
-  const allUsedServices = useMemo(() => {
-    const set = new Set(PREDEFINED_SERVICES);
+  // Distinct services and features actually assigned to registered clients (for stat cards)
+  const activeClientServices = useMemo(() => {
+    const set = new Set();
     clients.forEach((c) => {
-      if (Array.isArray(c.services)) c.services.forEach((s) => set.add(s));
+      if (Array.isArray(c.services)) {
+        c.services.forEach((s) => {
+          const val = String(s || '').trim();
+          if (val) set.add(val);
+        });
+      }
     });
     return Array.from(set).sort();
   }, [clients]);
 
-  const allUsedFeatures = useMemo(() => {
-    const set = new Set(PREDEFINED_FEATURES);
+  const activeClientFeatures = useMemo(() => {
+    const set = new Set();
     clients.forEach((c) => {
       if (Array.isArray(c.features)) {
         c.features.forEach((f) => {
-          if (f && typeof f === 'string' && f.trim().toUpperCase() !== 'SMS') {
-            set.add(f.trim());
+          const val = String(f || '').trim();
+          if (val && val.toUpperCase() !== 'SMS') {
+            set.add(val);
           }
         });
       }
     });
-    return Array.from(set).filter(Boolean).sort();
+    return Array.from(set).sort();
   }, [clients]);
+
+  // Catalogs across active clients for filter dropdowns
+  const allUsedServices = useMemo(() => {
+    const set = new Set(PREDEFINED_SERVICES);
+    activeClientServices.forEach((s) => set.add(s));
+    return Array.from(set).sort();
+  }, [activeClientServices]);
+
+  const allUsedFeatures = useMemo(() => {
+    const set = new Set(PREDEFINED_FEATURES);
+    activeClientFeatures.forEach((f) => set.add(f));
+    return Array.from(set).filter(Boolean).sort();
+  }, [activeClientFeatures]);
 
   // Statistics
   const totalRevenue = useMemo(() => {
@@ -738,6 +786,15 @@ export default function ClientManagementPage({ isAdmin = true }) {
     return result;
   }, [clients, search, statusFilter, serviceFilter, featureFilter, cardFilter]);
 
+  const effectivePageSize = pageSize === 'all' ? Math.max(1, filteredClients.length) : pageSize;
+  const totalPages = Math.max(1, Math.ceil(filteredClients.length / effectivePageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (safeCurrentPage - 1) * effectivePageSize;
+  const paginatedClients =
+    pageSize === 'all'
+      ? filteredClients
+      : filteredClients.slice(pageStartIndex, pageStartIndex + effectivePageSize);
+
   return (
     <div className="client-page">
       {/* ── Page Header ── */}
@@ -776,7 +833,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
                 <polyline points="7 10 12 15 17 10" />
                 <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
-              <span>Download</span>
+              <span>Export</span>
               <svg
                 width="12"
                 height="12"
@@ -981,7 +1038,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
           role="button"
           tabIndex={0}
           aria-pressed={cardFilter === 'services'}
-          aria-label={`Total Services: ${allUsedServices.length}. Click to filter clients with services.`}
+          aria-label={`Total Services: ${activeClientServices.length}. Click to filter clients with services.`}
           title="Click to filter clients with subscribed services"
           className={`client-stat-card stat-accent-blue ${cardFilter === 'services' ? 'active' : ''}`}
           style={{
@@ -1000,7 +1057,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
           }}
         >
           <div className="client-stat-label">Total Services</div>
-          <div className="client-stat-num">{allUsedServices.length}</div>
+          <div className="client-stat-num">{activeClientServices.length}</div>
         </div>
 
         {/* Total Features Card */}
@@ -1008,7 +1065,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
           role="button"
           tabIndex={0}
           aria-pressed={cardFilter === 'features'}
-          aria-label={`Total Features: ${allUsedFeatures.length}. Click to filter clients with features.`}
+          aria-label={`Total Features: ${activeClientFeatures.length}. Click to filter clients with features.`}
           title="Click to filter clients with active features"
           className={`client-stat-card stat-accent-emerald ${cardFilter === 'features' ? 'active' : ''}`}
           style={{
@@ -1027,7 +1084,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
           }}
         >
           <div className="client-stat-label">Total Features</div>
-          <div className="client-stat-num">{allUsedFeatures.length}</div>
+          <div className="client-stat-num">{activeClientFeatures.length}</div>
         </div>
       </div>
 
@@ -1115,6 +1172,42 @@ export default function ClientManagementPage({ isAdmin = true }) {
             </button>
           )}
         </div>
+      </div>
+
+      {/* ── Rows Filter Bar (Just Below Search Nav) ── */}
+      <div className="client-rows-bar">
+        <div className="client-rows-summary">
+          {filteredClients.length === 0 ? (
+            <span>Showing <strong>0</strong> clients</span>
+          ) : (
+            <span>
+              Showing{' '}
+              <strong>
+                {pageStartIndex + 1}–{Math.min(pageStartIndex + paginatedClients.length, filteredClients.length)}
+              </strong>{' '}
+              of <strong>{filteredClients.length}</strong> client
+              {filteredClients.length === 1 ? '' : 's'}
+            </span>
+          )}
+        </div>
+
+        <label className="client-pagesize-label">
+          <span>Rows:</span>
+          <select
+            className="client-filter-select client-pagesize-select"
+            value={pageSize}
+            onChange={(e) => {
+              const val = e.target.value;
+              setPageSize(val === 'all' ? 'all' : Number(val));
+            }}
+            aria-label="Rows per page"
+          >
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value="all">All</option>
+          </select>
+        </label>
       </div>
 
       {/* ── Error Banner ── */}
@@ -1213,6 +1306,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
               )}
             </div>
           ) : (
+            <>
             <div className="client-table-scroll">
             <table className="client-table">
               <thead>
@@ -1229,7 +1323,7 @@ export default function ClientManagementPage({ isAdmin = true }) {
                 </tr>
               </thead>
               <tbody>
-                {filteredClients.map((client) => {
+                {paginatedClients.map((client) => {
                   const servicesList = Array.isArray(client.services) ? client.services : [];
                   const featuresList = Array.isArray(client.features) ? client.features : [];
 
@@ -1491,6 +1585,43 @@ export default function ClientManagementPage({ isAdmin = true }) {
               </tbody>
             </table>
           </div>
+          {filteredClients.length > 0 && totalPages > 1 && (
+            <div className="client-pagination-bar">
+              <div className="client-pagination-info">
+                Showing{' '}
+                <strong>
+                  {pageStartIndex + 1}–{Math.min(pageStartIndex + paginatedClients.length, filteredClients.length)}
+                </strong>{' '}
+                of <strong>{filteredClients.length}</strong> client
+                {filteredClients.length === 1 ? '' : 's'}
+              </div>
+
+              <div className="client-pagination-controls">
+                <div className="client-page-btns">
+                  <button
+                    type="button"
+                    className="client-page-btn"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={safeCurrentPage <= 1}
+                  >
+                    ‹ Prev
+                  </button>
+                  <span className="client-page-indicator">
+                    Page <strong>{safeCurrentPage}</strong> / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="client-page-btn"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={safeCurrentPage >= totalPages}
+                  >
+                    Next ›
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
         )}
       </div>
     )}

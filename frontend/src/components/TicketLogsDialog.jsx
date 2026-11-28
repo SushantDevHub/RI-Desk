@@ -362,8 +362,14 @@ export default function TicketLogsDialog({ ticket, onClose }) {
   // Fetch freshest logs from server with fast live-sync & polling
   useEffect(() => {
     let isMounted = true;
+    let inFlight = false;
+    let lastPayloadText = '';
 
     async function fetchLogs(isBackground = false) {
+      if (isBackground && (inFlight || document.visibilityState !== 'visible')) {
+        return;
+      }
+      inFlight = true;
       try {
         if (!isBackground && logs.length === 0) {
           setLoading(true);
@@ -375,6 +381,11 @@ export default function TicketLogsDialog({ ticket, onClose }) {
         });
         if (!res.ok) throw new Error(`Failed to load logs (${res.status})`);
         const text = await res.text();
+        if (isBackground && text && text === lastPayloadText) {
+          return;
+        }
+        lastPayloadText = text;
+
         let data = {};
         try {
           data = text ? JSON.parse(text) : {};
@@ -397,6 +408,7 @@ export default function TicketLogsDialog({ ticket, onClose }) {
           setLogs((prev) => (prev.length > 0 ? prev : synthesizeTicketLogs(ticket)));
         }
       } finally {
+        inFlight = false;
         if (isMounted && !isBackground) {
           setLoading(false);
         }
@@ -407,7 +419,7 @@ export default function TicketLogsDialog({ ticket, onClose }) {
 
     const interval = setInterval(() => {
       fetchLogs(true);
-    }, 1500);
+    }, 4000);
 
     function handleFastSync(event) {
       if (event?.detail?.id && String(event.detail.id) !== String(ticket.id)) {
@@ -416,14 +428,18 @@ export default function TicketLogsDialog({ ticket, onClose }) {
       fetchLogs(true);
     }
 
+    function handleStorageSync() {
+      fetchLogs(true);
+    }
+
     window.addEventListener('tickets-updated', handleFastSync);
-    window.addEventListener('storage', () => fetchLogs(true));
+    window.addEventListener('storage', handleStorageSync);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
       window.removeEventListener('tickets-updated', handleFastSync);
-      window.removeEventListener('storage', () => fetchLogs(true));
+      window.removeEventListener('storage', handleStorageSync);
     };
   }, [ticket.id]);
 

@@ -1,4 +1,8 @@
 /* ── Shell ── */
+html {
+  scroll-behavior: smooth;
+}
+
 .db-shell {
   display: flex;
   flex-direction: column;
@@ -6,6 +10,8 @@
   height: 100vh;
   height: 100dvh;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   background: #f1f5f9;
   color: #0f172a;
 }
@@ -147,6 +153,38 @@
   color: #2563eb;
 }
 
+.db-notif-btn-whatsapp {
+  color: #16a34a;
+}
+
+.db-notif-btn-whatsapp:hover,
+.db-notif-btn-whatsapp.active {
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.db-notif-btn-whatsapp.has-unread {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+.db-notif-btn-email {
+  color: #2563eb;
+}
+
+.db-notif-btn-email:hover,
+.db-notif-btn-email.active {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.db-notif-btn-email.has-unread {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
 .db-notif-badge {
   position: absolute;
   top: 2px;
@@ -163,6 +201,37 @@
   align-items: center;
   justify-content: center;
   line-height: 1;
+}
+
+.db-notif-badge-wa {
+  background: #16a34a;
+}
+
+.db-notif-badge-email {
+  background: #2563eb;
+}
+
+.db-notif-header-with-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.db-notif-channel-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.db-notif-channel-tag.wa {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.db-notif-channel-tag.email {
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 /* Notification dropdown menu */
@@ -261,6 +330,22 @@
   background: #e5f0fe;
 }
 
+.db-notif-item.unread-wa {
+  background: #f0fdf4;
+}
+
+.db-notif-item.unread-wa:hover {
+  background: #dcfce7;
+}
+
+.db-notif-item.unread-email {
+  background: #eff6ff;
+}
+
+.db-notif-item.unread-email:hover {
+  background: #dbeafe;
+}
+
 .db-notif-item-body {
   flex: 1;
   min-width: 0;
@@ -300,6 +385,14 @@
   background: #2563eb;
   flex-shrink: 0;
   margin-top: 5px;
+}
+
+.db-notif-dot.wa {
+  background: #16a34a;
+}
+
+.db-notif-dot.email {
+  background: #2563eb;
 }
 .db-user-dropdown-container {
   position: relative;

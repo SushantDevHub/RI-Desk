@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import {
@@ -13,16 +13,17 @@ import TicketManagementPage, {
   TicketIcon,
   TicketFormFields,
 } from './TicketManagementPage.jsx';
-import EmployeeListPage from './EmployeeListPage.jsx';
-import CreateEmployeePage from './CreateEmployeePage.jsx';
-import ClientManagementPage from './ClientManagementPage.jsx';
-import ExtrasPage from './ExtrasPage.jsx';
 import { getActiveAnnouncements } from '../api/announcementApi.js';
 import ContactClientDialog from '../components/ContactClientDialog.jsx';
 import TicketLogsDialog from '../components/TicketLogsDialog.jsx';
 import TransferTicketDialog from '../components/TransferTicketDialog.jsx';
 import AskAdminDialog from '../components/AskAdminDialog.jsx';
 import AskEmployeeDialog from '../components/AskEmployeeDialog.jsx';
+
+const EmployeeListPage = lazy(() => import('./EmployeeListPage.jsx'));
+const CreateEmployeePage = lazy(() => import('./CreateEmployeePage.jsx'));
+const ClientManagementPage = lazy(() => import('./ClientManagementPage.jsx'));
+const ExtrasPage = lazy(() => import('./ExtrasPage.jsx'));
 import './TicketManagementPage.css';
 import './DashboardPage.css';
 
@@ -120,6 +121,45 @@ function TransferNotificationLogo({ size = 20, className = 'db-notif-icon' }) {
     >
       <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
       <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
+}
+
+function WhatsAppNotificationLogo({ size = 19, className = 'db-notif-icon' }) {
+  return (
+    <svg
+      className={className}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
+  );
+}
+
+function EmailNotificationLogo({ size = 19, className = 'db-notif-icon' }) {
+  return (
+    <svg
+      className={className}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <polyline points="22,6 12,13 2,6" />
     </svg>
   );
 }
@@ -368,6 +408,12 @@ export default function DashboardPage({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [contactDialog, setContactDialog] = useState(null);
 
+  /* ── Dashboard ticket pagination ── */
+  const [ticketPageSize, setTicketPageSize] = useState(25);
+  const [selectedStatPage, setSelectedStatPage] = useState(1);
+  const [unassignedPage, setUnassignedPage] = useState(1);
+  const [openPage, setOpenPage] = useState(1);
+
   /* ── User dropdown & change password modal state ── */
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -459,6 +505,12 @@ export default function DashboardPage({
   const [askEmployeeTicket, setAskEmployeeTicket] = useState(null);
   const [selectedStat, setSelectedStat] = useState(null);
 
+  useEffect(() => {
+    setSelectedStatPage(1);
+    setUnassignedPage(1);
+    setOpenPage(1);
+  }, [ticketPageSize, selectedStat]);
+
   const [viewingTicket, setViewingTicket] = useState(null);
   const [editingTicket, setEditingTicket] = useState(null);
   const [savingTicket, setSavingTicket] = useState(false);
@@ -468,14 +520,31 @@ export default function DashboardPage({
   const [deletingTicket, setDeletingTicket] = useState(false);
   const [deleteActionError, setDeleteActionError] = useState('');
 
-  /* ── Notifications state (topbar notification logo with count) ── */
+  /* ── Notifications state (topbar notification logos with counts) ── */
   const [notifications, setNotifications] = useState([]);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [notifMenuOpen, setNotifMenuOpen] = useState(false);
+
+  const [whatsappNotifications, setWhatsappNotifications] = useState([]);
+  const [whatsappUnreadCount, setWhatsappUnreadCount] = useState(0);
+  const [waMenuOpen, setWaMenuOpen] = useState(false);
+
+  const [emailNotifications, setEmailNotifications] = useState([]);
+  const [emailUnreadCount, setEmailUnreadCount] = useState(0);
+  const [emailMenuOpen, setEmailMenuOpen] = useState(false);
+
   const [activeMobileNotifModal, setActiveMobileNotifModal] = useState(null);
   const notifDropdownRef = useRef(null);
+  const waDropdownRef = useRef(null);
+  const emailDropdownRef = useRef(null);
+  const notifsInFlightRef = useRef(false);
+  const lastNotifsFingerprintRef = useRef('');
 
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async (isBackground = false) => {
+    if (isBackground && (notifsInFlightRef.current || document.visibilityState !== 'visible')) {
+      return;
+    }
+    notifsInFlightRef.current = true;
     try {
       const token = getToken();
       if (!token) return;
@@ -485,25 +554,50 @@ export default function DashboardPage({
         },
       });
       if (!res.ok) return;
-      const data = await safeReadJson(res);
+      const text = await res.text();
+      if (isBackground && text && text === lastNotifsFingerprintRef.current) {
+        return;
+      }
+      lastNotifsFingerprintRef.current = text;
+
+      let data = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = null;
+      }
       if (data && Array.isArray(data.notifications)) {
         setNotifications(data.notifications);
         setUnreadNotifCount(
           typeof data.unreadCount === 'number' ? data.unreadCount : 0
         );
       }
+      if (data && Array.isArray(data.whatsappNotifications)) {
+        setWhatsappNotifications(data.whatsappNotifications);
+        setWhatsappUnreadCount(
+          typeof data.whatsappUnreadCount === 'number' ? data.whatsappUnreadCount : 0
+        );
+      }
+      if (data && Array.isArray(data.emailNotifications)) {
+        setEmailNotifications(data.emailNotifications);
+        setEmailUnreadCount(
+          typeof data.emailUnreadCount === 'number' ? data.emailUnreadCount : 0
+        );
+      }
     } catch (err) {
       console.error('Fetch notifications error:', err);
+    } finally {
+      notifsInFlightRef.current = false;
     }
   }, []);
 
   useEffect(() => {
     if (user) {
-      fetchNotifications();
-      const interval = setInterval(fetchNotifications, 4000);
+      fetchNotifications(false);
+      const interval = setInterval(() => fetchNotifications(true), 10000);
 
       const handleNotifUpdate = () => {
-        fetchNotifications();
+        fetchNotifications(false);
       };
       const handleStorage = (e) => {
         if (e.key === 'ri_desk_notif_sync') {
@@ -532,23 +626,47 @@ export default function DashboardPage({
       ) {
         setNotifMenuOpen(false);
       }
+      if (
+        waDropdownRef.current &&
+        !waDropdownRef.current.contains(event.target)
+      ) {
+        setWaMenuOpen(false);
+      }
+      if (
+        emailDropdownRef.current &&
+        !emailDropdownRef.current.contains(event.target)
+      ) {
+        setEmailMenuOpen(false);
+      }
     }
-    if (notifMenuOpen) {
+    if (notifMenuOpen || waMenuOpen || emailMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [notifMenuOpen]);
+  }, [notifMenuOpen, waMenuOpen, emailMenuOpen]);
 
-  async function handleMarkNotifRead(notifId, e) {
+  async function handleMarkNotifRead(notifId, e, channel = null) {
     if (e) {
       e.stopPropagation();
     }
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === notifId ? { ...n, read: true } : n))
-    );
-    setUnreadNotifCount((prev) => Math.max(0, prev - 1));
+    if (channel === 'whatsapp') {
+      setWhatsappNotifications((prev) =>
+        prev.map((n) => (n.id === notifId ? { ...n, read: true } : n))
+      );
+      setWhatsappUnreadCount((prev) => Math.max(0, prev - 1));
+    } else if (channel === 'email') {
+      setEmailNotifications((prev) =>
+        prev.map((n) => (n.id === notifId ? { ...n, read: true } : n))
+      );
+      setEmailUnreadCount((prev) => Math.max(0, prev - 1));
+    } else {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notifId ? { ...n, read: true } : n))
+      );
+      setUnreadNotifCount((prev) => Math.max(0, prev - 1));
+    }
 
     try {
       const token = getToken();
@@ -559,14 +677,23 @@ export default function DashboardPage({
           Authorization: `Bearer ${token}`,
         },
       });
+      lastNotifsFingerprintRef.current = '';
     } catch (err) {
       console.error('Mark notification read error:', err);
     }
   }
 
-  async function handleMarkAllNotifsRead() {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    setUnreadNotifCount(0);
+  async function handleMarkAllNotifsRead(channel = null) {
+    if (channel === 'whatsapp') {
+      setWhatsappNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      setWhatsappUnreadCount(0);
+    } else if (channel === 'email') {
+      setEmailNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      setEmailUnreadCount(0);
+    } else {
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      setUnreadNotifCount(0);
+    }
 
     try {
       const token = getToken();
@@ -574,22 +701,31 @@ export default function DashboardPage({
       await fetch(`${API_BASE}/notifications/mark-all-read`, {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify(channel ? { channel } : {}),
       });
+      lastNotifsFingerprintRef.current = '';
     } catch (err) {
       console.error('Mark all read error:', err);
     }
   }
 
-  async function handleNotificationClick(notif) {
+  async function handleNotificationClick(notif, channel = null) {
     if (!notif.read) {
-      handleMarkNotifRead(notif.id);
+      handleMarkNotifRead(notif.id, null, channel);
     }
     setNotifMenuOpen(false);
+    setWaMenuOpen(false);
+    setEmailMenuOpen(false);
 
     if (notif.type === 'mobile_notification') {
       setActiveMobileNotifModal(notif);
+      return;
+    }
+
+    if (!notif.ticketId) {
       return;
     }
 
@@ -657,8 +793,14 @@ export default function DashboardPage({
 
   useEffect(() => {
     let isMounted = true;
+    let inFlight = false;
+    let lastTicketsRaw = '';
 
     async function fetchTickets(isBackground = false) {
+      if (isBackground && (inFlight || document.visibilityState !== 'visible')) {
+        return;
+      }
+      inFlight = true;
       try {
         if (!isBackground) {
           setLoading(true);
@@ -673,7 +815,17 @@ export default function DashboardPage({
           }
         );
 
-        const data = await res.json();
+        const text = await res.text();
+        if (isBackground && res.ok && text && text === lastTicketsRaw) {
+          return;
+        }
+
+        let data = {};
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch {
+          data = {};
+        }
 
         if (!res.ok) {
           throw new Error(
@@ -681,6 +833,7 @@ export default function DashboardPage({
           );
         }
 
+        lastTicketsRaw = text;
         if (isMounted) {
           setTickets(data.tickets || []);
         }
@@ -689,6 +842,7 @@ export default function DashboardPage({
           setError(err.message);
         }
       } finally {
+        inFlight = false;
         if (isMounted && !isBackground) {
           setLoading(false);
         }
@@ -727,10 +881,10 @@ export default function DashboardPage({
     fetchTickets(false);
     fetchEmployees();
 
-    // Fast live auto-refresh every 1500ms so changes reflect across all panels
+    // Poll tickets smoothly when tab is active (local mutations sync instantly via events)
     const interval = setInterval(() => {
       fetchTickets(true);
-    }, 1500);
+    }, 6000);
 
     function onVisibilityChange() {
       if (document.visibilityState === 'visible') {
@@ -1231,7 +1385,7 @@ export default function DashboardPage({
     }
   }
 
-  function renderTicketTable(ticketList, emptyText) {
+  function renderTicketTable(ticketList, emptyText, currentPage = 1, onPageChange = null) {
     if (loading) {
       return (
         <div style={{ padding: 32, textAlign: 'center', color: '#94a3b8' }}>
@@ -1277,24 +1431,32 @@ export default function DashboardPage({
       );
     }
 
+    const effectiveSize = ticketPageSize === 'all' ? Math.max(1, ticketList.length) : ticketPageSize;
+    const totalPages = Math.max(1, Math.ceil(ticketList.length / effectiveSize));
+    const safePage = Math.min(Math.max(1, currentPage), totalPages);
+    const startIndex = (safePage - 1) * effectiveSize;
+    const displayedTickets =
+      ticketPageSize === 'all' ? ticketList : ticketList.slice(startIndex, startIndex + effectiveSize);
+
     return (
-      <div className="db-table-scroll">
-        <table className="db-table">
-          <thead>
-            <tr>
-              <th>Ticket ID</th>
-              <th>Client</th>
-              <th>Category</th>
-              <th>Priority</th>
-              <th>Status</th>
-              <th style={{ width: 140 }}>Resolution time</th>
-              <th style={{ minWidth: 150 }}>Assigned To</th>
-              <th>Created at / Solved at</th>
-              <th style={{ width: 105, textAlign: 'center' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ticketList.map((ticket) => {
+      <>
+        <div className="db-table-scroll">
+          <table className="db-table">
+            <thead>
+              <tr>
+                <th>Ticket ID</th>
+                <th>Client</th>
+                <th>Category</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th style={{ width: 140 }}>Resolution time</th>
+                <th style={{ minWidth: 150 }}>Assigned To</th>
+                <th>Created at / Solved at</th>
+                <th style={{ width: 105, textAlign: 'center' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayedTickets.map((ticket) => {
               const isResolved = ticket.status === 'resolved';
               const isNew = !isResolved && isTicketNew(ticket.createdAt, ticket.status);
 
@@ -1759,9 +1921,44 @@ export default function DashboardPage({
                 </tr>
               );
             })}
-          </tbody>
-        </table>
-      </div>
+            </tbody>
+          </table>
+        </div>
+        {onPageChange && totalPages > 1 && (
+          <div className="ticket-pagination-bar">
+            <div className="ticket-pagination-info">
+              Showing{' '}
+              <strong>
+                {startIndex + 1}–{Math.min(startIndex + displayedTickets.length, ticketList.length)}
+              </strong>{' '}
+              of <strong>{ticketList.length}</strong> ticket
+              {ticketList.length === 1 ? '' : 's'}
+            </div>
+
+            <div className="ticket-page-btns">
+              <button
+                type="button"
+                className="ticket-page-btn"
+                onClick={() => onPageChange(Math.max(1, safePage - 1))}
+                disabled={safePage <= 1}
+              >
+                ‹ Prev
+              </button>
+              <span className="ticket-page-indicator">
+                Page <strong>{safePage}</strong> / {totalPages}
+              </span>
+              <button
+                type="button"
+                className="ticket-page-btn"
+                onClick={() => onPageChange(Math.min(totalPages, safePage + 1))}
+                disabled={safePage >= totalPages}
+              >
+                Next ›
+              </button>
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 
@@ -1832,13 +2029,213 @@ export default function DashboardPage({
         </div>
         <div className="db-topbar-right">
 
+          {/* ── WhatsApp Notification Icon with Count (Admin only) ── */}
+          {user && isAdmin && (
+            <div className="db-notif-container" ref={waDropdownRef}>
+              <button
+                type="button"
+                className={`db-notif-btn db-notif-btn-whatsapp ${waMenuOpen ? 'active' : ''} ${whatsappUnreadCount > 0 ? 'has-unread' : ''}`}
+                onClick={() => {
+                  setWaMenuOpen((prev) => !prev);
+                  setEmailMenuOpen(false);
+                  setNotifMenuOpen(false);
+                }}
+                aria-label="WhatsApp Notifications"
+                aria-expanded={waMenuOpen}
+                title={
+                  whatsappUnreadCount > 0
+                    ? `${whatsappUnreadCount} unread WhatsApp notification${whatsappUnreadCount > 1 ? 's' : ''}`
+                    : 'WhatsApp Notifications'
+                }
+              >
+                <WhatsAppNotificationLogo size={19} />
+                {whatsappUnreadCount > 0 && (
+                  <span className="db-notif-badge db-notif-badge-wa">
+                    {whatsappUnreadCount > 99 ? '99+' : whatsappUnreadCount}
+                  </span>
+                )}
+              </button>
+
+              {waMenuOpen && (
+                <div className="db-notif-dropdown" role="menu">
+                  <div className="db-notif-header">
+                    <div className="db-notif-header-title db-notif-header-with-tag">
+                      <span>WhatsApp</span>
+                      {whatsappUnreadCount > 0 && (
+                        <span className="db-notif-channel-tag wa">{whatsappUnreadCount} new</span>
+                      )}
+                    </div>
+                    {whatsappUnreadCount > 0 && (
+                      <button
+                        type="button"
+                        className="db-notif-mark-all"
+                        onClick={() => handleMarkAllNotifsRead('whatsapp')}
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="db-notif-list">
+                    {whatsappNotifications.length === 0 ? (
+                      <div className="db-notif-empty">
+                        <div className="db-notif-empty-title">No WhatsApp notifications</div>
+                        <div className="db-notif-empty-desc">
+                          Incoming WhatsApp alerts and queries will appear here.
+                        </div>
+                      </div>
+                    ) : (
+                      whatsappNotifications.map((notif) => (
+                        <div
+                          key={notif.id}
+                          className={`db-notif-item ${!notif.read ? 'unread unread-wa' : ''}`}
+                          onClick={() => handleNotificationClick(notif, 'whatsapp')}
+                          role="menuitem"
+                          tabIndex={0}
+                        >
+                          <div className="db-notif-item-body">
+                            <div className="db-notif-item-title">
+                              <strong>{notif.senderName || 'Team Member'}</strong>
+                              {notif.ticketId ? (
+                                <>
+                                  {' '}via WhatsApp on{' '}
+                                  <span className="db-notif-ticket-id">
+                                    #{notif.ticketNumber || notif.ticketId}
+                                  </span>
+                                </>
+                              ) : (
+                                <> — {notif.title || 'WhatsApp Alert'}</>
+                              )}
+                            </div>
+                            {notif.message && (
+                              <div className="db-notif-item-desc">{notif.message}</div>
+                            )}
+                            <div className="db-notif-item-meta">
+                              {notif.clientName ? `${notif.clientName} • ` : ''}
+                              {formatNotifTime(notif.createdAt)}
+                            </div>
+                          </div>
+                          {!notif.read && (
+                            <span className="db-notif-dot wa" title="Unread" />
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Email Notification Icon with Count (Admin only) ── */}
+          {user && isAdmin && (
+            <div className="db-notif-container" ref={emailDropdownRef}>
+              <button
+                type="button"
+                className={`db-notif-btn db-notif-btn-email ${emailMenuOpen ? 'active' : ''} ${emailUnreadCount > 0 ? 'has-unread' : ''}`}
+                onClick={() => {
+                  setEmailMenuOpen((prev) => !prev);
+                  setWaMenuOpen(false);
+                  setNotifMenuOpen(false);
+                }}
+                aria-label="Email Notifications"
+                aria-expanded={emailMenuOpen}
+                title={
+                  emailUnreadCount > 0
+                    ? `${emailUnreadCount} unread Email notification${emailUnreadCount > 1 ? 's' : ''}`
+                    : 'Email Notifications'
+                }
+              >
+                <EmailNotificationLogo size={19} />
+                {emailUnreadCount > 0 && (
+                  <span className="db-notif-badge db-notif-badge-email">
+                    {emailUnreadCount > 99 ? '99+' : emailUnreadCount}
+                  </span>
+                )}
+              </button>
+
+              {emailMenuOpen && (
+                <div className="db-notif-dropdown" role="menu">
+                  <div className="db-notif-header">
+                    <div className="db-notif-header-title db-notif-header-with-tag">
+                      <span>Email</span>
+                      {emailUnreadCount > 0 && (
+                        <span className="db-notif-channel-tag email">{emailUnreadCount} new</span>
+                      )}
+                    </div>
+                    {emailUnreadCount > 0 && (
+                      <button
+                        type="button"
+                        className="db-notif-mark-all"
+                        onClick={() => handleMarkAllNotifsRead('email')}
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="db-notif-list">
+                    {emailNotifications.length === 0 ? (
+                      <div className="db-notif-empty">
+                        <div className="db-notif-empty-title">No Email notifications</div>
+                        <div className="db-notif-empty-desc">
+                          Incoming email alerts and queries will appear here.
+                        </div>
+                      </div>
+                    ) : (
+                      emailNotifications.map((notif) => (
+                        <div
+                          key={notif.id}
+                          className={`db-notif-item ${!notif.read ? 'unread unread-email' : ''}`}
+                          onClick={() => handleNotificationClick(notif, 'email')}
+                          role="menuitem"
+                          tabIndex={0}
+                        >
+                          <div className="db-notif-item-body">
+                            <div className="db-notif-item-title">
+                              <strong>{notif.senderName || 'Team Member'}</strong>
+                              {notif.ticketId ? (
+                                <>
+                                  {' '}via Email on{' '}
+                                  <span className="db-notif-ticket-id">
+                                    #{notif.ticketNumber || notif.ticketId}
+                                  </span>
+                                </>
+                              ) : (
+                                <> — {notif.title || 'Email Alert'}</>
+                              )}
+                            </div>
+                            {notif.message && (
+                              <div className="db-notif-item-desc">{notif.message}</div>
+                            )}
+                            <div className="db-notif-item-meta">
+                              {notif.clientName ? `${notif.clientName} • ` : ''}
+                              {formatNotifTime(notif.createdAt)}
+                            </div>
+                          </div>
+                          {!notif.read && (
+                            <span className="db-notif-dot email" title="Unread" />
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── Notification Bell Logo with Count (Employees & Admin) ── */}
           {user && (
             <div className="db-notif-container" ref={notifDropdownRef}>
               <button
                 type="button"
                 className={`db-notif-btn ${notifMenuOpen ? 'active' : ''} ${unreadNotifCount > 0 ? 'has-unread' : ''}`}
-                onClick={() => setNotifMenuOpen((prev) => !prev)}
+                onClick={() => {
+                  setNotifMenuOpen((prev) => !prev);
+                  setWaMenuOpen(false);
+                  setEmailMenuOpen(false);
+                }}
                 aria-label="Notifications"
                 aria-expanded={notifMenuOpen}
                 title={
@@ -1865,7 +2262,7 @@ export default function DashboardPage({
                       <button
                         type="button"
                         className="db-notif-mark-all"
-                        onClick={handleMarkAllNotifsRead}
+                        onClick={() => handleMarkAllNotifsRead(null)}
                       >
                         Mark all read
                       </button>
@@ -2316,17 +2713,25 @@ export default function DashboardPage({
           {active === 'tickets' ? (
             <TicketManagementPage />
           ) : active === 'clients' ? (
-            <ClientManagementPage isAdmin={isAdmin} />
+            <Suspense fallback={<div className="db-empty-state" style={{ padding: 48 }}>Loading Manage Clients...</div>}>
+              <ClientManagementPage isAdmin={isAdmin} />
+            </Suspense>
           ) : active === 'employees' && isAdmin ? (
-            <EmployeeListPage
-              onCreateEmployee={() => setActive('create-employee')}
-            />
+            <Suspense fallback={<div className="db-empty-state" style={{ padding: 48 }}>Loading Employees...</div>}>
+              <EmployeeListPage
+                onCreateEmployee={() => setActive('create-employee')}
+              />
+            </Suspense>
           ) : active === 'create-employee' && isAdmin ? (
-            <CreateEmployeePage
-              onBack={() => setActive('employees')}
-            />
+            <Suspense fallback={<div className="db-empty-state" style={{ padding: 48 }}>Loading Add Employee...</div>}>
+              <CreateEmployeePage
+                onBack={() => setActive('employees')}
+              />
+            </Suspense>
           ) : active === 'extras' && isAdmin ? (
-            <ExtrasPage isAdmin={isAdmin} />
+            <Suspense fallback={<div className="db-empty-state" style={{ padding: 48 }}>Loading Extras...</div>}>
+              <ExtrasPage isAdmin={isAdmin} />
+            </Suspense>
           ) : (
 
             /* Dashboard / Assigned Tickets page */
@@ -2438,8 +2843,9 @@ export default function DashboardPage({
                 })}
               </div>
 
-              {/* ── Single Common View All in Tickets Header ── */}
+              {/* ── Single Common View All in Tickets + Rows Bar ── */}
               <div
+                className="db-tickets-rows-header"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -2450,8 +2856,6 @@ export default function DashboardPage({
                   marginBottom: 12,
                 }}
               >
-               
-
                 <button
                   type="button"
                   className="db-view-all-tickets-btn"
@@ -2459,6 +2863,24 @@ export default function DashboardPage({
                 >
                   View All in Tickets →
                 </button>
+
+                <label className="ticket-pagesize-label">
+                  <span>Rows:</span>
+                  <select
+                    className="ticket-pagesize-select"
+                    value={ticketPageSize}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setTicketPageSize(val === 'all' ? 'all' : Number(val));
+                    }}
+                    aria-label="Dashboard ticket rows per page"
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value="all">All</option>
+                  </select>
+                </label>
               </div>
 
               {/* If a stat card is selected, show that specific list */}
@@ -2541,7 +2963,9 @@ export default function DashboardPage({
 
                   {renderTicketTable(
                     selectedStatTickets,
-                    'No tickets found matching this list.'
+                    'No tickets found matching this list.',
+                    selectedStatPage,
+                    setSelectedStatPage
                   )}
                 </div>
               ) : (
@@ -2587,7 +3011,9 @@ export default function DashboardPage({
 
                     {renderTicketTable(
                       unassignedOpenTickets,
-                      '✓ No unassigned tickets.'
+                      '✓ No unassigned tickets.',
+                      unassignedPage,
+                      setUnassignedPage
                     )}
                   </div>
 
@@ -2644,7 +3070,9 @@ export default function DashboardPage({
 
                     {renderTicketTable(
                       openTicketsDescending,
-                      '✓ No assigned open tickets.'
+                      '✓ No assigned open tickets.',
+                      openPage,
+                      setOpenPage
                     )}
                   </div>
                 </>

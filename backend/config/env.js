@@ -23,28 +23,28 @@ if (fs.existsSync(backendEnvPath)) {
   loadedPath = 'process.cwd()/.env';
 }
 
-// Normalize variable names (support MONGODB_URI, MONGO_URI, and MONGODB_URL)
-if (!process.env.MONGODB_URI) {
-  if (process.env.MONGO_URI) {
-    process.env.MONGODB_URI = process.env.MONGO_URI;
-  } else if (process.env.MONGODB_URL) {
-    process.env.MONGODB_URI = process.env.MONGODB_URL;
-  }
-}
-
 // Clean up surrounding quotes and whitespace if present
-if (typeof process.env.MONGODB_URI === 'string') {
-  process.env.MONGODB_URI = process.env.MONGODB_URI.trim().replace(/^["']|["']$/g, '');
-}
-
 if (typeof process.env.JWT_SECRET === 'string') {
   process.env.JWT_SECRET = process.env.JWT_SECRET.trim().replace(/^["']|["']$/g, '');
 }
 
+const cleanEnvStr = (val, fallback = '') =>
+  typeof val === 'string' ? val.trim().replace(/^["']|["']$/g, '') : fallback;
+
+const dbHost = cleanEnvStr(process.env.DB_HOST, '127.0.0.1') || '127.0.0.1';
+const dbPort = Number(cleanEnvStr(process.env.DB_PORT, '3306')) || 3306;
+const dbUser = cleanEnvStr(process.env.DB_USER, 'root') || 'root';
+const dbPassword = cleanEnvStr(process.env.DB_PASSWORD, '');
+const dbName = cleanEnvStr(process.env.DB_NAME, 'ri_desk') || 'ri_desk';
+
 export const envConfig = {
   PORT: process.env.PORT || 4000,
   JWT_SECRET: process.env.JWT_SECRET || 'dev_only_change_this_before_deploying_anywhere_real',
-  MONGODB_URI: process.env.MONGODB_URI || '',
+  DB_HOST: dbHost,
+  DB_PORT: dbPort,
+  DB_USER: dbUser,
+  DB_PASSWORD: dbPassword,
+  DB_NAME: dbName,
   ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173',
   loadedPath,
 };

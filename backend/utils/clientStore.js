@@ -1,8 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import mongoose from 'mongoose';
-import Client from '../models/Client.js';
+import { getPool } from '../config/db.js';
 import { getAllTickets, getAllTicketsSync } from './ticketStore.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -10,6 +9,7 @@ const DATA_DIR = path.join(__dirname, '..', 'data');
 const CLIENTS_FILE = path.join(DATA_DIR, 'clients.json');
 
 let cachedClients = [];
+let lastWrittenClientsJson = null;
 
 function ensureFile() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -18,6 +18,7 @@ function ensureFile() {
 
   if (!fs.existsSync(CLIENTS_FILE)) {
     fs.writeFileSync(CLIENTS_FILE, '[]');
+    lastWrittenClientsJson = '[]';
   }
 }
 
@@ -25,16 +26,100 @@ function syncJsonBackup(clients) {
   try {
     ensureFile();
     cachedClients = Array.isArray(clients) ? [...clients] : [];
-    fs.writeFileSync(CLIENTS_FILE, JSON.stringify(clients, null, 2));
+    const serialized = JSON.stringify(clients, null, 2);
+    if (serialized === lastWrittenClientsJson) {
+      return;
+    }
+    fs.writeFileSync(CLIENTS_FILE, serialized);
+    lastWrittenClientsJson = serialized;
   } catch {
     // Non-critical backup sync
   }
 }
 
+function parseJsonColumn(val, fallback = []) {
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? parsed : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+}
+
+function serializeJson(val, defaultVal = []) {
+  if (val === null || val === undefined) return JSON.stringify(defaultVal);
+  if (typeof val === 'string') return val;
+  return JSON.stringify(val);
+}
+
+function toIsoString(val, fallback = null) {
+  if (!val) return fallback;
+  if (val instanceof Date) return val.toISOString();
+  return String(val);
+}
+
+function mapClientRow(row) {
+  if (!row) return null;
+  return {
+    id: String(row.id),
+    name: row.name || '',
+    companyName: row.companyName || '',
+    address: row.address || '',
+    website: row.website || '',
+    mobileNumber: row.mobileNumber || '',
+    email: row.email || '',
+    whatsappNumber: row.whatsappNumber || '',
+    cityState: row.cityState || '',
+    monthlyRental: Number.isFinite(Number(row.monthlyRental)) ? Number(row.monthlyRental) : 0,
+    services: parseJsonColumn(row.services, []),
+    features: parseJsonColumn(row.features, []),
+    servicesFeatures: parseJsonColumn(row.servicesFeatures, []),
+    status: row.status === 'inactive' ? 'inactive' : 'active',
+    createdBy: row.createdBy || 'Admin User',
+    ticketCount: Number.isFinite(Number(row.ticketCount)) ? Number(row.ticketCount) : 0,
+    tickets: parseJsonColumn(row.tickets, []),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function buildClientDbParams(c) {
+  const now = new Date().toISOString();
+  return [
+    String(c.id),
+    String(c.name || ''),
+    String(c.companyName || ''),
+    c.address ?? '',
+    String(c.website || ''),
+    String(c.mobileNumber || ''),
+    String(c.email || ''),
+    String(c.whatsappNumber || ''),
+    String(c.cityState || ''),
+    Number.isFinite(Number(c.monthlyRental)) ? Number(c.monthlyRental) : 0,
+    serializeJson(c.services, []),
+    serializeJson(c.features, []),
+    serializeJson(c.servicesFeatures, []),
+    c.status === 'inactive' ? 'inactive' : 'active',
+    String(c.createdBy || 'Admin User'),
+    Number.isFinite(Number(c.ticketCount)) ? Number(c.ticketCount) : 0,
+    serializeJson(c.tickets, []),
+    toIsoString(c.createdAt, now),
+    toIsoString(c.updatedAt, now),
+  ];
+}
+
 export function getAllClientsSync() {
+  if (cachedClients.length > 0) {
+    return cachedClients;
+  }
   if (fs.existsSync(CLIENTS_FILE)) {
     try {
       const raw = fs.readFileSync(CLIENTS_FILE, 'utf-8');
+      lastWrittenClientsJson = raw;
       const parsed = JSON.parse(raw);
       cachedClients = Array.isArray(parsed) ? parsed : [];
       return cachedClients;
@@ -81,15 +166,11 @@ function cleanStringArray(arr) {
   return [];
 }
 
-function escapeRegExp(str) {
-  return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 /**
  * Synchronizes client data with ticket customers, removing mock/dummy data.
- * Optionally merges onto a provided base client list (e.g. from MongoDB).
+ * Optionally merges onto a provided base client list and base ticket list (from MySQL).
  */
-export function syncClientsWithTickets(baseClients = null) {
+export function syncClientsWithTickets(baseClients = null, baseTickets = null) {
   ensureFile();
   let existingClients = [];
 
@@ -99,7 +180,6 @@ export function syncClientsWithTickets(baseClients = null) {
     existingClients = getAllClientsSync();
   }
 
-  // Remove dummy/mock clients
   const dummyNames = [
     'amitabh sharma',
     'priya nair',
@@ -114,22 +194,18 @@ export function syncClientsWithTickets(baseClients = null) {
     return !dummyNames.includes(name) && !dummyNames.includes(comp);
   });
 
-  // Read tickets safely
   let tickets = [];
-  try {
-    const res = getAllTickets();
-    if (res && typeof res.then === 'function') {
-      tickets = getAllTicketsSync();
-    } else if (Array.isArray(res)) {
-      tickets = res;
-    } else {
-      tickets = getAllTicketsSync();
+  if (Array.isArray(baseTickets)) {
+    tickets = baseTickets;
+  } else {
+    try {
+      const res = getAllTicketsSync();
+      tickets = Array.isArray(res) ? res : [];
+    } catch {
+      tickets = [];
     }
-  } catch {
-    tickets = getAllTicketsSync();
   }
 
-  // Group tickets by customer mobile or customer name
   const customerMap = new Map();
 
   tickets.forEach((ticket) => {
@@ -183,23 +259,38 @@ export function syncClientsWithTickets(baseClients = null) {
 
   let nextCliNumber = 1001;
   const mergedClients = [...existingClients];
+  const indexByMobile = new Map();
+  const indexByName = new Map();
 
-  mergedClients.forEach((c) => {
+  mergedClients.forEach((c, idx) => {
     const m = String(c.id || '').match(/^CLI-(\d+)$/i);
     if (m) {
       nextCliNumber = Math.max(nextCliNumber, Number(m[1]) + 1);
+    }
+    const cMob = String(c.mobileNumber || '').replace(/\D/g, '');
+    if (cMob && !indexByMobile.has(cMob)) {
+      indexByMobile.set(cMob, idx);
+    }
+    const cName = String(c.name || '').trim().toLowerCase();
+    if (cName && !indexByName.has(cName)) {
+      indexByName.set(cName, idx);
+    }
+    const cComp = String(c.companyName || '').trim().toLowerCase();
+    if (cComp && !indexByName.has(cComp)) {
+      indexByName.set(cComp, idx);
     }
   });
 
   const findExistingIndex = (group) => {
     const normMob = (group.mobileNumber || '').replace(/\D/g, '');
-    const normName = (group.name || '').toLowerCase();
-    return mergedClients.findIndex((c) => {
-      const cMob = (c.mobileNumber || '').replace(/\D/g, '');
-      const cName = (c.name || '').toLowerCase();
-      const cComp = (c.companyName || '').toLowerCase();
-      return (normMob && cMob && normMob === cMob) || (normName && (cName === normName || cComp === normName));
-    });
+    if (normMob && indexByMobile.has(normMob)) {
+      return indexByMobile.get(normMob);
+    }
+    const normName = (group.name || '').trim().toLowerCase();
+    if (normName && indexByName.has(normName)) {
+      return indexByName.get(normName);
+    }
+    return -1;
   };
 
   customerMap.forEach((group) => {
@@ -287,42 +378,79 @@ export function syncClientsWithTickets(baseClients = null) {
   return mergedClients;
 }
 
+const CLIENT_UPSERT_SQL = `
+  INSERT INTO clients
+    (id, name, companyName, address, website, mobileNumber, email, whatsappNumber,
+     cityState, monthlyRental, services, features, servicesFeatures, status,
+     createdBy, ticketCount, tickets, createdAt, updatedAt)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ON DUPLICATE KEY UPDATE
+    name = VALUES(name),
+    companyName = VALUES(companyName),
+    address = VALUES(address),
+    website = VALUES(website),
+    mobileNumber = VALUES(mobileNumber),
+    email = VALUES(email),
+    whatsappNumber = VALUES(whatsappNumber),
+    cityState = VALUES(cityState),
+    monthlyRental = VALUES(monthlyRental),
+    services = VALUES(services),
+    features = VALUES(features),
+    servicesFeatures = VALUES(servicesFeatures),
+    status = VALUES(status),
+    ticketCount = VALUES(ticketCount),
+    tickets = VALUES(tickets),
+    updatedAt = VALUES(updatedAt)
+`;
+
+async function refreshClientsBackup(pool) {
+  try {
+    const [rows] = await pool.query('SELECT * FROM clients');
+    const mapped = rows.map(mapClientRow);
+    syncJsonBackup(mapped);
+    return mapped;
+  } catch {
+    return cachedClients;
+  }
+}
+
 export async function getAllClients() {
-  if (mongoose.connection.readyState === 1) {
-    const docs = await Client.find({}).lean();
-    const mapped = docs.map((c) => ({
-      ...c,
-      _id: c._id?.toString(),
-    }));
-    const synced = syncClientsWithTickets(mapped);
+  const pool = getPool();
+  if (pool) {
+    const [[rows], allTickets] = await Promise.all([
+      pool.query('SELECT * FROM clients'),
+      getAllTickets(),
+    ]);
+    const mapped = rows.map(mapClientRow);
+    const synced = syncClientsWithTickets(mapped, allTickets);
     return sortClientsList(synced);
   }
 
-  const clients = syncClientsWithTickets();
+  const allTickets = await getAllTickets();
+  const clients = syncClientsWithTickets(null, allTickets);
   return sortClientsList(clients);
 }
 
 export async function saveAllClients(items) {
-  if (mongoose.connection.readyState === 1 && Array.isArray(items)) {
+  const pool = getPool();
+  if (pool && Array.isArray(items)) {
     for (const c of items) {
       if (!c.id) continue;
-      await Client.findOneAndUpdate(
-        { id: String(c.id) },
-        { $set: c },
-        { upsert: true, returnDocument: 'after' }
-      );
+      await pool.execute(CLIENT_UPSERT_SQL, buildClientDbParams(c));
     }
   }
   syncJsonBackup(items);
 }
 
 export async function findClientById(id) {
-  if (mongoose.connection.readyState === 1) {
-    const doc = await Client.findOne({
-      id: { $regex: new RegExp(`^${escapeRegExp(id)}$`, 'i') },
-    }).lean();
-    if (doc) {
-      return { ...doc, _id: doc._id?.toString() };
+  const pool = getPool();
+  if (pool) {
+    const [rows] = await pool.execute(
+      'SELECT * FROM clients WHERE LOWER(id) = LOWER(?) LIMIT 1',
+      [String(id)]
+    );
+    if (rows.length > 0) {
+      return mapClientRow(rows[0]);
     }
   }
 
@@ -331,12 +459,12 @@ export async function findClientById(id) {
 }
 
 export async function addClient(item) {
-  if (mongoose.connection.readyState === 1) {
-    const created = await Client.create(item);
-    const result = created.toObject();
-    const all = await Client.find({}).lean();
-    syncJsonBackup(all.map((c) => ({ ...c, _id: c._id?.toString() })));
-    return result;
+  const pool = getPool();
+  if (pool) {
+    await pool.execute(CLIENT_UPSERT_SQL, buildClientDbParams(item));
+    const created = await findClientById(item.id);
+    await refreshClientsBackup(pool);
+    return created || item;
   }
 
   const items = await getAllClients();
@@ -345,22 +473,63 @@ export async function addClient(item) {
   return item;
 }
 
+const CLIENT_UPDATABLE_COLUMNS = new Set([
+  'name',
+  'companyName',
+  'address',
+  'website',
+  'mobileNumber',
+  'email',
+  'whatsappNumber',
+  'cityState',
+  'monthlyRental',
+  'services',
+  'features',
+  'servicesFeatures',
+  'status',
+  'createdBy',
+  'ticketCount',
+  'tickets',
+  'updatedAt',
+]);
+
 export async function updateClient(id, updates) {
   const stampedUpdates = {
     ...updates,
     updatedAt: new Date().toISOString(),
   };
 
-  if (mongoose.connection.readyState === 1) {
-    const updated = await Client.findOneAndUpdate(
-      { id: { $regex: new RegExp(`^${escapeRegExp(id)}$`, 'i') } },
-      { $set: stampedUpdates },
-      { returnDocument: 'after' }
-    ).lean();
-    if (updated) {
-      const all = await Client.find({}).lean();
-      syncJsonBackup(all.map((c) => ({ ...c, _id: c._id?.toString() })));
-      return { ...updated, _id: updated._id?.toString() };
+  const pool = getPool();
+  if (pool) {
+    const entries = Object.entries(stampedUpdates).filter(([key]) =>
+      CLIENT_UPDATABLE_COLUMNS.has(key)
+    );
+    const setClauses = entries.map(([key]) => `\`${key}\` = ?`).join(', ');
+    const values = entries.map(([key, val]) => {
+      if (key === 'services' || key === 'features' || key === 'servicesFeatures' || key === 'tickets') {
+        return serializeJson(val, []);
+      }
+      if (key === 'monthlyRental') {
+        return Number.isFinite(Number(val)) ? Number(val) : 0;
+      }
+      if (key === 'ticketCount') {
+        return Number.isFinite(Number(val)) ? Number(val) : 0;
+      }
+      if (key === 'status') {
+        return val === 'inactive' ? 'inactive' : 'active';
+      }
+      return val === undefined ? null : val;
+    });
+    values.push(String(id));
+
+    const [result] = await pool.execute(
+      `UPDATE clients SET ${setClauses} WHERE LOWER(id) = LOWER(?)`,
+      values
+    );
+    if (result.affectedRows > 0) {
+      const updated = await findClientById(id);
+      await refreshClientsBackup(pool);
+      return updated;
     }
   }
 
@@ -379,14 +548,13 @@ export async function updateClient(id, updates) {
 }
 
 export async function deleteClient(id) {
-  if (mongoose.connection.readyState === 1) {
-    const removed = await Client.findOneAndDelete({
-      id: { $regex: new RegExp(`^${escapeRegExp(id)}$`, 'i') },
-    }).lean();
-    if (removed) {
-      const all = await Client.find({}).lean();
-      syncJsonBackup(all.map((c) => ({ ...c, _id: c._id?.toString() })));
-      return { ...removed, _id: removed._id?.toString() };
+  const pool = getPool();
+  if (pool) {
+    const existing = await findClientById(id);
+    if (existing) {
+      await pool.execute('DELETE FROM clients WHERE LOWER(id) = LOWER(?)', [String(id)]);
+      await refreshClientsBackup(pool);
+      return existing;
     }
   }
 
@@ -402,8 +570,8 @@ export async function deleteClient(id) {
 }
 
 /**
- * Bulk imports or updates multiple clients cleanly in one batch.
- * Persists to MongoDB via insertMany/bulkWrite when connected and updates JSON backup.
+ * Bulk imports or updates multiple clients cleanly in one transaction.
+ * Persists to MySQL via parameterized queries when connected and updates JSON backup.
  */
 export async function bulkUpsertClients(
   rawRows = [],
@@ -523,25 +691,22 @@ export async function bulkUpsertClients(
     byMobile.set(digitsMobile, newClient);
   });
 
-  if (mongoose.connection.readyState === 1) {
-    if (toInsert.length > 0) {
-      await Client.insertMany(toInsert, { ordered: false });
+  const pool = getPool();
+  if (pool) {
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      for (const doc of [...toInsert, ...toUpdate]) {
+        await conn.execute(CLIENT_UPSERT_SQL, buildClientDbParams(doc));
+      }
+      await conn.commit();
+    } catch (txErr) {
+      await conn.rollback();
+      throw txErr;
+    } finally {
+      conn.release();
     }
-    if (toUpdate.length > 0) {
-      const bulkOps = toUpdate.map((doc) => {
-        const { _id, ...fields } = doc;
-        return {
-          updateOne: {
-            filter: { id: doc.id },
-            update: { $set: fields },
-            upsert: true,
-          },
-        };
-      });
-      await Client.bulkWrite(bulkOps);
-    }
-    const refreshed = await Client.find({}).lean();
-    syncJsonBackup(refreshed.map((c) => ({ ...c, _id: c._id?.toString() })));
+    await refreshClientsBackup(pool);
   } else {
     const updateMap = new Map(toUpdate.map((u) => [u.id, u]));
     const updatedList = existingClients.map((c) => updateMap.get(c.id) || c);

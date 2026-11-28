@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import {
   Routes,
   Route,
@@ -6,8 +6,9 @@ import {
   useNavigate,
 } from 'react-router-dom';
 import LoginPage from './components/LoginPage.jsx';
-import DashboardPage from './pages/DashboardPage.jsx';
-import RaiseTicketPage from './modules/raise-ticket/RaiseTicketPage.jsx';
+
+const DashboardPage = lazy(() => import('./pages/DashboardPage.jsx'));
+const RaiseTicketPage = lazy(() => import('./modules/raise-ticket/RaiseTicketPage.jsx'));
 
 import {
   loginUser,
@@ -150,7 +151,24 @@ export default function App() {
   }
 
   return (
-    <>
+    <Suspense
+      fallback={
+        <div
+          style={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: "'Inter', system-ui, sans-serif",
+            color: '#64748b',
+            fontSize: '14px',
+            background: '#f8fafc',
+          }}
+        >
+          Loading RI-Desk...
+        </div>
+      }
+    >
       <Routes>
         {/* Standalone Public Raise Ticket Route */}
         <Route path="/raise-ticket" element={<RaiseTicketPage />} />
@@ -182,6 +200,6 @@ export default function App() {
           }
         />
       </Routes>
-    </>
+    </Suspense>
   );
 }

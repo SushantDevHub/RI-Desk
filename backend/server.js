@@ -1,8 +1,12 @@
 import './config/env.js';
 import express from 'express';
 import cors from 'cors';
-import mongoose from 'mongoose';
-import { connectDB } from './config/db.js';
+import {
+  connectDB,
+  isDatabaseConnected,
+  getDbConfigInfo,
+  closeDB,
+} from './config/db.js';
 import authRoutes from './routes/auth.js';
 import ticketsRoutes from './routes/tickets.js';
 import usersRoutes from './routes/users.js';
@@ -13,6 +17,7 @@ import notificationsRoutes from './routes/notifications.js';
 import raiseTicketRoutes from './modules/tickets/ticketRoutes.js';
 
 const app = express();
+app.disable('x-powered-by');
 const PORT = process.env.PORT || 4000;
 
 // Respect X-Forwarded-For behind reverse proxies (Nginx, Cloudflare, Render, etc.)
@@ -51,28 +56,29 @@ app.use('/api/notifications', notificationsRoutes);
 
 // Health check endpoint with database status
 app.get('/api/health', (req, res) => {
-  const isDbConnected = Boolean(mongoose.connection && mongoose.connection.readyState === 1);
+  const isDbConnected = isDatabaseConnected();
+  const dbInfo = getDbConfigInfo();
   return res.json({
     status: 'ok',
     database: isDbConnected ? 'connected' : 'disconnected',
-    databaseHost: isDbConnected ? mongoose.connection.host : null,
-    databaseName: isDbConnected ? mongoose.connection.name : null,
-    storageMode: isDbConnected ? 'mongodb' : 'json-fallback',
+    databaseHost: isDbConnected ? `${dbInfo.host}:${dbInfo.port}` : null,
+    databaseName: isDbConnected ? dbInfo.database : null,
+    storageMode: isDbConnected ? 'mysql' : 'json-fallback',
     timestamp: new Date().toISOString(),
   });
 });
 
 /**
- * Connect to MongoDB Atlas first, then start Express server.
+ * Connect to MySQL first, then start Express server.
  * Handles database connection errors properly.
  */
 async function startServer() {
   try {
-    console.log('[Startup] Initializing database connection...');
-    const conn = await connectDB();
-    const isDbConnected = Boolean(conn && mongoose.connection.readyState === 1);
+    console.log('[Startup] Initializing MySQL database connection...');
+    await connectDB();
+    const isDbConnected = isDatabaseConnected();
     console.log(
-      `[Startup] Database initialized (${isDbConnected ? 'MongoDB Atlas' : 'Local Data Mode'}).`
+      `[Startup] Database initialized (${isDbConnected ? 'MySQL (ri_desk)' : 'Local JSON Fallback Mode'}).`
     );
 
     const server = app.listen(PORT, () => {
@@ -81,11 +87,9 @@ async function startServer() {
 
     // Graceful shutdown
     process.on('SIGTERM', async () => {
-      console.log('SIGTERM signal received. Closing HTTP server and database connection...');
+      console.log('SIGTERM signal received. Closing HTTP server and MySQL pool...');
       server.close(async () => {
-        if (mongoose.connection && mongoose.connection.readyState === 1) {
-          await mongoose.connection.close(false);
-        }
+        await closeDB();
         console.log('Server closed.');
         process.exit(0);
       });
@@ -102,4 +106,3 @@ async function startServer() {
 startServer();
 
 export default app;
- 

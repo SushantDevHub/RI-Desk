@@ -4,8 +4,8 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   build: {
-    minify: false,
-    cssMinify: false,
+    minify: 'esbuild',
+    cssMinify: true,
     rollupOptions: {
       output: {
         entryFileNames: 'assets/app-bundle.js',

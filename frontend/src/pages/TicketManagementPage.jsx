@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { getToken } from '../api/authApi.js';
 import { API_BASE } from '../config/api.js';
 import ContactClientDialog from '../components/ContactClientDialog.jsx';
@@ -603,12 +603,20 @@ export default function TicketManagementPage() {
   const [assignmentFilter, setAssignmentFilter] = useState('all');
   const [staffFilter, setStaffFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const isAdmin = getCurrentRole() === 'admin';
+  const ticketsInFlightRef = useRef(false);
+  const lastTicketsSnapshotRef = useRef('');
 
   /* ---------- Data loading ---------- */
 
   async function fetchTickets(isBackground = false) {
+    if (isBackground && (ticketsInFlightRef.current || document.visibilityState !== 'visible')) {
+      return;
+    }
+    ticketsInFlightRef.current = true;
     try {
       if (!isBackground) {
         setLoading(true);
@@ -618,8 +626,23 @@ export default function TicketManagementPage() {
       const response = await fetch(`${API}/tickets`, {
         headers: authHeaders(),
       });
-      const data = await readResponse(response);
+      const text = await response.text();
+      if (isBackground && response.ok && text && text === lastTicketsSnapshotRef.current) {
+        return;
+      }
 
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = { error: text || `Request failed (${response.status}).` };
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || `Request failed (${response.status}).`);
+      }
+
+      lastTicketsSnapshotRef.current = text;
       const ticketList = Array.isArray(data.tickets) ? data.tickets : [];
       setTickets(ticketList);
 
@@ -647,6 +670,7 @@ export default function TicketManagementPage() {
         setError(err.message || 'Failed to load tickets.');
       }
     } finally {
+      ticketsInFlightRef.current = false;
       if (!isBackground) {
         setLoading(false);
       }
@@ -733,10 +757,10 @@ export default function TicketManagementPage() {
     fetchTickets(false);
     fetchEmployees();
 
-    // Fast live auto-refresh every 1500ms
+    // Smooth background auto-refresh when tab is visible
     const interval = setInterval(() => {
       fetchTickets(true);
-    }, 1500);
+    }, 6000);
 
     function onVisibilityChange() {
       if (document.visibilityState === 'visible') {
@@ -766,6 +790,10 @@ export default function TicketManagementPage() {
     }, 2000);
     return () => clearTimeout(timer);
   }, [message]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, categoryFilter, priorityFilter, assignmentFilter, staffFilter, pageSize]);
 
   /* ---------- Create ---------- */
 
@@ -1226,6 +1254,15 @@ export default function TicketManagementPage() {
       });
     });
 
+  const effectivePageSize = pageSize === 'all' ? Math.max(1, filteredTickets.length) : pageSize;
+  const totalPages = Math.max(1, Math.ceil(filteredTickets.length / effectivePageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (safeCurrentPage - 1) * effectivePageSize;
+  const paginatedTickets =
+    pageSize === 'all'
+      ? filteredTickets
+      : filteredTickets.slice(pageStartIndex, pageStartIndex + effectivePageSize);
+
   /* ---------- Render ---------- */
 
   return (
@@ -1379,6 +1416,42 @@ export default function TicketManagementPage() {
         </div>
       )}
 
+      {/* ── Rows Filter Bar (Just Below Search Nav) ── */}
+      <div className="ticket-rows-bar">
+        <div className="ticket-rows-summary">
+          {filteredTickets.length === 0 ? (
+            <span>Showing <strong>0</strong> tickets</span>
+          ) : (
+            <span>
+              Showing{' '}
+              <strong>
+                {pageStartIndex + 1}–{Math.min(pageStartIndex + paginatedTickets.length, filteredTickets.length)}
+              </strong>{' '}
+              of <strong>{filteredTickets.length}</strong> ticket
+              {filteredTickets.length === 1 ? '' : 's'}
+            </span>
+          )}
+        </div>
+
+        <label className="ticket-pagesize-label">
+          <span>Rows:</span>
+          <select
+            className="ticket-filter-select ticket-pagesize-select"
+            value={pageSize}
+            onChange={(e) => {
+              const val = e.target.value;
+              setPageSize(val === 'all' ? 'all' : Number(val));
+            }}
+            aria-label="Ticket rows per page"
+          >
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value="all">All</option>
+          </select>
+        </label>
+      </div>
+
       {message && (
         <div className="ticket-notice ticket-success" role="status">
           {message}
@@ -1424,11 +1497,6 @@ export default function TicketManagementPage() {
           </div>
         ) : (
           <>
-            <div className="ticket-results-count">
-              Showing {filteredTickets.length}{' '}
-              {filteredTickets.length === 1 ? 'ticket' : 'tickets'}
-            </div>
-
             <div className="ticket-table-scroll">
               <table className="db-table">
                 <thead>
@@ -1446,7 +1514,7 @@ export default function TicketManagementPage() {
                 </thead>
 
                 <tbody>
-                  {filteredTickets.map((ticket) => {
+                  {paginatedTickets.map((ticket) => {
                     const isResolved = ticket.status === 'resolved';
                     const isNew = !isResolved && isTicketNew(ticket.createdAt, ticket.status);
                     const isJustCreated = !isResolved && newlyCreatedTicketId === ticket.id;
@@ -1922,6 +1990,40 @@ export default function TicketManagementPage() {
                 </tbody>
               </table>
             </div>
+            {filteredTickets.length > 0 && totalPages > 1 && (
+              <div className="ticket-pagination-bar">
+                <div className="ticket-pagination-info">
+                  Showing{' '}
+                  <strong>
+                    {pageStartIndex + 1}–{Math.min(pageStartIndex + paginatedTickets.length, filteredTickets.length)}
+                  </strong>{' '}
+                  of <strong>{filteredTickets.length}</strong> ticket
+                  {filteredTickets.length === 1 ? '' : 's'}
+                </div>
+
+                <div className="ticket-page-btns">
+                  <button
+                    type="button"
+                    className="ticket-page-btn"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={safeCurrentPage <= 1}
+                  >
+                    ‹ Prev
+                  </button>
+                  <span className="ticket-page-indicator">
+                    Page <strong>{safeCurrentPage}</strong> / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    className="ticket-page-btn"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={safeCurrentPage >= totalPages}
+                  >
+                    Next ›
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

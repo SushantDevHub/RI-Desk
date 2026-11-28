@@ -70,6 +70,22 @@ export function deleteMobileNotification(id) {
 }
 
 /**
+ * Identify notification channel ('whatsapp' | 'email' | 'app').
+ */
+export function getNotificationChannel(n) {
+  const ch = String(n?.channel || '').trim().toLowerCase();
+  if (ch === 'whatsapp' || ch === 'email') return ch;
+  const t = String(n?.type || '').trim().toLowerCase();
+  if (t === 'whatsapp_notification') return 'whatsapp';
+  if (t === 'email_notification') return 'email';
+  return 'app';
+}
+
+function isChannelNotification(n, channel) {
+  return getNotificationChannel(n) === channel;
+}
+
+/**
  * Check if a user is an intended recipient of a notification.
  */
 function isUserRecipient(n, userId, userRole = 'employee') {
@@ -133,34 +149,123 @@ function isNotificationReadByUser(n, userId) {
   return false;
 }
 
+function formatNotificationForUser(n, userId, allUsers) {
+  let resolvedRecipientName = n.recipientName;
+  if (!resolvedRecipientName && n.recipientId) {
+    resolvedRecipientName = allUsers.find((u) => String(u.id) === String(n.recipientId))?.name || '';
+  }
+  let resolvedSenderName = n.senderName;
+  if (!resolvedSenderName && n.senderId) {
+    resolvedSenderName = allUsers.find((u) => String(u.id) === String(n.senderId))?.name || 'A team member';
+  }
+
+  return {
+    ...n,
+    channel: getNotificationChannel(n),
+    recipientName: resolvedRecipientName,
+    senderName: resolvedSenderName,
+    read: isNotificationReadByUser(n, userId),
+  };
+}
+
 export function getNotificationsForUser(userId, userRole = 'employee') {
   const allUsers = getAllUsersSync();
   const all = getAllNotifications();
   return all
-    .filter((n) => isUserRecipient(n, userId, userRole))
-    .map((n) => {
-      let resolvedRecipientName = n.recipientName;
-      if (!resolvedRecipientName && n.recipientId) {
-        resolvedRecipientName = allUsers.find((u) => String(u.id) === String(n.recipientId))?.name || '';
-      }
-      let resolvedSenderName = n.senderName;
-      if (!resolvedSenderName && n.senderId) {
-        resolvedSenderName = allUsers.find((u) => String(u.id) === String(n.senderId))?.name || 'A team member';
-      }
-
-      return {
-        ...n,
-        recipientName: resolvedRecipientName,
-        senderName: resolvedSenderName,
-        read: isNotificationReadByUser(n, userId),
-      };
-    })
+    .filter((n) => getNotificationChannel(n) === 'app' && isUserRecipient(n, userId, userRole))
+    .map((n) => formatNotificationForUser(n, userId, allUsers))
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export function getUnreadCountForUser(userId, userRole = 'employee') {
   const all = getAllNotifications();
-  return all.filter((n) => isUserRecipient(n, userId, userRole) && !isNotificationReadByUser(n, userId)).length;
+  return all.filter(
+    (n) =>
+      getNotificationChannel(n) === 'app' &&
+      isUserRecipient(n, userId, userRole) &&
+      !isNotificationReadByUser(n, userId)
+  ).length;
+}
+
+export function getChannelNotificationsForAdmin(userId, channel) {
+  const normChannel = String(channel || '').toLowerCase();
+  if (normChannel !== 'whatsapp' && normChannel !== 'email') return [];
+  const allUsers = getAllUsersSync();
+  const all = getAllNotifications();
+  return all
+    .filter((n) => isChannelNotification(n, normChannel))
+    .map((n) => formatNotificationForUser(n, userId, allUsers))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+export function getChannelUnreadCountForAdmin(userId, channel) {
+  const normChannel = String(channel || '').toLowerCase();
+  if (normChannel !== 'whatsapp' && normChannel !== 'email') return 0;
+  const all = getAllNotifications();
+  return all.filter(
+    (n) => isChannelNotification(n, normChannel) && !isNotificationReadByUser(n, userId)
+  ).length;
+}
+
+export function createChannelNotification({
+  channel,
+  senderId = null,
+  senderName = '',
+  senderRole = 'employee',
+  recipientId = null,
+  recipientName = 'Admin',
+  ticketId = null,
+  ticketNumber = null,
+  ticketSubject = '',
+  title = '',
+  message = '',
+  contactInfo = '',
+  clientName = '',
+}) {
+  const normChannel = String(channel || '').trim().toLowerCase();
+  if (normChannel !== 'whatsapp' && normChannel !== 'email') {
+    throw new Error('Notification channel must be "whatsapp" or "email".');
+  }
+
+  const allUsers = getAllUsersSync();
+  const resolvedSenderName =
+    senderName ||
+    allUsers.find((u) => String(u.id) === String(senderId))?.name ||
+    'Team Member';
+
+  const cleanTitle =
+    String(title || '').trim() ||
+    (normChannel === 'whatsapp'
+      ? `WhatsApp Query${ticketNumber || ticketId ? ` on Ticket #${ticketNumber || ticketId}` : ''}`
+      : `Email Query${ticketNumber || ticketId ? ` on Ticket #${ticketNumber || ticketId}` : ''}`);
+
+  const cleanMessage = String(message || '').trim();
+  const all = getAllNotifications();
+  const newNotif = {
+    id: `notif_${normChannel}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    type: `${normChannel}_notification`,
+    channel: normChannel,
+    recipientRole: 'admin',
+    recipientId: recipientId || null,
+    recipientName: recipientName || 'Admin',
+    senderId: senderId || null,
+    senderName: resolvedSenderName,
+    senderRole: senderRole || 'employee',
+    ticketId: ticketId || null,
+    ticketNumber: ticketNumber || ticketId || null,
+    ticketSubject: ticketSubject || '',
+    clientName: clientName || '',
+    contactInfo: contactInfo || '',
+    title: cleanTitle,
+    message: cleanMessage,
+    read: false,
+    readBy: [],
+    createdAt: new Date().toISOString(),
+  };
+
+  all.unshift(newNotif);
+  saveAllNotifications(all);
+  return newNotif;
 }
 
 export function addNotification({
@@ -354,12 +459,27 @@ export function markNotificationRead(notificationId, userId) {
   return all[index];
 }
 
-export function markAllNotificationsRead(userId, userRole = 'employee') {
+export function markAllNotificationsRead(userId, userRole = 'employee', channel = null) {
   const all = getAllNotifications();
+  const normRole = String(userRole || '').toLowerCase();
+  const normChannel = channel ? String(channel).trim().toLowerCase() : null;
   let updatedCount = 0;
 
   const updated = all.map((n) => {
-    if (isUserRecipient(n, userId, userRole)) {
+    const itemChannel = getNotificationChannel(n);
+    const channelMatches =
+      normChannel === 'whatsapp' || normChannel === 'email'
+        ? itemChannel === normChannel
+        : itemChannel === 'app';
+
+    if (!channelMatches) return n;
+
+    const isRecipient =
+      normChannel === 'whatsapp' || normChannel === 'email'
+        ? normRole === 'admin'
+        : isUserRecipient(n, userId, userRole);
+
+    if (isRecipient) {
       const readBy = Array.isArray(n.readBy) ? [...n.readBy] : [];
       if (!readBy.map(String).includes(String(userId))) {
         readBy.push(String(userId));

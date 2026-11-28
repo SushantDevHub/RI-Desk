@@ -137,7 +137,7 @@ export async function raiseNewTicket(ticketData) {
     logs: [initialLog],
   };
 
-  // Persist ticket to MongoDB storage
+  // Persist ticket to MySQL storage
   await addTicket(newTicket);
 
   // Sync with client list so customer profile is indexed if applicable

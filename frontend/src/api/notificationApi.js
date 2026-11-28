@@ -21,12 +21,16 @@ async function req(url, options = {}) {
   return data;
 }
 
-// Get user notifications and unread count
+// Get user notifications and unread count (plus WhatsApp & Email counts for admin)
 export async function getNotifications() {
   const data = await req(API_BASE);
   return {
     notifications: Array.isArray(data.notifications) ? data.notifications : [],
     unreadCount: typeof data.unreadCount === 'number' ? data.unreadCount : 0,
+    whatsappNotifications: Array.isArray(data.whatsappNotifications) ? data.whatsappNotifications : [],
+    whatsappUnreadCount: typeof data.whatsappUnreadCount === 'number' ? data.whatsappUnreadCount : 0,
+    emailNotifications: Array.isArray(data.emailNotifications) ? data.emailNotifications : [],
+    emailUnreadCount: typeof data.emailUnreadCount === 'number' ? data.emailUnreadCount : 0,
   };
 }
 
@@ -37,10 +41,41 @@ export async function markNotificationRead(id) {
   });
 }
 
-// Mark all user notifications as read
-export async function markAllNotificationsRead() {
+// Mark all user notifications as read (optionally scoped to 'whatsapp' or 'email')
+export async function markAllNotificationsRead(channel = null) {
   return await req(`${API_BASE}/mark-all-read`, {
     method: 'POST',
+    body: JSON.stringify(channel ? { channel } : {}),
+  });
+}
+
+// Create a WhatsApp or Email notification for Admin
+export async function sendChannelNotification({
+  channel,
+  ticketId = null,
+  ticketNumber = null,
+  ticketSubject = '',
+  title = '',
+  message = '',
+  contactInfo = '',
+  clientName = '',
+  recipientId = null,
+  recipientName = 'Admin',
+}) {
+  return await req(`${API_BASE}/channel`, {
+    method: 'POST',
+    body: JSON.stringify({
+      channel,
+      ticketId,
+      ticketNumber,
+      ticketSubject,
+      title,
+      message,
+      contactInfo,
+      clientName,
+      recipientId,
+      recipientName,
+    }),
   });
 }
 

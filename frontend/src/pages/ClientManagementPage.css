@@ -2058,6 +2058,100 @@
   color: #3730a3;
 }
 
+/* ── Rows Bar (Just Below Search Nav) ── */
+.client-rows-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: -8px;
+  margin-bottom: 12px;
+}
+
+.client-rows-summary {
+  font-size: 12.5px;
+  color: #475569;
+}
+
+/* ── Pagination Bar ── */
+.client-pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.client-pagination-info {
+  font-size: 12.5px;
+  color: #475569;
+}
+
+.client-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.client-pagesize-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.client-pagesize-select {
+  padding: 5px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.client-page-btns {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.client-page-btn {
+  padding: 6px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.client-page-btn:hover:not(:disabled) {
+  background: #eef2ff;
+  border-color: #a5b4fc;
+  color: #3730a3;
+}
+
+.client-page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.client-page-indicator {
+  font-size: 12.5px;
+  color: #475569;
+}
+
 .client-template-dl-btn:hover {
   background: #f1f5f9;
   border-color: #94a3b8;

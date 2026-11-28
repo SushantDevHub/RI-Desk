@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getToken } from '../api/authApi.js';
+import { sendChannelNotification } from '../api/notificationApi.js';
 import { API_BASE } from '../config/api.js';
 import './AskAdminDialog.css';
 
@@ -114,6 +115,28 @@ export default function AskAdminDialog({ ticket, currentUser, onClose }) {
     return lines.join('\n');
   }
 
+  function notifyAdminChannel(channel, title, message, contactInfo) {
+    sendChannelNotification({
+      channel,
+      ticketId: ticket.id,
+      ticketNumber: ticket.ticketNumber || ticket.id,
+      ticketSubject: ticket.description || ticket.category || 'Support Ticket',
+      title,
+      message,
+      contactInfo,
+      clientName,
+      recipientId: admin.id || null,
+      recipientName: admin.name || 'Admin',
+    })
+      .then(() => {
+        window.dispatchEvent(new CustomEvent('notifications-updated'));
+        try {
+          localStorage.setItem('ri_desk_notif_sync', String(Date.now()));
+        } catch {}
+      })
+      .catch(() => {});
+  }
+
   // Handle WhatsApp action
   function handleSendWhatsApp() {
     const rawDigits = String(admin.mobileNumber || '').replace(/\D/g, '');
@@ -123,6 +146,15 @@ export default function AskAdminDialog({ ticket, currentUser, onClose }) {
       return;
     }
     const message = buildMessageText();
+    const summaryMsg = employeeDoubt.trim()
+      ? employeeDoubt.trim()
+      : `${employeeName} sent a WhatsApp query for ${clientName}`;
+    notifyAdminChannel(
+      'whatsapp',
+      `WhatsApp query from ${employeeName} (#${ticket.ticketNumber || ticket.id})`,
+      summaryMsg,
+      admin.mobileNumber || ''
+    );
     const waUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`;
     window.open(waUrl, '_blank', 'noopener,noreferrer');
   }
@@ -136,6 +168,15 @@ export default function AskAdminDialog({ ticket, currentUser, onClose }) {
     const emailSubject = `[RI-Desk Support Query] Ticket #${ticket.id}${
       ticket.category ? ` (${ticket.category.toUpperCase()})` : ''
     }`;
+    const summaryMsg = employeeDoubt.trim()
+      ? employeeDoubt.trim()
+      : `${employeeName} sent an Email query for ${clientName}`;
+    notifyAdminChannel(
+      'email',
+      emailSubject,
+      summaryMsg,
+      admin.email || ''
+    );
     const emailBody = [
       `Hi ${admin.name || 'Admin'},`,
       ``,

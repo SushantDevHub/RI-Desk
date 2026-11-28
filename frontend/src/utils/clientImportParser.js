@@ -1,4 +1,5 @@
-import * as XLSX from 'xlsx';
+// `xlsx` is dynamically imported inside parse/download/export functions
+// so the ~970KB Excel bundle is only downloaded when the user imports or exports spreadsheets.
 
 const HEADER_ALIASES = {
   name: [
@@ -80,6 +81,7 @@ function splitListField(value) {
  * Parses an uploaded .csv, .xlsx, or .xls file into validated client rows.
  */
 export async function parseClientSpreadsheet(file) {
+  const XLSX = await import('xlsx');
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array' });
 
@@ -169,7 +171,8 @@ export async function parseClientSpreadsheet(file) {
 /**
  * Generates and triggers a download for a sample CSV or Excel template.
  */
-export function downloadClientTemplate(format = 'xlsx') {
+export async function downloadClientTemplate(format = 'xlsx') {
+  const XLSX = await import('xlsx');
   const sampleRows = [
     {
       name: 'Rajesh Sharma',
@@ -201,11 +204,12 @@ export function downloadClientTemplate(format = 'xlsx') {
 /**
  * Exports an array of client objects to an Excel (.xlsx) or CSV (.csv) file.
  */
-export function exportClientsSpreadsheet(clientsList = [], format = 'xlsx') {
+export async function exportClientsSpreadsheet(clientsList = [], format = 'xlsx') {
   if (!Array.isArray(clientsList) || clientsList.length === 0) {
     throw new Error('No clients available to download.');
   }
 
+  const XLSX = await import('xlsx');
   const rows = clientsList.map((client) => ({
     id: client.id || '',
     name: client.name || '',
